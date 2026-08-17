@@ -160,12 +160,12 @@ export const MARKER_DEFINITIONS: MarkerDefinition[] = [
   { type: 'borders', labelKey: 'editor.markers.borders', color: '#EF4444', shape: 'line', size: 8, fixedShape: true, resizable: false },
 ]
 
-export const MATERIALS: { value: MapMaterial; labelKey: string; bgColor: string; textColor: string }[] = [
-  { value: 'parchment', labelKey: 'maps.materials.parchment', bgColor: '#F5E6D3', textColor: '#5C3D1E' },
-  { value: 'paper', labelKey: 'maps.materials.paper', bgColor: '#FFFFFF', textColor: '#1F2937' },
-  { value: 'aged', labelKey: 'maps.materials.aged', bgColor: '#E8D5A3', textColor: '#6B4E1B' },
-  { value: 'leather', labelKey: 'maps.materials.leather', bgColor: '#4A2C17', textColor: '#F5E6D3' },
-  { value: 'stone', labelKey: 'maps.materials.stone', bgColor: '#9CA3AF', textColor: '#1F2937' },
+export const MATERIALS: { value: MapMaterial; labelKey: string; bgColor: string; textColor: string; image: string }[] = [
+  { value: 'parchment', labelKey: 'maps.materials.parchment', bgColor: '#F5E6D3', textColor: '#5C3D1E', image: '/materials/parchment.jpg' },
+  { value: 'paper', labelKey: 'maps.materials.paper', bgColor: '#FFFFFF', textColor: '#1F2937', image: '/materials/paper.jpg' },
+  { value: 'aged', labelKey: 'maps.materials.aged', bgColor: '#E8D5A3', textColor: '#6B4E1B', image: '/materials/aged.jpg' },
+  { value: 'leather', labelKey: 'maps.materials.leather', bgColor: '#4A2C17', textColor: '#F5E6D3', image: '/materials/leather.jpg' },
+  { value: 'stone', labelKey: 'maps.materials.stone', bgColor: '#9CA3AF', textColor: '#1F2937', image: '/materials/stone.jpg' },
 ]
 
 export const MAP_TYPES: { value: MapType; labelKey: string }[] = [

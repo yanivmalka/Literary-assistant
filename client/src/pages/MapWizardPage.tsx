@@ -69,18 +69,37 @@ export default function MapWizardPage() {
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {MATERIALS.map(({ value, labelKey, bgColor, textColor }) => (
+            {MATERIALS.map(({ value, labelKey, bgColor, textColor, image }) => (
               <button
                 key={value}
                 onClick={() => setMaterial(value)}
-                className={`p-6 border-2 rounded-lg text-center transition-all ${
+                className={`relative aspect-square border-2 rounded-lg overflow-hidden transition-all ${
                   material === value
                     ? 'ring-2 ring-primary ring-offset-2 scale-105'
                     : 'hover:scale-102'
                 }`}
-                style={{ backgroundColor: bgColor, color: textColor, borderColor: material === value ? undefined : bgColor }}
+                style={{ borderColor: material === value ? undefined : 'transparent' }}
               >
-                <span className="font-semibold text-base">{t(labelKey)}</span>
+                <img
+                  src={image}
+                  alt={t(labelKey)}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to solid color if image not found
+                    (e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+                <div
+                  className="absolute inset-0 flex items-end justify-center pb-3"
+                  style={{ backgroundColor: `${bgColor}40` }}
+                >
+                  <span
+                    className="font-semibold text-sm px-2 py-1 rounded backdrop-blur-sm"
+                    style={{ color: textColor, backgroundColor: `${bgColor}CC` }}
+                  >
+                    {t(labelKey)}
+                  </span>
+                </div>
               </button>
             ))}
           </div>
