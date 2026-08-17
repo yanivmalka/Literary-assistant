@@ -27,24 +27,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   initialized: false,
 
   initialize: async () => {
-    const { data: { session } } = await supabase.auth.getSession()
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
 
-    if (session) {
-      set({ user: session.user, session, initialized: true })
-      await get().fetchProfile()
-    } else {
-      set({ initialized: true })
-    }
-
-    // Listen for auth changes
-    supabase.auth.onAuthStateChange(async (_event, session) => {
-      set({ user: session?.user ?? null, session })
-      if (session?.user) {
+      if (session) {
+        set({ user: session.user, session, initialized: true })
         await get().fetchProfile()
       } else {
-        set({ profile: null })
+        set({ initialized: true })
       }
-    })
+
+      // Listen for auth changes
+      supabase.auth.onAuthStateChange(async (_event, session) => {
+        set({ user: session?.user ?? null, session })
+        if (session?.user) {
+          await get().fetchProfile()
+        } else {
+          set({ profile: null })
+        }
+      })
+    } catch (error) {
+      console.warn('Auth initialization failed:', error)
+      set({ initialized: true })
+    }
   },
 
   signUp: async (email, password) => {
