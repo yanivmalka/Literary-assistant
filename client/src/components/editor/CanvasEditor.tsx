@@ -2,7 +2,7 @@ import { useRef, useCallback, useEffect, useState } from 'react'
 import { Stage, Layer, Circle, Line, Text, RegularPolygon, Image as KonvaImage, Rect } from 'react-konva'
 import { useMapStore } from '@/stores/mapStore'
 import { MARKER_DEFINITIONS } from '@/lib/types'
-import type { MarkerType, CanvasMarker } from '@/lib/types'
+import type { MarkerType, CanvasMarker, MarkerShape } from '@/lib/types'
 import type Konva from 'konva'
 
 export default function CanvasEditor() {
@@ -219,15 +219,16 @@ export default function CanvasEditor() {
           {markers.map((marker) => {
             const def = getMarkerDef(marker.type)
             const isSelected = selectedMarkerId === marker.id
-            // Use per-marker overrides if set
             const markerColor = marker.color || def.color
-            const markerShape = marker.shape || def.shape
+            const markerShape = (marker.shape || def.shape) as MarkerShape
+            const markerStroke = def.strokeColor
+            const markerSize = marker.size || def.size
 
             return (
               <MarkerShape
                 key={marker.id}
                 marker={marker}
-                def={{ color: markerColor, shape: markerShape, size: def.size }}
+                def={{ color: markerColor, shape: markerShape, size: markerSize, strokeColor: markerStroke }}
                 isSelected={isSelected}
                 onClick={() => selectMarker(marker.id)}
                 onDragEnd={(e) => handleMarkerDragEnd(marker.id, e)}
@@ -275,7 +276,7 @@ export default function CanvasEditor() {
 
 interface MarkerShapeProps {
   marker: CanvasMarker
-  def: { color: string; shape: string; size: number }
+  def: { color: string; shape: string; size: number; strokeColor?: string }
   isSelected: boolean
   onClick: () => void
   onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void
@@ -291,6 +292,9 @@ function MarkerShape({ marker, def, isSelected, onClick, onDragEnd }: MarkerShap
     onDragEnd,
   }
 
+  const selStroke = isSelected ? '#000' : def.strokeColor || undefined
+  const selStrokeWidth = isSelected ? 2 : def.strokeColor ? 1.5 : 0
+
   if (def.shape === 'triangle') {
     return (
       <RegularPolygon
@@ -298,8 +302,8 @@ function MarkerShape({ marker, def, isSelected, onClick, onDragEnd }: MarkerShap
         sides={3}
         radius={def.size / 2 + 2}
         fill={def.color}
-        stroke={isSelected ? '#000' : undefined}
-        strokeWidth={isSelected ? 2 : 0}
+        stroke={selStroke}
+        strokeWidth={selStrokeWidth}
       />
     )
   }
@@ -311,21 +315,41 @@ function MarkerShape({ marker, def, isSelected, onClick, onDragEnd }: MarkerShap
         sides={5}
         radius={def.size / 2 + 2}
         fill={def.color}
-        stroke={isSelected ? '#000' : undefined}
-        strokeWidth={isSelected ? 2 : 0}
+        stroke={selStroke}
+        strokeWidth={selStrokeWidth}
       />
     )
   }
 
   if (def.shape === 'crown') {
+    // Crown rendered as a star-like polygon
     return (
       <RegularPolygon
         {...commonProps}
         sides={5}
-        radius={def.size / 2 + 2}
+        radius={def.size / 2 + 3}
         fill={def.color}
-        stroke={isSelected ? '#000' : undefined}
-        strokeWidth={isSelected ? 2 : 0}
+        stroke={selStroke || '#B45309'}
+        strokeWidth={selStrokeWidth || 1}
+        innerRadius={def.size / 4}
+      />
+    )
+  }
+
+  if (def.shape === 'square') {
+    return (
+      <Rect
+        x={marker.x - def.size / 2}
+        y={marker.y - def.size / 2}
+        width={def.size}
+        height={def.size}
+        fill={def.color}
+        stroke={selStroke}
+        strokeWidth={selStrokeWidth}
+        draggable
+        onClick={onClick}
+        onTap={onClick}
+        onDragEnd={onDragEnd}
       />
     )
   }
@@ -354,8 +378,8 @@ function MarkerShape({ marker, def, isSelected, onClick, onDragEnd }: MarkerShap
       {...commonProps}
       radius={def.shape === 'dot' ? def.size / 3 : def.size / 2}
       fill={def.color}
-      stroke={isSelected ? '#000' : undefined}
-      strokeWidth={isSelected ? 2 : 0}
+      stroke={selStroke}
+      strokeWidth={selStrokeWidth}
       opacity={def.shape === 'dot' ? 1 : 0.8}
     />
   )

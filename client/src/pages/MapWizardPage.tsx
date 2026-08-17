@@ -16,7 +16,6 @@ export default function MapWizardPage() {
   const [description, setDescription] = useState('')
   const [mapName, setMapName] = useState('')
   const [creating, setCreating] = useState(false)
-
   const handleCreate = async () => {
     if (!projectId) return
     setCreating(true)
@@ -45,14 +44,6 @@ export default function MapWizardPage() {
     }
   }
 
-  const materialColors: Record<MapMaterial, string> = {
-    parchment: 'bg-amber-50 border-amber-200',
-    paper: 'bg-white border-gray-200',
-    aged: 'bg-yellow-50 border-yellow-300',
-    leather: 'bg-amber-900/10 border-amber-800/30',
-    stone: 'bg-gray-100 border-gray-300',
-  }
-
   return (
     <div className="max-w-3xl mx-auto p-6">
       {/* Progress indicator */}
@@ -78,20 +69,18 @@ export default function MapWizardPage() {
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {MATERIALS.map(({ value, labelKey }) => (
+            {MATERIALS.map(({ value, labelKey, bgColor, textColor }) => (
               <button
                 key={value}
                 onClick={() => setMaterial(value)}
                 className={`p-6 border-2 rounded-lg text-center transition-all ${
-                  materialColors[value]
-                } ${
                   material === value
                     ? 'ring-2 ring-primary ring-offset-2 scale-105'
                     : 'hover:scale-102'
                 }`}
+                style={{ backgroundColor: bgColor, color: textColor, borderColor: material === value ? undefined : bgColor }}
               >
-                <div className="h-12 mb-3 rounded bg-current/5" />
-                <span className="font-medium">{t(labelKey)}</span>
+                <span className="font-semibold text-base">{t(labelKey)}</span>
               </button>
             ))}
           </div>

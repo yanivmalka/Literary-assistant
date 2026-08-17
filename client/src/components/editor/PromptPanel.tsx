@@ -235,8 +235,11 @@ function buildPromptFromCanvas(
   }
 
   // Style suffix
-  prompt += `\nStyle: High detail, fantasy cartography, labeled with place names in an elegant serif font. `
-  prompt += `Include a compass rose and decorative border elements. `
+  prompt += `\nStyle: Clean outline map with only landmass contours and coastlines. `
+  prompt += `Do NOT include terrain features, textures, city names, labels, or place names. `
+  prompt += `Only show the outlines/borders of continents, islands, and major landmasses. `
+  prompt += `The map should be a basic sketch suitable for the user to add their own markers and details later. `
+  prompt += `Include a compass rose. `
   prompt += `The overall tone should match the ${material} material aesthetic.`
 
   // Count unnamed markers
