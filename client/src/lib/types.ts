@@ -138,6 +138,7 @@ export interface MarkerDefinition {
   isCustom?: boolean
   hasShapeMenu?: boolean // markers that allow shape selection
   resizable?: boolean // markers that allow size change
+  rotatable?: boolean // markers that allow rotation (default true if resizable)
   fixedShape?: boolean // markers with no shape menu
 }
 
@@ -152,12 +153,12 @@ export const MARKER_DEFINITIONS: MarkerDefinition[] = [
   { type: 'steppe', labelKey: 'editor.markers.steppe', color: '#BBF7D0', shape: 'square', size: 12, hasShapeMenu: true, resizable: true },
   { type: 'swamp', labelKey: 'editor.markers.swamp', color: '#92400E', shape: 'circle', size: 12, hasShapeMenu: true, resizable: true },
   // --- Fixed-shape markers ---
-  { type: 'mountains', labelKey: 'editor.markers.mountains', color: '#6B7280', shape: 'triangle', size: 14, fixedShape: true, resizable: true },
-  { type: 'highMountains', labelKey: 'editor.markers.highMountains', color: '#FFFFFF', strokeColor: '#6B7280', shape: 'triangle', size: 16, fixedShape: true, resizable: true },
-  { type: 'capital', labelKey: 'editor.markers.capital', color: '#D97706', shape: 'crown', size: 16, fixedShape: true, resizable: false },
-  { type: 'city', labelKey: 'editor.markers.city', color: '#1F2937', shape: 'dot', size: 10, fixedShape: true, resizable: false },
-  { type: 'village', labelKey: 'editor.markers.village', color: '#166534', shape: 'dot', size: 8, fixedShape: true, resizable: false },
-  { type: 'borders', labelKey: 'editor.markers.borders', color: '#EF4444', shape: 'line', size: 8, fixedShape: true, resizable: false },
+  { type: 'mountains', labelKey: 'editor.markers.mountains', color: '#6B7280', shape: 'triangle', size: 14, fixedShape: true, resizable: true, rotatable: false },
+  { type: 'highMountains', labelKey: 'editor.markers.highMountains', color: '#FFFFFF', strokeColor: '#6B7280', shape: 'triangle', size: 16, fixedShape: true, resizable: true, rotatable: false },
+  { type: 'capital', labelKey: 'editor.markers.capital', color: '#D97706', shape: 'crown', size: 20, fixedShape: true, resizable: false, rotatable: false },
+  { type: 'city', labelKey: 'editor.markers.city', color: '#1F2937', shape: 'dot', size: 10, fixedShape: true, resizable: false, rotatable: false },
+  { type: 'village', labelKey: 'editor.markers.village', color: '#166534', shape: 'dot', size: 8, fixedShape: true, resizable: false, rotatable: false },
+  { type: 'borders', labelKey: 'editor.markers.borders', color: '#EF4444', shape: 'line', size: 8, fixedShape: true, resizable: true, rotatable: true },
 ]
 
 export const MATERIALS: { value: MapMaterial; labelKey: string; bgColor: string; textColor: string; image: string }[] = [

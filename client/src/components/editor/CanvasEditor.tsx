@@ -46,12 +46,13 @@ export default function CanvasEditor() {
     if (selectedMarkerId && transformerRef.current && stageRef.current) {
       const selectedNode = stageRef.current.findOne(`#marker-${selectedMarkerId}`)
       if (selectedNode) {
-        // Check if this marker type is resizable
         const marker = markers.find(m => m.id === selectedMarkerId)
         const def = marker ? MARKER_DEFINITIONS.find(d => d.type === marker.type) : null
         const isResizable = def?.resizable !== false
+        const isRotatable = def?.rotatable !== false && isResizable
 
         if (isResizable) {
+          transformerRef.current.rotateEnabled(isRotatable)
           transformerRef.current.nodes([selectedNode])
           transformerRef.current.getLayer()?.batchDraw()
         } else {
@@ -364,17 +365,62 @@ function MarkerShape({ id, marker, def, isSelected, onClick, onDragEnd }: Marker
   }
 
   if (def.shape === 'crown') {
-    // Crown rendered as a star-like polygon
+    // Detailed crown shape - gold with dark red interior
+    const s = def.size / 2
+    const crownPoints = [
+      -s, s*0.4,  // bottom-left
+      -s, -s*0.1,  // left rise
+      -s*0.8, -s*0.6,  // left point
+      -s*0.5, -s*0.2,  // left valley
+      -s*0.2, -s*0.8,  // inner-left point
+      0, -s*0.3,  // center valley
+      s*0.2, -s*0.8,  // inner-right point
+      s*0.5, -s*0.2,  // right valley
+      s*0.8, -s*0.6,  // right point
+      s, -s*0.1,  // right rise
+      s, s*0.4,  // bottom-right
+    ]
     return (
-      <RegularPolygon
-        {...commonProps}
-        sides={5}
-        radius={def.size / 2 + 3}
-        fill={def.color}
-        stroke={selStroke || '#B45309'}
-        strokeWidth={selStrokeWidth || 1}
-        innerRadius={def.size / 4}
-      />
+      <>
+        <Line
+          {...commonProps}
+          points={crownPoints}
+          closed
+          fill="#D4A017"
+          stroke="#B8860B"
+          strokeWidth={1}
+        />
+        {/* Crown band at bottom */}
+        <Line
+          x={marker.x}
+          y={marker.y}
+          points={[-s, s*0.25, s, s*0.25, s, s*0.4, -s, s*0.4]}
+          closed
+          fill="#C49B08"
+          stroke="#B8860B"
+          strokeWidth={0.5}
+          listening={false}
+        />
+        {/* Red interior */}
+        <Line
+          x={marker.x}
+          y={marker.y}
+          points={[
+            -s*0.7, -s*0.05,
+            -s*0.4, -s*0.15,
+            -s*0.15, -s*0.55,
+            0, -s*0.15,
+            s*0.15, -s*0.55,
+            s*0.4, -s*0.15,
+            s*0.7, -s*0.05,
+            s*0.5, s*0.2,
+            -s*0.5, s*0.2,
+          ]}
+          closed
+          fill="#8B1A1A"
+          listening={false}
+        />
+      </>
     )
   }
 

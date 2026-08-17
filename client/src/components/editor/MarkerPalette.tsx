@@ -222,10 +222,9 @@ export function MarkerIcon({ color, strokeColor, shape, size }: { color: string;
   if (shape === 'crown') {
     return (
       <svg width={size} height={size} viewBox="0 0 16 16">
-        <path d="M2 12 L4 4 L8 7 L12 4 L14 12 Z" fill={color} stroke={strokeColor || 'none'} strokeWidth={strokeColor ? 1 : 0} />
-        <circle cx="4" cy="3.5" r="1.2" fill={color} />
-        <circle cx="8" cy="1.5" r="1.2" fill={color} />
-        <circle cx="12" cy="3.5" r="1.2" fill={color} />
+        <polygon points="1,12 1,7 3,4 5,8 8,2 11,8 13,4 15,7 15,12" fill="#D4A017" stroke="#B8860B" strokeWidth="0.5" />
+        <polygon points="3,7 5,8 8,3.5 11,8 13,7 12,11 4,11" fill="#8B1A1A" />
+        <rect x="1" y="11" width="14" height="2" fill="#C49B08" stroke="#B8860B" strokeWidth="0.3" />
       </svg>
     )
   }
