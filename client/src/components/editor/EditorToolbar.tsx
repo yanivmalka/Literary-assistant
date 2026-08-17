@@ -6,7 +6,7 @@ import { MARKER_DEFINITIONS } from '@/lib/types'
 
 export default function EditorToolbar() {
   const { t } = useTranslation()
-  const { currentMap, scale, setScale, setViewport, undo, redo, saveCanvas, isDirty, historyIndex, history, selectedMarkerId, removeMarker, clearAll, markers, regions, updateMarker } = useMapStore()
+  const { currentMap, scale, setScale, setViewport, undo, redo, saveCanvas, isDirty, historyIndex, history, selectedMarkerId, removeMarker, clearAll, markers, regions, updateMarker, activeToolType, activeStrokeWidth, setActiveStrokeWidth } = useMapStore()
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
   const handleZoomIn = () => setScale(Math.min(scale * 1.2, 5))
@@ -37,13 +37,18 @@ export default function EditorToolbar() {
 
   const hasContent = markers.length > 0 || regions.length > 0
 
-  // Check if selected marker is a line-type (supports stroke width)
+  // Check if selected marker supports stroke width control
   const selectedMarker = selectedMarkerId ? markers.find(m => m.id === selectedMarkerId) : null
   const selectedDef = selectedMarker ? MARKER_DEFINITIONS.find(d => d.type === selectedMarker.type) : null
-  const isLineType = selectedMarker && (selectedMarker.shape === 'line' || selectedDef?.shape === 'line' || selectedDef?.hasShapeMenu)
-  const currentStrokeWidth = selectedMarker?.strokeWidth ?? 3
+  const activeToolDef = activeToolType ? MARKER_DEFINITIONS.find(d => d.type === activeToolType) : null
+  const showStrokeControl = (
+    (selectedMarker && (selectedMarker.shape === 'line' || selectedDef?.shape === 'line' || selectedDef?.hasShapeMenu)) ||
+    (activeToolType && (activeToolDef?.shape === 'line' || activeToolDef?.hasShapeMenu))
+  )
+  const currentStrokeWidth = selectedMarker?.strokeWidth ?? activeStrokeWidth
 
   const handleStrokeWidthChange = (value: number) => {
+    setActiveStrokeWidth(value)
     if (selectedMarkerId) {
       updateMarker(selectedMarkerId, { strokeWidth: value })
     }
@@ -135,7 +140,7 @@ export default function EditorToolbar() {
           <div className="w-px h-5 bg-border mx-2" />
 
           {/* Stroke width control for line markers */}
-          {isLineType && selectedMarkerId && (
+          {showStrokeControl && (
             <>
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground whitespace-nowrap">{t('editor.toolbar.strokeWidth')}</span>

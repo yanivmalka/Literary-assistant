@@ -18,6 +18,7 @@ export default function CanvasEditor() {
     viewportY,
     activeToolType,
     activeShape,
+    activeStrokeWidth,
     selectedMarkerId,
     setScale,
     setViewport,
@@ -122,13 +123,14 @@ export default function CanvasEditor() {
           regionId: null,
           shape: activeShape || def?.shape || 'circle',
           color: def?.color,
+          strokeWidth: activeStrokeWidth,
         }
         addMarker(newMarker)
       } else {
         selectMarker(null)
       }
     }
-  }, [activeToolType, activeShape, viewportX, viewportY, scale, addMarker, selectMarker])
+  }, [activeToolType, activeShape, activeStrokeWidth, viewportX, viewportY, scale, addMarker, selectMarker])
 
   // Handle drag from palette (drop on canvas)
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -155,10 +157,11 @@ export default function CanvasEditor() {
       regionId: null,
       shape: activeShape || def?.shape || 'circle',
       color: def?.color,
+      strokeWidth: activeStrokeWidth,
     }
     addMarker(newMarker)
     setActiveTool(null)
-  }, [viewportX, viewportY, scale, activeShape, addMarker, setActiveTool])
+  }, [viewportX, viewportY, scale, activeShape, activeStrokeWidth, addMarker, setActiveTool])
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()

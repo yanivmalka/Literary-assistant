@@ -14,6 +14,7 @@ interface MapState {
   selectedMarkerId: string | null
   activeToolType: MarkerType | null
   activeShape: CanvasMarker['shape']
+  activeStrokeWidth: number
   scale: number
   viewportX: number
   viewportY: number
@@ -30,6 +31,7 @@ interface MapState {
   setViewport: (x: number, y: number) => void
   setActiveTool: (type: MarkerType | null) => void
   setActiveShape: (shape: CanvasMarker['shape']) => void
+  setActiveStrokeWidth: (width: number) => void
   selectMarker: (id: string | null) => void
   setFinalImageUrl: (url: string) => void
 
@@ -60,6 +62,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   selectedMarkerId: null,
   activeToolType: null,
   activeShape: 'circle',
+  activeStrokeWidth: 3,
   scale: 1,
   viewportX: 0,
   viewportY: 0,
@@ -110,6 +113,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   setViewport: (x, y) => set({ viewportX: x, viewportY: y }),
   setActiveTool: (type) => set({ activeToolType: type, selectedMarkerId: null }),
   setActiveShape: (shape) => set({ activeShape: shape }),
+  setActiveStrokeWidth: (width) => set({ activeStrokeWidth: width }),
   selectMarker: (id) => set({ selectedMarkerId: id, activeToolType: null }),
   setFinalImageUrl: (url) => {
     const { currentMap } = get()
