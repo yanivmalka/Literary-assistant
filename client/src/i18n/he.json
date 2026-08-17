@@ -180,5 +180,99 @@
     "format": "פורמט",
     "quality": "איכות",
     "download": "הורד"
+  },
+  "documents": {
+    "title": "מסמכים",
+    "subtitle": "העלה את כתב היד שלך כדי לבנות בסיס ידע",
+    "confirmDelete": "האם למחוק את המסמך הזה?",
+    "upload": {
+      "dropzone": "גרור ושחרר את כתב היד שלך כאן, או לחץ לעיון",
+      "maxSize": "עד 50MB",
+      "confirm": "העלה מסמך",
+      "uploading": "מעלה...",
+      "invalidType": "סוג קובץ לא חוקי. רק PDF ו-DOCX נתמכים.",
+      "tooLarge": "הקובץ גדול מדי. הגודל המרבי הוא 50MB.",
+      "failed": "ההעלאה נכשלה. נסה שוב."
+    },
+    "status": {
+      "extracting": "מחלץ טקסט",
+      "chunking": "מנתח מבנה",
+      "indexing": "בונה אינדקס חיפוש",
+      "analyzing": "מזהה ישויות",
+      "ready": "מוכן",
+      "skippedNoProvider": "חיפוש מוכן (ניתוח AI לא זמין)",
+      "searchAvailable": "ניתן לחפש במסמך. זיהוי ישויות דורש ספק AI.",
+      "retry": "נסה שוב"
+    }
+  },
+  "entities": {
+    "title": "ישויות",
+    "subtitle": "דמויות, מקומות ואלמנטים אחרים שנמצאו במסמכים שלך",
+    "empty": "לא נמצאו ישויות עדיין. העלה מסמך כדי להתחיל.",
+    "confirm": "אשר",
+    "dismiss": "דחה",
+    "merge": "מזג",
+    "viewDetails": "הצג פרטים",
+    "mentions": "אזכורים",
+    "attributes": "תכונות",
+    "types": {
+      "character": "דמות",
+      "location": "מקום",
+      "country": "מדינה",
+      "continent": "יבשת",
+      "region": "אזור",
+      "object": "חפץ",
+      "ability": "יכולת",
+      "magic_system": "מערכת קסם",
+      "event": "אירוע"
+    },
+    "status": {
+      "pending": "ממתין",
+      "confirmed": "מאושר",
+      "dismissed": "נדחה"
+    },
+    "mergeSuggestions": "הצעות מיזוג",
+    "mergeSuggestion": "אלו עשויות להיות אותה ישות",
+    "keepSeparate": "שמור בנפרד"
+  },
+  "qa": {
+    "title": "שאל על הספר שלך",
+    "subtitle": "שאל שאלות וקבל תשובות מבוססות על המסמכים שלך",
+    "placeholder": "שאל שאלה על הספר שלך...",
+    "examples": "לדוגמה: מה אנחנו יודעים על רייבן? איך מערכת הקסם מתוארת?",
+    "inputPlaceholder": "הקלד את שאלתך...",
+    "sources": "מקורות",
+    "chapter": "פרק",
+    "page": "עמוד",
+    "source": "מקור",
+    "thinking": "מחפש וחושב...",
+    "clearHistory": "נקה היסטוריה",
+    "noAnswer": "לא ניתן היה ליצור תשובה. קטעים רלוונטיים מוצגים למטה."
+  },
+  "contradictions": {
+    "title": "סתירות",
+    "subtitle": "אי-התאמות אפשריות שנמצאו בטקסט שלך",
+    "empty": "לא נמצאו סתירות. הטקסט שלך נראה עקבי!",
+    "open": "פתוחות",
+    "resolved": "נפתרו",
+    "unknownEntity": "ישות לא ידועה",
+    "fixProfile": "תקן פרופיל",
+    "fixText": "תקן טקסט",
+    "intentional": "מכוון",
+    "ignore": "התעלם"
+  },
+  "knowledge": {
+    "title": "בסיס ידע",
+    "documents": "מסמכים",
+    "entities": "ישויות",
+    "contradictions": "סתירות",
+    "search": "חיפוש",
+    "ready": "מוכנים",
+    "pending": "ממתינים לסקירה",
+    "needsReview": "דורש סקירה",
+    "searchReady": "מוכן",
+    "searchNotReady": "העלה מסמך",
+    "uploadCta": "העלה את כתב היד שלך כדי לבנות את בסיס הידע",
+    "uploadButton": "העלה מסמך"
   }
 }

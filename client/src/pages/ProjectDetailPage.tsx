@@ -1,21 +1,31 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Plus, Map, ArrowLeft, Users, TreePine, Sparkles } from 'lucide-react'
+import { Plus, Map, ArrowLeft, Users, TreePine, Sparkles, FileText, MessageSquare, AlertTriangle } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
+import { useDocumentStore } from '@/stores/documentStore'
+import { useEntityStore } from '@/stores/entityStore'
+import { useContradictionStore } from '@/stores/contradictionStore'
+import KnowledgeOverview from '@/components/knowledge/KnowledgeOverview'
 
 export default function ProjectDetailPage() {
   const { t } = useTranslation()
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
   const { currentProject, projectMaps, fetchProject, fetchProjectMaps } = useProjectStore()
+  const { documents, fetchDocuments } = useDocumentStore()
+  const { entities, fetchEntities } = useEntityStore()
+  const { contradictions, fetchContradictions } = useContradictionStore()
 
   useEffect(() => {
     if (projectId) {
       fetchProject(projectId)
       fetchProjectMaps(projectId)
+      fetchDocuments(projectId)
+      fetchEntities(projectId)
+      fetchContradictions(projectId)
     }
-  }, [projectId, fetchProject, fetchProjectMaps])
+  }, [projectId, fetchProject, fetchProjectMaps, fetchDocuments, fetchEntities, fetchContradictions])
 
   if (!currentProject) {
     return (
@@ -23,10 +33,14 @@ export default function ProjectDetailPage() {
     )
   }
 
+  const hasReadyDocument = documents.some(d =>
+    d.latest_version && ['ready', 'skipped_no_provider', 'indexed'].includes(d.latest_version.status)
+  )
+
   return (
     <div className="max-w-6xl mx-auto p-6">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-8">
+      <div className="flex items-center gap-4 mb-6">
         <button
           onClick={() => navigate('/projects')}
           className="p-2 rounded-md hover:bg-accent transition-colors"
@@ -41,7 +55,50 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
-      {/* Maps Section */}
+      {/* Sub-navigation */}
+      <nav className="flex flex-wrap gap-2 mb-8 border-b pb-3">
+        <Link
+          to={`/projects/${projectId}/documents`}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md hover:bg-muted transition-colors"
+        >
+          <FileText className="h-4 w-4" />
+          {t('documents.title')}
+        </Link>
+        <Link
+          to={`/projects/${projectId}/entities`}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${hasReadyDocument ? 'hover:bg-muted' : 'opacity-50 pointer-events-none'}`}
+        >
+          <Users className="h-4 w-4" />
+          {t('entities.title')}
+        </Link>
+        <Link
+          to={`/projects/${projectId}/qa`}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${hasReadyDocument ? 'hover:bg-muted' : 'opacity-50 pointer-events-none'}`}
+        >
+          <MessageSquare className="h-4 w-4" />
+          {t('qa.title')}
+        </Link>
+        <Link
+          to={`/projects/${projectId}/contradictions`}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${hasReadyDocument ? 'hover:bg-muted' : 'opacity-50 pointer-events-none'}`}
+        >
+          <AlertTriangle className="h-4 w-4" />
+          {t('contradictions.title')}
+        </Link>
+      </nav>
+
+      {/* Knowledge Overview */}
+      <section className="mb-10">
+        <h3 className="text-lg font-semibold mb-4">{t('knowledge.title')}</h3>
+        <KnowledgeOverview
+          projectId={projectId!}
+          documents={documents}
+          entities={entities}
+          contradictions={contradictions}
+        />
+      </section>
+
+      {/* Maps Section — always available */}
       <section className="mb-10">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -94,9 +151,9 @@ export default function ProjectDetailPage() {
         )}
       </section>
 
-      {/* Placeholder Sections */}
+      {/* Future Module Placeholders — disabled unless document ready */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <section className="border rounded-lg p-5 bg-muted/30 opacity-60">
+        <section className={`border rounded-lg p-5 bg-muted/30 ${hasReadyDocument ? '' : 'opacity-60'}`}>
           <h3 className="font-semibold flex items-center gap-2 mb-2">
             <Users className="h-5 w-5 text-muted-foreground" />
             {t('home.characters.title')}
@@ -107,7 +164,7 @@ export default function ProjectDetailPage() {
           </span>
         </section>
 
-        <section className="border rounded-lg p-5 bg-muted/30 opacity-60">
+        <section className={`border rounded-lg p-5 bg-muted/30 ${hasReadyDocument ? '' : 'opacity-60'}`}>
           <h3 className="font-semibold flex items-center gap-2 mb-2">
             <TreePine className="h-5 w-5 text-muted-foreground" />
             {t('home.environment.title')}
@@ -118,7 +175,7 @@ export default function ProjectDetailPage() {
           </span>
         </section>
 
-        <section className="border rounded-lg p-5 bg-muted/30 opacity-60">
+        <section className={`border rounded-lg p-5 bg-muted/30 ${hasReadyDocument ? '' : 'opacity-60'}`}>
           <h3 className="font-semibold flex items-center gap-2 mb-2">
             <Sparkles className="h-5 w-5 text-muted-foreground" />
             {t('home.magic.title')}

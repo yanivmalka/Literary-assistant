@@ -180,5 +180,99 @@
     "format": "Format",
     "quality": "Quality",
     "download": "Download"
+  },
+  "documents": {
+    "title": "Documents",
+    "subtitle": "Upload your manuscript to build a knowledge base",
+    "confirmDelete": "Are you sure you want to delete this document?",
+    "upload": {
+      "dropzone": "Drag & drop your manuscript here, or click to browse",
+      "maxSize": "Max 50MB",
+      "confirm": "Upload Document",
+      "uploading": "Uploading...",
+      "invalidType": "Invalid file type. Only PDF and DOCX are supported.",
+      "tooLarge": "File too large. Maximum size is 50MB.",
+      "failed": "Upload failed. Please try again."
+    },
+    "status": {
+      "extracting": "Extracting text",
+      "chunking": "Analyzing structure",
+      "indexing": "Building search index",
+      "analyzing": "Extracting entities",
+      "ready": "Ready",
+      "skippedNoProvider": "Search ready (AI analysis unavailable)",
+      "searchAvailable": "Document is searchable. Entity extraction requires an AI provider.",
+      "retry": "Retry"
+    }
+  },
+  "entities": {
+    "title": "Entities",
+    "subtitle": "Characters, locations, and other elements found in your documents",
+    "empty": "No entities found yet. Upload a document to get started.",
+    "confirm": "Confirm",
+    "dismiss": "Dismiss",
+    "merge": "Merge",
+    "viewDetails": "View Details",
+    "mentions": "Mentions",
+    "attributes": "Attributes",
+    "types": {
+      "character": "Character",
+      "location": "Location",
+      "country": "Country",
+      "continent": "Continent",
+      "region": "Region",
+      "object": "Object",
+      "ability": "Ability",
+      "magic_system": "Magic System",
+      "event": "Event"
+    },
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "dismissed": "Dismissed"
+    },
+    "mergeSuggestions": "Merge Suggestions",
+    "mergeSuggestion": "These might be the same entity",
+    "keepSeparate": "Keep Separate"
+  },
+  "qa": {
+    "title": "Ask About Your Book",
+    "subtitle": "Ask questions and get answers based on your documents",
+    "placeholder": "Ask a question about your book...",
+    "examples": "e.g. What do we know about Raven? How is the magic system described?",
+    "inputPlaceholder": "Type your question...",
+    "sources": "Sources",
+    "chapter": "Chapter",
+    "page": "Page",
+    "source": "Source",
+    "thinking": "Searching and thinking...",
+    "clearHistory": "Clear history",
+    "noAnswer": "No answer could be generated. Relevant passages are shown below."
+  },
+  "contradictions": {
+    "title": "Contradictions",
+    "subtitle": "Potential inconsistencies found in your text",
+    "empty": "No contradictions found. Your text appears consistent!",
+    "open": "Open",
+    "resolved": "Resolved",
+    "unknownEntity": "Unknown entity",
+    "fixProfile": "Fix Profile",
+    "fixText": "Fix Text",
+    "intentional": "Intentional",
+    "ignore": "Ignore"
+  },
+  "knowledge": {
+    "title": "Knowledge Base",
+    "documents": "Documents",
+    "entities": "Entities",
+    "contradictions": "Contradictions",
+    "search": "Search",
+    "ready": "ready",
+    "pending": "pending review",
+    "needsReview": "needs review",
+    "searchReady": "Ready",
+    "searchNotReady": "Upload a document",
+    "uploadCta": "Upload your manuscript to build your knowledge base",
+    "uploadButton": "Upload Document"
   }
 }
