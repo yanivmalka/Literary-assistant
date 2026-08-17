@@ -3,6 +3,7 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import { getAIStatus } from './ai/index.js'
 import documentRoutes from './documents/routes.js'
+import { entityRoutes } from './entities/index.js'
 
 dotenv.config()
 
@@ -32,6 +33,11 @@ app.get('/api/ai/status', async (_req, res) => {
 // Document Analysis Routes
 // ============================================
 app.use('/api', documentRoutes)
+
+// ============================================
+// Entity Routes
+// ============================================
+app.use('/api', entityRoutes)
 
 // ============================================
 // AI Name Suggestion Endpoint

@@ -8,6 +8,8 @@
 import { Router, Request, Response } from 'express'
 import multer from 'multer'
 import { requireAuth, getServiceClient } from '../middleware/auth.js'
+import { enqueue, getQueueStatus, reprocess } from '../pipeline/index.js'
+import type { PipelineStage } from '../pipeline/types.js'
 
 const router = Router()
 
@@ -168,6 +170,14 @@ router.post(
         file_type: fileType,
         file_size: file.size,
         created_at: version.created_at,
+      })
+
+      // Trigger pipeline processing in background
+      enqueue({
+        versionId: version.id,
+        projectId: projectId as string,
+        userId,
+        documentId,
       })
     } catch (error) {
       console.error('Document upload error:', error)
@@ -446,6 +456,100 @@ router.delete(
       console.error('Document delete error:', error)
       res.status(500).json({ error: 'Internal server error' })
     }
+  }
+)
+
+/**
+ * POST /api/projects/:projectId/documents/:documentId/versions/:versionId/reprocess
+ * Trigger reprocessing from a specific stage.
+ */
+router.post(
+  '/projects/:projectId/documents/:documentId/versions/:versionId/reprocess',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { projectId, documentId, versionId } = req.params
+      const userId = req.user!.id
+      const { from_stage } = req.body
+      const supabase = getServiceClient()
+
+      // Verify ownership
+      const { data: doc } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('id', documentId)
+        .eq('project_id', projectId)
+        .eq('user_id', userId)
+        .single()
+
+      if (!doc) {
+        res.status(404).json({ error: 'Document not found or access denied' })
+        return
+      }
+
+      reprocess(versionId as string, projectId as string, userId, documentId as string, from_stage as PipelineStage || 'extraction')
+      res.json({ success: true, message: 'Reprocessing enqueued' })
+    } catch (error) {
+      res.status(500).json({ error: 'Internal server error' })
+    }
+  }
+)
+
+/**
+ * POST /api/projects/:projectId/search
+ * Search across all documents in a project.
+ */
+router.post(
+  '/projects/:projectId/search',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { projectId } = req.params
+      const userId = req.user!.id
+      const { query, mode, top_k } = req.body
+      const supabase = getServiceClient()
+
+      if (!query || typeof query !== 'string') {
+        res.status(400).json({ error: 'query is required' })
+        return
+      }
+
+      // Verify project ownership
+      const { data: project } = await supabase
+        .from('projects')
+        .select('id')
+        .eq('id', projectId)
+        .eq('user_id', userId)
+        .single()
+
+      if (!project) {
+        res.status(404).json({ error: 'Project not found or access denied' })
+        return
+      }
+
+      const { search } = await import('../documents/search.js')
+      const results = await search(projectId as string, query, {
+        mode: mode || 'hybrid',
+        topK: top_k || 5,
+      })
+
+      res.json({ results })
+    } catch (error) {
+      res.status(500).json({ error: 'Internal server error' })
+    }
+  }
+)
+
+/**
+ * GET /api/pipeline/status
+ * Get current pipeline queue status (admin/debug endpoint).
+ */
+router.get(
+  '/pipeline/status',
+  requireAuth,
+  async (_req: Request, res: Response): Promise<void> => {
+    const status = getQueueStatus()
+    res.json(status)
   }
 )
 

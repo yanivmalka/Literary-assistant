@@ -10,3 +10,8 @@ export type { DocumentStructure, StructuredChapter, DetectedChapter, DetectedSce
 
 export { chunkDocument, mergeSmallChunks, estimateTokens, loadChunkerConfig } from './chunker.js'
 export type { DocumentChunk, ChunkerConfig } from './chunker.js'
+
+export { generateEmbeddingsForVersion, markEmbeddingsStale } from './embeddings.js'
+
+export { search, semanticSearch, fullTextSearch, hybridSearch } from './search.js'
+export type { SearchResult, SearchMode } from './search.js'
