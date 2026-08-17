@@ -4,6 +4,7 @@ import { Sparkles, Check, RefreshCw } from 'lucide-react'
 import { useMapStore } from '@/stores/mapStore'
 import { MARKER_DEFINITIONS } from '@/lib/types'
 import { generateFantasyNames } from '@/lib/nameGenerator'
+import { PaletteIcon } from './MarkerPalette'
 
 export default function NamingPanel() {
   const { t, i18n } = useTranslation()
@@ -95,14 +96,10 @@ export default function NamingPanel() {
 
           {/* Unnamed markers */}
           {unnamedMarkers.map((marker) => {
-            const def = MARKER_DEFINITIONS.find(d => d.type === marker.type)
             return (
               <div key={marker.id} className="border rounded p-2 text-sm">
                 <div className="flex items-center gap-2 mb-1">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: def?.color }}
-                  />
+                  <PaletteIcon type={marker.type} size={16} />
                   <span className="font-medium">{getMarkerLabel(marker.type)}</span>
                 </div>
                 <input
