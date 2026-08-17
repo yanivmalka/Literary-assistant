@@ -5,9 +5,11 @@ import { useMapStore } from '@/stores/mapStore'
 import { MARKER_DEFINITIONS } from '@/lib/types'
 import type { MarkerType, MarkerDefinition } from '@/lib/types'
 
+const SHAPES: Array<'circle' | 'dot' | 'polygon' | 'line' | 'triangle'> = ['circle', 'dot', 'polygon', 'line', 'triangle']
+
 export default function MarkerPalette() {
   const { t } = useTranslation()
-  const { activeToolType, setActiveTool } = useMapStore()
+  const { activeToolType, setActiveTool, activeShape, setActiveShape } = useMapStore()
   const [customMarkers, setCustomMarkers] = useState<MarkerDefinition[]>([])
   const [showEditor, setShowEditor] = useState(false)
   const [editingMarker, setEditingMarker] = useState<MarkerDefinition | null>(null)
@@ -70,13 +72,44 @@ export default function MarkerPalette() {
       <h3 className="text-sm font-semibold mb-3 px-1">
         {t('editor.markers.title')}
       </h3>
+
+      {/* Shape selector - always visible when a tool is active */}
+      {activeToolType && (
+        <div className="mb-3 p-2 bg-muted/50 rounded-md">
+          <p className="text-xs font-medium mb-1.5">{t('editor.markers.markerShape')}</p>
+          <div className="flex gap-1">
+            {SHAPES.map((shapeOpt) => (
+              <button
+                key={shapeOpt}
+                onClick={() => setActiveShape(shapeOpt)}
+                className={`p-1.5 border rounded flex items-center justify-center ${
+                  activeShape === shapeOpt ? 'border-primary bg-primary/10' : 'hover:bg-accent border-transparent'
+                }`}
+                title={shapeOpt}
+              >
+                <MarkerIcon type="any" color={
+                  allMarkers.find(m => m.type === activeToolType)?.color || '#6B7280'
+                } shape={shapeOpt} size={14} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-1">
         {allMarkers.map((def) => (
           <div key={def.type} className="flex items-center group">
             <button
               draggable
               onDragStart={(e) => handleDragStart(e, def.type)}
-              onClick={() => setActiveTool(activeToolType === def.type ? null : def.type)}
+              onClick={() => {
+                if (activeToolType === def.type) {
+                  setActiveTool(null)
+                } else {
+                  setActiveTool(def.type)
+                  setActiveShape(def.shape)
+                }
+              }}
               className={`flex-1 flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors text-start ${
                 activeToolType === def.type
                   ? 'bg-primary/10 text-primary border border-primary/30'
@@ -160,16 +193,16 @@ export default function MarkerPalette() {
 
               <div>
                 <label className="block text-xs font-medium mb-1">{t('editor.markers.markerShape')}</label>
-                <div className="grid grid-cols-4 gap-1">
-                  {(['circle', 'dot', 'polygon', 'line', 'triangle'] as const).map((shape) => (
+                <div className="grid grid-cols-5 gap-1">
+                  {SHAPES.map((shapeOpt) => (
                     <button
-                      key={shape}
-                      onClick={() => setNewShape(shape)}
+                      key={shapeOpt}
+                      onClick={() => setNewShape(shapeOpt)}
                       className={`p-2 border rounded flex items-center justify-center ${
-                        newShape === shape ? 'border-primary bg-primary/10' : 'hover:bg-accent'
+                        newShape === shapeOpt ? 'border-primary bg-primary/10' : 'hover:bg-accent'
                       }`}
                     >
-                      <MarkerIcon type="custom" color={newColor} shape={shape} size={16} />
+                      <MarkerIcon type="custom" color={newColor} shape={shapeOpt} size={16} />
                     </button>
                   ))}
                 </div>
@@ -198,11 +231,18 @@ export default function MarkerPalette() {
   )
 }
 
-function MarkerIcon({ color, shape, size }: { type: string; color: string; shape: string; size: number }) {
-  if (shape === 'triangle' || shape === 'polygon') {
+export function MarkerIcon({ color, shape, size }: { type: string; color: string; shape: string; size: number }) {
+  if (shape === 'triangle') {
     return (
       <svg width={size} height={size} viewBox="0 0 16 16">
         <polygon points="8,2 14,14 2,14" fill={color} />
+      </svg>
+    )
+  }
+  if (shape === 'polygon') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 16 16">
+        <polygon points="8,1 15,6 12,15 4,15 1,6" fill={color} />
       </svg>
     )
   }

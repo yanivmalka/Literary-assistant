@@ -13,6 +13,7 @@ interface MapState {
   regions: CanvasRegion[]
   selectedMarkerId: string | null
   activeToolType: MarkerType | null
+  activeShape: CanvasMarker['shape']
   scale: number
   viewportX: number
   viewportY: number
@@ -28,7 +29,9 @@ interface MapState {
   setScale: (scale: number) => void
   setViewport: (x: number, y: number) => void
   setActiveTool: (type: MarkerType | null) => void
+  setActiveShape: (shape: CanvasMarker['shape']) => void
   selectMarker: (id: string | null) => void
+  setFinalImageUrl: (url: string) => void
 
   // Marker operations
   addMarker: (marker: CanvasMarker) => void
@@ -56,6 +59,7 @@ export const useMapStore = create<MapState>((set, get) => ({
   regions: [],
   selectedMarkerId: null,
   activeToolType: null,
+  activeShape: 'circle',
   scale: 1,
   viewportX: 0,
   viewportY: 0,
@@ -105,7 +109,14 @@ export const useMapStore = create<MapState>((set, get) => ({
   setScale: (scale) => set({ scale }),
   setViewport: (x, y) => set({ viewportX: x, viewportY: y }),
   setActiveTool: (type) => set({ activeToolType: type, selectedMarkerId: null }),
+  setActiveShape: (shape) => set({ activeShape: shape }),
   selectMarker: (id) => set({ selectedMarkerId: id, activeToolType: null }),
+  setFinalImageUrl: (url) => {
+    const { currentMap } = get()
+    if (currentMap) {
+      set({ currentMap: { ...currentMap, final_image_url: url } })
+    }
+  },
 
   addMarker: (marker) => {
     get().pushHistory()

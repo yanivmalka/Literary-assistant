@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase'
 
 export default function UploadPanel() {
   const { t } = useTranslation()
-  const { currentMap } = useMapStore()
+  const { currentMap, setFinalImageUrl } = useMapStore()
   const [preview, setPreview] = useState<string | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -77,6 +77,7 @@ export default function UploadPanel() {
       .neq('storage_path', filePath)
 
     setUploadedUrl(publicUrl)
+    setFinalImageUrl(publicUrl)
     setUploading(false)
     setPreview(null)
     setFile(null)

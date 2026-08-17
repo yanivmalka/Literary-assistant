@@ -15,6 +15,7 @@ export default function CanvasEditor() {
     viewportX,
     viewportY,
     activeToolType,
+    activeShape,
     selectedMarkerId,
     setScale,
     setViewport,
@@ -81,6 +82,8 @@ export default function CanvasEditor() {
         const x = (pointer.x - viewportX) / scale
         const y = (pointer.y - viewportY) / scale
 
+        const def = MARKER_DEFINITIONS.find(d => d.type === activeToolType)
+
         const newMarker: CanvasMarker = {
           id: generateId(),
           type: activeToolType,
@@ -89,13 +92,15 @@ export default function CanvasEditor() {
           name: null,
           noNameNeeded: false,
           regionId: null,
+          shape: activeShape || def?.shape || 'circle',
+          color: def?.color,
         }
         addMarker(newMarker)
       } else {
         selectMarker(null)
       }
     }
-  }, [activeToolType, viewportX, viewportY, scale, addMarker, selectMarker])
+  }, [activeToolType, activeShape, viewportX, viewportY, scale, addMarker, selectMarker])
 
   // Handle drag from palette (drop on canvas)
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -110,6 +115,8 @@ export default function CanvasEditor() {
     const x = (e.clientX - stageBox.left - viewportX) / scale
     const y = (e.clientY - stageBox.top - viewportY) / scale
 
+    const def = MARKER_DEFINITIONS.find(d => d.type === markerType)
+
     const newMarker: CanvasMarker = {
       id: generateId(),
       type: markerType,
@@ -118,10 +125,12 @@ export default function CanvasEditor() {
       name: null,
       noNameNeeded: false,
       regionId: null,
+      shape: activeShape || def?.shape || 'circle',
+      color: def?.color,
     }
     addMarker(newMarker)
     setActiveTool(null)
-  }, [viewportX, viewportY, scale, addMarker, setActiveTool])
+  }, [viewportX, viewportY, scale, activeShape, addMarker, setActiveTool])
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -210,12 +219,15 @@ export default function CanvasEditor() {
           {markers.map((marker) => {
             const def = getMarkerDef(marker.type)
             const isSelected = selectedMarkerId === marker.id
+            // Use per-marker overrides if set
+            const markerColor = marker.color || def.color
+            const markerShape = marker.shape || def.shape
 
             return (
               <MarkerShape
                 key={marker.id}
                 marker={marker}
-                def={def}
+                def={{ color: markerColor, shape: markerShape, size: def.size }}
                 isSelected={isSelected}
                 onClick={() => selectMarker(marker.id)}
                 onDragEnd={(e) => handleMarkerDragEnd(marker.id, e)}
@@ -292,6 +304,19 @@ function MarkerShape({ marker, def, isSelected, onClick, onDragEnd }: MarkerShap
     )
   }
 
+  if (def.shape === 'polygon') {
+    return (
+      <RegularPolygon
+        {...commonProps}
+        sides={5}
+        radius={def.size / 2 + 2}
+        fill={def.color}
+        stroke={isSelected ? '#000' : undefined}
+        strokeWidth={isSelected ? 2 : 0}
+      />
+    )
+  }
+
   if (def.shape === 'crown') {
     return (
       <RegularPolygon
@@ -305,11 +330,29 @@ function MarkerShape({ marker, def, isSelected, onClick, onDragEnd }: MarkerShap
     )
   }
 
+  if (def.shape === 'line') {
+    return (
+      <Line
+        x={marker.x}
+        y={marker.y}
+        points={[-8, 8, 8, -8]}
+        stroke={def.color}
+        strokeWidth={3}
+        lineCap="round"
+        draggable
+        onClick={onClick}
+        onTap={onClick}
+        onDragEnd={onDragEnd}
+        hitStrokeWidth={12}
+      />
+    )
+  }
+
   // Default: circle/dot
   return (
     <Circle
       {...commonProps}
-      radius={def.size / 2}
+      radius={def.shape === 'dot' ? def.size / 3 : def.size / 2}
       fill={def.color}
       stroke={isSelected ? '#000' : undefined}
       strokeWidth={isSelected ? 2 : 0}

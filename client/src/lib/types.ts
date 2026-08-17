@@ -98,6 +98,9 @@ export interface CanvasMarker {
   name: string | null
   noNameNeeded: boolean
   regionId: string | null
+  // Per-marker visual overrides (user-selected)
+  shape?: 'circle' | 'dot' | 'triangle' | 'polygon' | 'line' | 'crown'
+  color?: string
 }
 
 export interface CanvasRegion {
