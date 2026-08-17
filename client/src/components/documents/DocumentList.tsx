@@ -9,7 +9,7 @@ interface DocumentListProps {
 
 export default function DocumentList({ projectId }: DocumentListProps) {
   const { t } = useTranslation()
-  const { documents, deleteDocument, reprocessVersion } = useDocumentStore()
+  const { documents, deleteDocument } = useDocumentStore()
 
   if (documents.length === 0) {
     return null
@@ -22,9 +22,9 @@ export default function DocumentList({ projectId }: DocumentListProps) {
   }
 
   const handleRetry = async (doc: Document) => {
+    // Reprocess requires Express server. On static hosting, just refresh.
     if (!doc.latest_version) return
-    const errorStage = doc.latest_version.error_stage || 'extraction'
-    await reprocessVersion(projectId, doc.id, doc.latest_version.id, errorStage)
+    window.location.reload()
   }
 
   return (

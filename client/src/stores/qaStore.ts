@@ -29,12 +29,6 @@ interface QAState {
   clearHistory: () => void
 }
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) return {}
-  return { 'Authorization': `Bearer ${session.access_token}` }
-}
-
 export const useQAStore = create<QAState>((set, get) => ({
   messages: [],
   loading: false,
@@ -49,47 +43,109 @@ export const useQAStore = create<QAState>((set, get) => ({
     set({ messages: [...get().messages, questionMsg], loading: true })
 
     try {
-      const headers = await getAuthHeaders()
-      const response = await fetch(`/api/projects/${projectId}/qa/ask`, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question }),
-      })
-
-      if (!response.ok) {
-        const answerMsg: QAMessage = {
-          id: crypto.randomUUID(),
-          type: 'answer',
-          text: 'Failed to get an answer. Please try again.',
-          timestamp: new Date(),
-        }
-        set({ messages: [...get().messages, answerMsg], loading: false })
+      // Direct Supabase full-text search (basic Q&A without LLM)
+      // This works on static hosting. Full AI-powered Q&A requires the Express server.
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        set({ loading: false })
         return
       }
 
-      const data = await response.json()
+      // Get project documents
+      const { data: docs } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
 
+      if (!docs || docs.length === 0) {
+        const noDocsMsg: QAMessage = {
+          id: crypto.randomUUID(),
+          type: 'answer',
+          text: 'No documents uploaded yet. Upload a document to start asking questions.',
+          noSufficientContext: true,
+          timestamp: new Date(),
+        }
+        set({ messages: [...get().messages, noDocsMsg], loading: false })
+        return
+      }
+
+      const docIds = docs.map(d => d.id)
+
+      // Get versions
+      const { data: versions } = await supabase
+        .from('document_versions')
+        .select('id')
+        .in('document_id', docIds)
+        .in('status', ['ready', 'indexed', 'skipped_no_provider'])
+
+      if (!versions || versions.length === 0) {
+        const notReadyMsg: QAMessage = {
+          id: crypto.randomUUID(),
+          type: 'answer',
+          text: 'Documents are still being processed. Please wait until processing is complete.',
+          noSufficientContext: true,
+          timestamp: new Date(),
+        }
+        set({ messages: [...get().messages, notReadyMsg], loading: false })
+        return
+      }
+
+      const versionIds = versions.map(v => v.id)
+
+      // Full-text search in chunks
+      const { data: chunks } = await supabase
+        .from('document_chunks')
+        .select('id, content, chapter_number, chapter_title, page, position, version_id')
+        .in('version_id', versionIds)
+        .textSearch('content', question.split(' ').filter(w => w.length > 2).join(' & '), {
+          type: 'plain',
+          config: 'simple',
+        })
+        .limit(5)
+
+      const sources: QASource[] = (chunks || []).map(chunk => ({
+        chunkId: chunk.id,
+        content: chunk.content,
+        chapterNumber: chunk.chapter_number,
+        chapterTitle: chunk.chapter_title,
+        page: chunk.page,
+        score: 1,
+        documentName: undefined,
+      }))
+
+      if (sources.length === 0) {
+        const noResultsMsg: QAMessage = {
+          id: crypto.randomUUID(),
+          type: 'answer',
+          text: 'No relevant passages found for this question. Try different keywords.',
+          sources: [],
+          noSufficientContext: true,
+          timestamp: new Date(),
+        }
+        set({ messages: [...get().messages, noResultsMsg], loading: false })
+        return
+      }
+
+      // Without LLM: show relevant sources directly
       const answerMsg: QAMessage = {
         id: crypto.randomUUID(),
         type: 'answer',
-        text: data.answer || (data.noSufficientContext
-          ? 'I could not find sufficient information in the document to answer this question.'
-          : 'No answer generated. Relevant passages are shown below.'),
-        sources: data.sources,
-        entitiesReferenced: data.entitiesReferenced,
-        noSufficientContext: data.noSufficientContext,
+        text: 'Here are the relevant passages found in your documents. (Full AI-generated answers require the Express server to be running.)',
+        sources,
+        noSufficientContext: false,
         timestamp: new Date(),
       }
-
       set({ messages: [...get().messages, answerMsg], loading: false })
     } catch (error) {
-      const answerMsg: QAMessage = {
+      console.error('Q&A error:', error)
+      const errorMsg: QAMessage = {
         id: crypto.randomUUID(),
         type: 'answer',
-        text: 'An error occurred. Please try again.',
+        text: 'An error occurred while searching. Please try again.',
         timestamp: new Date(),
       }
-      set({ messages: [...get().messages, answerMsg], loading: false })
+      set({ messages: [...get().messages, errorMsg], loading: false })
     }
   },
 

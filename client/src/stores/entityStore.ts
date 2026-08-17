@@ -48,12 +48,6 @@ interface EntityState {
   fetchEntityDetail: (projectId: string, entityId: string) => Promise<void>
 }
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session?.access_token) return {}
-  return { 'Authorization': `Bearer ${session.access_token}` }
-}
-
 export const useEntityStore = create<EntityState>((set, get) => ({
   entities: [],
   mergeSuggestions: [],
@@ -64,16 +58,31 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   fetchEntities: async (projectId, filters) => {
     set({ loading: true })
     try {
-      const headers = await getAuthHeaders()
-      const params = new URLSearchParams()
-      if (filters?.type) params.set('type', filters.type)
-      if (filters?.status) params.set('status', filters.status)
-      const url = `/api/projects/${projectId}/entities${params.toString() ? '?' + params.toString() : ''}`
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { set({ loading: false }); return }
 
-      const response = await fetch(url, { headers })
-      if (response.ok) {
-        const data = await response.json()
-        set({ entities: data.entities || [] })
+      let query = supabase
+        .from('entities')
+        .select('id, name, entity_type, status, aliases, metadata, created_at, updated_at')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .neq('status', 'merged')
+        .order('name')
+
+      if (filters?.type) {
+        query = query.eq('entity_type', filters.type)
+      }
+      if (filters?.status) {
+        query = query.eq('status', filters.status)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        console.error('Failed to fetch entities:', error)
+        set({ entities: [] })
+      } else {
+        set({ entities: (data as Entity[]) || [] })
       }
     } catch (error) {
       console.error('Failed to fetch entities:', error)
@@ -82,80 +91,75 @@ export const useEntityStore = create<EntityState>((set, get) => ({
     }
   },
 
-  fetchMergeSuggestions: async (projectId) => {
-    try {
-      const headers = await getAuthHeaders()
-      const response = await fetch(`/api/projects/${projectId}/entities/suggestions/merge`, { headers })
-      if (response.ok) {
-        const data = await response.json()
-        set({ mergeSuggestions: data.suggestions || [] })
-      }
-    } catch (error) {
-      console.error('Failed to fetch merge suggestions:', error)
-    }
+  fetchMergeSuggestions: async (_projectId) => {
+    // Merge suggestions require server-side processing (deduplication logic).
+    // On static hosting, this is a no-op. Suggestions only available with Express server.
+    set({ mergeSuggestions: [] })
   },
 
-  confirmEntity: async (projectId, entityId) => {
+  confirmEntity: async (_projectId, entityId) => {
     try {
-      const headers = await getAuthHeaders()
-      await fetch(`/api/projects/${projectId}/entities/${entityId}`, {
-        method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'confirmed' }),
-      })
-      set({
-        entities: get().entities.map(e =>
-          e.id === entityId ? { ...e, status: 'confirmed' } : e
-        ),
-      })
+      const { error } = await supabase
+        .from('entities')
+        .update({ status: 'confirmed' })
+        .eq('id', entityId)
+
+      if (!error) {
+        set({
+          entities: get().entities.map(e =>
+            e.id === entityId ? { ...e, status: 'confirmed' } : e
+          ),
+        })
+      }
     } catch (error) {
       console.error('Failed to confirm entity:', error)
     }
   },
 
-  dismissEntity: async (projectId, entityId) => {
+  dismissEntity: async (_projectId, entityId) => {
     try {
-      const headers = await getAuthHeaders()
-      await fetch(`/api/projects/${projectId}/entities/${entityId}`, {
-        method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'dismissed' }),
-      })
-      set({
-        entities: get().entities.filter(e => e.id !== entityId),
-      })
+      const { error } = await supabase
+        .from('entities')
+        .update({ status: 'dismissed' })
+        .eq('id', entityId)
+
+      if (!error) {
+        set({
+          entities: get().entities.filter(e => e.id !== entityId),
+        })
+      }
     } catch (error) {
       console.error('Failed to dismiss entity:', error)
     }
   },
 
-  mergeEntities: async (projectId, entityAId, entityBId) => {
-    try {
-      const headers = await getAuthHeaders()
-      await fetch(`/api/projects/${projectId}/entities/merge`, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entity_a_id: entityAId, entity_b_id: entityBId }),
-      })
-      // Refresh entities and suggestions
-      await get().fetchEntities(projectId)
-      await get().fetchMergeSuggestions(projectId)
-    } catch (error) {
-      console.error('Failed to merge entities:', error)
-    }
+  mergeEntities: async (projectId, _entityAId, _entityBId) => {
+    // Merge requires server-side logic. No-op on static hosting.
+    // Refresh to show current state
+    await get().fetchEntities(projectId)
   },
 
-  fetchEntityDetail: async (projectId, entityId) => {
+  fetchEntityDetail: async (_projectId, entityId) => {
     try {
-      const headers = await getAuthHeaders()
-      const response = await fetch(`/api/projects/${projectId}/entities/${entityId}`, { headers })
-      if (response.ok) {
-        const data = await response.json()
-        set({
-          selectedEntity: data.entity,
-          entityMentions: data.mentions || [],
-        })
-      }
+      const { data: entity } = await supabase
+        .from('entities')
+        .select('*')
+        .eq('id', entityId)
+        .single()
+
+      const { data: mentions } = await supabase
+        .from('entity_mentions')
+        .select(`
+          id, context_snippet, mention_text, created_at,
+          document_chunks (id, chapter_number, chapter_title, page, position)
+        `)
+        .eq('entity_id', entityId)
+        .order('created_at')
+
+      set({
+        selectedEntity: entity as Entity | null,
+        entityMentions: (mentions as unknown as EntityMention[]) || [],
+      })
     } catch (error) {
       console.error('Failed to fetch entity detail:', error)
     }
