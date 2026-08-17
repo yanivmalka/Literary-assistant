@@ -155,7 +155,9 @@
       "noNameNeeded": "לא נדרש שם",
       "suggestName": "הצע שם",
       "enterName": "הכנס שם...",
-      "allNamed": "לכל המקומות יש שם!"
+      "allNamed": "לכל המקומות יש שם!",
+      "suggestions": "שמות מוצעים",
+      "refresh": "צור שמות חדשים"
     },
     "prompt": {
       "title": "ייצור פרומפט",

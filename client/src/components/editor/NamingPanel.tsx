@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Sparkles, Check } from 'lucide-react'
+import { Sparkles, Check, RefreshCw } from 'lucide-react'
 import { useMapStore } from '@/stores/mapStore'
 import { MARKER_DEFINITIONS } from '@/lib/types'
+import { generateFantasyNames } from '@/lib/nameGenerator'
 
 export default function NamingPanel() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { markers, regions, updateMarker, updateRegion } = useMapStore()
   const [suggestingFor, setSuggestingFor] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<string[]>([])
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
 
   // Get unnamed markers (excluding borders which don't need names)
   const unnamedMarkers = markers.filter(
@@ -17,23 +17,21 @@ export default function NamingPanel() {
   )
   const unnamedRegions = regions.filter(r => !r.name && !r.noNameNeeded)
 
-  const handleSuggestNames = async (id: string, context: string) => {
+  const getMarkerLabel = (type: string): string => {
+    const def = MARKER_DEFINITIONS.find(d => d.type === type)
+    if (def) return t(def.labelKey)
+    return type
+  }
+
+  const handleSuggestNames = (id: string) => {
     setSuggestingFor(id)
-    setLoadingSuggestions(true)
+    const names = generateFantasyNames(i18n.language, 5)
+    setSuggestions(names)
+  }
 
-    try {
-      const response = await fetch('/api/suggest-names', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context, style: 'fantasy' }),
-      })
-      const data = await response.json()
-      setSuggestions(data.suggestions || [])
-    } catch {
-      setSuggestions(['Eldoria', 'Thornvale', 'Mistpeak', 'Shadowmere', 'Crystalford'])
-    }
-
-    setLoadingSuggestions(false)
+  const handleRefreshSuggestions = () => {
+    const names = generateFantasyNames(i18n.language, 5)
+    setSuggestions(names)
   }
 
   const applyNameToMarker = (markerId: string, name: string) => {
@@ -53,14 +51,14 @@ export default function NamingPanel() {
       <h3 className="text-sm font-semibold mb-3">{t('editor.naming.title')}</h3>
 
       {unnamedMarkers.length === 0 && unnamedRegions.length === 0 ? (
-        <p className="text-xs text-muted-foreground">All places are named!</p>
+        <p className="text-xs text-muted-foreground">{t('editor.naming.allNamed')}</p>
       ) : (
         <div className="space-y-2">
           {/* Unnamed regions */}
           {unnamedRegions.map((region) => (
             <div key={region.id} className="border rounded p-2 text-sm">
               <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium capitalize">{region.type} region</span>
+                <span className="font-medium">{getMarkerLabel(region.type)}</span>
               </div>
               <input
                 type="text"
@@ -79,7 +77,7 @@ export default function NamingPanel() {
               />
               <div className="flex items-center gap-2 mt-1">
                 <button
-                  onClick={() => handleSuggestNames(region.id, region.type)}
+                  onClick={() => handleSuggestNames(region.id)}
                   className="text-xs text-primary flex items-center gap-1 hover:underline"
                 >
                   <Sparkles className="h-3 w-3" />
@@ -105,7 +103,7 @@ export default function NamingPanel() {
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: def?.color }}
                   />
-                  <span className="font-medium capitalize">{marker.type}</span>
+                  <span className="font-medium">{getMarkerLabel(marker.type)}</span>
                 </div>
                 <input
                   type="text"
@@ -124,7 +122,7 @@ export default function NamingPanel() {
                 />
                 <div className="flex items-center gap-2 mt-1">
                   <button
-                    onClick={() => handleSuggestNames(marker.id, marker.type)}
+                    onClick={() => handleSuggestNames(marker.id)}
                     className="text-xs text-primary flex items-center gap-1 hover:underline"
                   >
                     <Sparkles className="h-3 w-3" />
@@ -143,33 +141,38 @@ export default function NamingPanel() {
         </div>
       )}
 
-      {/* Suggestions popup */}
+      {/* Suggestions popup with refresh */}
       {suggestingFor && (
         <div className="mt-3 border rounded p-2 bg-secondary/50">
-          <p className="text-xs font-medium mb-2">Suggestions:</p>
-          {loadingSuggestions ? (
-            <p className="text-xs text-muted-foreground">Generating...</p>
-          ) : (
-            <div className="space-y-1">
-              {suggestions.map((name) => (
-                <button
-                  key={name}
-                  onClick={() => {
-                    const isRegion = regions.some(r => r.id === suggestingFor)
-                    if (isRegion) {
-                      applyNameToRegion(suggestingFor, name)
-                    } else {
-                      applyNameToMarker(suggestingFor, name)
-                    }
-                  }}
-                  className="w-full text-start px-2 py-1 text-xs rounded hover:bg-accent flex items-center gap-2"
-                >
-                  <Check className="h-3 w-3 text-primary" />
-                  {name}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium">{t('editor.naming.suggestions')}</p>
+            <button
+              onClick={handleRefreshSuggestions}
+              className="p-1 hover:bg-accent rounded transition-colors"
+              title={t('editor.naming.refresh')}
+            >
+              <RefreshCw className="h-3.5 w-3.5 text-primary" />
+            </button>
+          </div>
+          <div className="space-y-1">
+            {suggestions.map((name, idx) => (
+              <button
+                key={`${name}-${idx}`}
+                onClick={() => {
+                  const isRegion = regions.some(r => r.id === suggestingFor)
+                  if (isRegion) {
+                    applyNameToRegion(suggestingFor, name)
+                  } else {
+                    applyNameToMarker(suggestingFor, name)
+                  }
+                }}
+                className="w-full text-start px-2 py-1 text-xs rounded hover:bg-accent flex items-center gap-2"
+              >
+                <Check className="h-3 w-3 text-primary" />
+                {name}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>

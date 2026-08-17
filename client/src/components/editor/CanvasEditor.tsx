@@ -1,5 +1,5 @@
 import { useRef, useCallback, useEffect, useState } from 'react'
-import { Stage, Layer, Circle, Line, Text, RegularPolygon, Image as KonvaImage, Rect } from 'react-konva'
+import { Stage, Layer, Circle, Line, Text, RegularPolygon, Image as KonvaImage, Rect, Transformer } from 'react-konva'
 import { useMapStore } from '@/stores/mapStore'
 import { MARKER_DEFINITIONS } from '@/lib/types'
 import type { MarkerType, CanvasMarker, MarkerShape } from '@/lib/types'
@@ -7,6 +7,8 @@ import type Konva from 'konva'
 
 export default function CanvasEditor() {
   const stageRef = useRef<Konva.Stage>(null)
+  const transformerRef = useRef<Konva.Transformer>(null)
+  const selectedShapeRef = useRef<Konva.Node | null>(null)
   const {
     currentMap,
     markers,
@@ -38,6 +40,31 @@ export default function CanvasEditor() {
       setBgImage(null)
     }
   }, [currentMap?.final_image_url])
+
+  // Attach transformer to selected marker
+  useEffect(() => {
+    if (selectedMarkerId && transformerRef.current && stageRef.current) {
+      const selectedNode = stageRef.current.findOne(`#marker-${selectedMarkerId}`)
+      if (selectedNode) {
+        // Check if this marker type is resizable
+        const marker = markers.find(m => m.id === selectedMarkerId)
+        const def = marker ? MARKER_DEFINITIONS.find(d => d.type === marker.type) : null
+        const isResizable = def?.resizable !== false
+
+        if (isResizable) {
+          transformerRef.current.nodes([selectedNode])
+          transformerRef.current.getLayer()?.batchDraw()
+        } else {
+          transformerRef.current.nodes([])
+        }
+        selectedShapeRef.current = selectedNode
+      }
+    } else if (transformerRef.current) {
+      transformerRef.current.nodes([])
+      transformerRef.current.getLayer()?.batchDraw()
+      selectedShapeRef.current = null
+    }
+  }, [selectedMarkerId, markers])
 
   const generateId = () => crypto.randomUUID()
 
@@ -227,6 +254,7 @@ export default function CanvasEditor() {
             return (
               <MarkerShape
                 key={marker.id}
+                id={`marker-${marker.id}`}
                 marker={marker}
                 def={{ color: markerColor, shape: markerShape, size: markerSize, strokeColor: markerStroke }}
                 isSelected={isSelected}
@@ -268,6 +296,18 @@ export default function CanvasEditor() {
               />
             )
           })}
+
+          {/* Transformer for resize/rotate/stretch */}
+          <Transformer
+            ref={transformerRef}
+            rotateEnabled={true}
+            enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top-center', 'bottom-center']}
+            boundBoxFunc={(oldBox, newBox) => {
+              // Limit minimum size
+              if (newBox.width < 5 || newBox.height < 5) return oldBox
+              return newBox
+            }}
+          />
         </Layer>
       </Stage>
     </div>
@@ -275,6 +315,7 @@ export default function CanvasEditor() {
 }
 
 interface MarkerShapeProps {
+  id: string
   marker: CanvasMarker
   def: { color: string; shape: string; size: number; strokeColor?: string }
   isSelected: boolean
@@ -282,8 +323,9 @@ interface MarkerShapeProps {
   onDragEnd: (e: Konva.KonvaEventObject<DragEvent>) => void
 }
 
-function MarkerShape({ marker, def, isSelected, onClick, onDragEnd }: MarkerShapeProps) {
+function MarkerShape({ id, marker, def, isSelected, onClick, onDragEnd }: MarkerShapeProps) {
   const commonProps = {
+    id,
     x: marker.x,
     y: marker.y,
     draggable: true,
@@ -339,6 +381,7 @@ function MarkerShape({ marker, def, isSelected, onClick, onDragEnd }: MarkerShap
   if (def.shape === 'square') {
     return (
       <Rect
+        id={id}
         x={marker.x - def.size / 2}
         y={marker.y - def.size / 2}
         width={def.size}
@@ -357,6 +400,7 @@ function MarkerShape({ marker, def, isSelected, onClick, onDragEnd }: MarkerShap
   if (def.shape === 'line') {
     return (
       <Line
+        id={id}
         x={marker.x}
         y={marker.y}
         points={[-8, 8, 8, -8]}

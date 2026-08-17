@@ -155,7 +155,9 @@
       "noNameNeeded": "No name needed",
       "suggestName": "Suggest a name",
       "enterName": "Enter name...",
-      "allNamed": "All places are named!"
+      "allNamed": "All places are named!",
+      "suggestions": "Suggested Names",
+      "refresh": "Generate new names"
     },
     "prompt": {
       "title": "Generate Prompt",
