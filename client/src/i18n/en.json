@@ -125,7 +125,8 @@
       "deleteSelected": "Delete Selected Marker",
       "clearAll": "Clear All",
       "clearAllTitle": "Clear All Markers",
-      "clearAllWarning": "This will remove all markers and regions from the canvas. This action can be undone."
+      "clearAllWarning": "This will remove all markers and regions from the canvas. This action can be undone.",
+      "strokeWidth": "Width"
     },
     "markers": {
       "title": "Markers",

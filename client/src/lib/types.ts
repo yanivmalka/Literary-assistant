@@ -103,6 +103,7 @@ export interface CanvasMarker {
   color?: string
   strokeColor?: string
   size?: number
+  strokeWidth?: number
 }
 
 export interface CanvasRegion {

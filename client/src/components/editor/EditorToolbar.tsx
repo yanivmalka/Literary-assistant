@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ZoomIn, ZoomOut, Maximize, RotateCcw, Undo2, Redo2, Save, Trash2, XCircle } from 'lucide-react'
 import { useMapStore } from '@/stores/mapStore'
+import { MARKER_DEFINITIONS } from '@/lib/types'
 
 export default function EditorToolbar() {
   const { t } = useTranslation()
-  const { currentMap, scale, setScale, setViewport, undo, redo, saveCanvas, isDirty, historyIndex, history, selectedMarkerId, removeMarker, clearAll, markers, regions } = useMapStore()
+  const { currentMap, scale, setScale, setViewport, undo, redo, saveCanvas, isDirty, historyIndex, history, selectedMarkerId, removeMarker, clearAll, markers, regions, updateMarker } = useMapStore()
   const [showClearConfirm, setShowClearConfirm] = useState(false)
 
   const handleZoomIn = () => setScale(Math.min(scale * 1.2, 5))
@@ -35,6 +36,18 @@ export default function EditorToolbar() {
   }
 
   const hasContent = markers.length > 0 || regions.length > 0
+
+  // Check if selected marker is a line-type (supports stroke width)
+  const selectedMarker = selectedMarkerId ? markers.find(m => m.id === selectedMarkerId) : null
+  const selectedDef = selectedMarker ? MARKER_DEFINITIONS.find(d => d.type === selectedMarker.type) : null
+  const isLineType = selectedMarker && (selectedMarker.shape === 'line' || selectedDef?.shape === 'line' || selectedDef?.hasShapeMenu)
+  const currentStrokeWidth = selectedMarker?.strokeWidth ?? 3
+
+  const handleStrokeWidthChange = (value: number) => {
+    if (selectedMarkerId) {
+      updateMarker(selectedMarkerId, { strokeWidth: value })
+    }
+  }
 
   return (
     <>
@@ -120,6 +133,26 @@ export default function EditorToolbar() {
           </button>
 
           <div className="w-px h-5 bg-border mx-2" />
+
+          {/* Stroke width control for line markers */}
+          {isLineType && selectedMarkerId && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">{t('editor.toolbar.strokeWidth')}</span>
+                <input
+                  type="range"
+                  min="1"
+                  max="12"
+                  step="0.5"
+                  value={currentStrokeWidth}
+                  onChange={(e) => handleStrokeWidthChange(parseFloat(e.target.value))}
+                  className="w-16 h-1 accent-primary"
+                />
+                <span className="text-xs text-muted-foreground w-4">{currentStrokeWidth}</span>
+              </div>
+              <div className="w-px h-5 bg-border mx-2" />
+            </>
+          )}
 
           <button
             onClick={saveCanvas}

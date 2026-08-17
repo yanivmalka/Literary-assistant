@@ -451,7 +451,7 @@ function MarkerShape({ id, marker, def, isSelected, onClick, onDragEnd }: Marker
         y={marker.y}
         points={[-8, 8, 8, -8]}
         stroke={def.color}
-        strokeWidth={3}
+        strokeWidth={marker.strokeWidth ?? 3}
         lineCap="round"
         draggable
         onClick={onClick}
