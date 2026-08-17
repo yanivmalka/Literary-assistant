@@ -81,7 +81,7 @@ export default function MapWizardPage() {
                 style={{ borderColor: material === value ? undefined : 'transparent' }}
               >
                 <img
-                  src={image}
+                  src={`${import.meta.env.BASE_URL}${image}`}
                   alt={t(labelKey)}
                   className="absolute inset-0 w-full h-full object-cover"
                   onError={(e) => {

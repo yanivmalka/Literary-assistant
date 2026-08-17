@@ -161,11 +161,11 @@ export const MARKER_DEFINITIONS: MarkerDefinition[] = [
 ]
 
 export const MATERIALS: { value: MapMaterial; labelKey: string; bgColor: string; textColor: string; image: string }[] = [
-  { value: 'parchment', labelKey: 'maps.materials.parchment', bgColor: '#F5E6D3', textColor: '#5C3D1E', image: '/materials/parchment.jpg' },
-  { value: 'paper', labelKey: 'maps.materials.paper', bgColor: '#FFFFFF', textColor: '#1F2937', image: '/materials/paper.jpg' },
-  { value: 'aged', labelKey: 'maps.materials.aged', bgColor: '#E8D5A3', textColor: '#6B4E1B', image: '/materials/aged.jpg' },
-  { value: 'leather', labelKey: 'maps.materials.leather', bgColor: '#4A2C17', textColor: '#F5E6D3', image: '/materials/leather.jpg' },
-  { value: 'stone', labelKey: 'maps.materials.stone', bgColor: '#9CA3AF', textColor: '#1F2937', image: '/materials/stone.jpg' },
+  { value: 'parchment', labelKey: 'maps.materials.parchment', bgColor: '#F5E6D3', textColor: '#5C3D1E', image: 'materials/parchment.jpg' },
+  { value: 'paper', labelKey: 'maps.materials.paper', bgColor: '#FFFFFF', textColor: '#1F2937', image: 'materials/paper.jpg' },
+  { value: 'aged', labelKey: 'maps.materials.aged', bgColor: '#E8D5A3', textColor: '#6B4E1B', image: 'materials/aged.jpg' },
+  { value: 'leather', labelKey: 'maps.materials.leather', bgColor: '#4A2C17', textColor: '#F5E6D3', image: 'materials/leather.jpg' },
+  { value: 'stone', labelKey: 'maps.materials.stone', bgColor: '#9CA3AF', textColor: '#1F2937', image: 'materials/stone.jpg' },
 ]
 
 export const MAP_TYPES: { value: MapType; labelKey: string }[] = [
