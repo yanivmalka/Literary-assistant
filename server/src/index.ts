@@ -4,6 +4,8 @@ import dotenv from 'dotenv'
 import { getAIStatus } from './ai/index.js'
 import documentRoutes from './documents/routes.js'
 import { entityRoutes } from './entities/index.js'
+import { profileRoutes } from './profiles/index.js'
+import { qaRoutes } from './qa/index.js'
 
 dotenv.config()
 
@@ -38,6 +40,16 @@ app.use('/api', documentRoutes)
 // Entity Routes
 // ============================================
 app.use('/api', entityRoutes)
+
+// ============================================
+// Profile Routes
+// ============================================
+app.use('/api', profileRoutes)
+
+// ============================================
+// Q&A Routes
+// ============================================
+app.use('/api', qaRoutes)
 
 // ============================================
 // AI Name Suggestion Endpoint
