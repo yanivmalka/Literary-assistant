@@ -1,6 +1,8 @@
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
+import { getAIStatus } from './ai/index.js'
+import documentRoutes from './documents/routes.js'
 
 dotenv.config()
 
@@ -15,6 +17,21 @@ app.use(express.json())
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
+
+// AI status endpoint
+app.get('/api/ai/status', async (_req, res) => {
+  try {
+    const status = await getAIStatus()
+    res.json(status)
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get AI status' })
+  }
+})
+
+// ============================================
+// Document Analysis Routes
+// ============================================
+app.use('/api', documentRoutes)
 
 // ============================================
 // AI Name Suggestion Endpoint
