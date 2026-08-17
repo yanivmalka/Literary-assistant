@@ -6,9 +6,11 @@ import ToastContainer from './components/Toast'
 import './index.css'
 import './i18n'
 
+const basename = import.meta.env.BASE_URL
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <App />
       <ToastContainer />
     </BrowserRouter>
