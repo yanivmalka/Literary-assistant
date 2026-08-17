@@ -1,0 +1,168 @@
+{
+  "app": {
+    "title": "Fantasy Map Builder"
+  },
+  "common": {
+    "comingSoon": "Coming Soon",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "create": "Create",
+    "edit": "Edit",
+    "export": "Export",
+    "upload": "Upload",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next"
+  },
+  "home": {
+    "welcome": "Build Maps for Your Fantasy Worlds",
+    "subtitle": "An interactive tool for fantasy authors to create, edit, and visualize world maps with AI-powered prompt generation",
+    "hero": {
+      "badge": "AI-Powered Map Building",
+      "cta": "Start Creating"
+    },
+    "features": {
+      "title": "How It Works",
+      "canvas": {
+        "title": "Interactive Canvas",
+        "description": "Place markers for cities, mountains, rivers, and more on an interactive canvas with drag & drop"
+      },
+      "prompt": {
+        "title": "AI Prompt Generation",
+        "description": "Generate detailed prompts for AI image tools like Midjourney, DALL-E, or Stable Diffusion"
+      },
+      "export": {
+        "title": "Export & Upload",
+        "description": "Export your canvas as PNG/JPG/PDF, or upload your AI-generated final map back to the project"
+      }
+    },
+    "modules": {
+      "title": "Modules",
+      "subtitle": "Tools designed for fantasy authors",
+      "available": "Available Now"
+    },
+    "maps": {
+      "title": "Maps",
+      "description": "Create interactive maps for your fantasy world with AI-powered tools"
+    },
+    "characters": {
+      "title": "Characters",
+      "description": "Manage character profiles, appearances, and track descriptions across your story"
+    },
+    "environment": {
+      "title": "Environments",
+      "description": "Build environment profiles for locations and track their impact on the plot"
+    },
+    "magic": {
+      "title": "Magic & Abilities",
+      "description": "Document magic systems, abilities, and their logical rules"
+    },
+    "footer": {
+      "languages": "Available in English and Hebrew"
+    }
+  },
+  "auth": {
+    "login": "Log In",
+    "signup": "Sign Up",
+    "logout": "Log Out",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "loginWithGoogle": "Continue with Google",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?"
+  },
+  "projects": {
+    "title": "My Creations",
+    "create": "New Project",
+    "empty": "No projects yet. Create your first one!",
+    "trash": "Trash",
+    "restore": "Restore",
+    "deletePermanently": "Delete Permanently",
+    "daysRemaining": "{{days}} days until permanent deletion",
+    "name": "Project Name",
+    "description": "Description"
+  },
+  "maps": {
+    "create": "New Map",
+    "wizard": {
+      "materialTitle": "Choose Material",
+      "materialSubtitle": "What will your map be printed on?",
+      "typeTitle": "Choose Map Type",
+      "typeSubtitle": "What area does your map cover?",
+      "descriptionTitle": "Describe Your Map",
+      "descriptionSubtitle": "Describe the general structure and layout",
+      "mapName": "Map Name",
+      "mapNamePlaceholder": "e.g. The Realm of Eldoria",
+      "descriptionPlaceholder": "Describe the general layout: continents, major geographical features, position of key locations..."
+    },
+    "materials": {
+      "parchment": "Parchment",
+      "paper": "Paper",
+      "aged": "Aged Paper",
+      "leather": "Leather",
+      "stone": "Stone"
+    },
+    "types": {
+      "world": "World",
+      "continent": "Continent",
+      "country": "Country",
+      "city": "City",
+      "region": "Custom Region"
+    }
+  },
+  "editor": {
+    "toolbar": {
+      "zoomIn": "Zoom In",
+      "zoomOut": "Zoom Out",
+      "fitToScreen": "Fit to Screen",
+      "resetView": "Reset View",
+      "undo": "Undo",
+      "redo": "Redo"
+    },
+    "markers": {
+      "title": "Markers",
+      "water": "Water (Sea/Lake/River)",
+      "mountains": "Mountains",
+      "city": "City",
+      "capital": "Capital City",
+      "borders": "Borders",
+      "desert": "Desert",
+      "forest": "Forest",
+      "village": "Village/Town",
+      "custom": "Custom Illustration",
+      "instructions": "Click to select tool, then click on map to place. Or drag marker directly onto the canvas."
+    },
+    "naming": {
+      "title": "Place Names",
+      "unnamed": "Unnamed places",
+      "noNameNeeded": "No name needed",
+      "suggestName": "Suggest a name",
+      "enterName": "Enter name...",
+      "allNamed": "All places are named!"
+    },
+    "prompt": {
+      "title": "Generate Prompt",
+      "generate": "Generate AI Prompt",
+      "copy": "Copy to Clipboard",
+      "copied": "Copied!",
+      "edit": "Edit Prompt",
+      "history": "Prompt History"
+    },
+    "upload": {
+      "title": "Upload Final Map",
+      "dropzone": "Drag & drop your AI-generated map here, or click to browse",
+      "preview": "Preview",
+      "confirm": "Confirm Upload"
+    }
+  },
+  "export": {
+    "title": "Export Map",
+    "format": "Format",
+    "quality": "Quality",
+    "download": "Download"
+  }
+}

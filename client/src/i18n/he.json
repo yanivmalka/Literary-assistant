@@ -1,0 +1,168 @@
+{
+  "app": {
+    "title": "בונה מפות פנטזיה"
+  },
+  "common": {
+    "comingSoon": "בקרוב",
+    "save": "שמור",
+    "cancel": "ביטול",
+    "delete": "מחק",
+    "create": "צור",
+    "edit": "ערוך",
+    "export": "ייצוא",
+    "upload": "העלאה",
+    "loading": "טוען...",
+    "error": "משהו השתבש",
+    "confirm": "אשר",
+    "back": "חזרה",
+    "next": "הבא"
+  },
+  "home": {
+    "welcome": "בנה מפות לעולמות הפנטזיה שלך",
+    "subtitle": "כלי אינטראקטיבי לסופרי פנטזיה ליצירה, עריכה והמחשת מפות עולם עם יצירת פרומפטים מונחית AI",
+    "hero": {
+      "badge": "בניית מפות מונחית AI",
+      "cta": "התחל ליצור"
+    },
+    "features": {
+      "title": "איך זה עובד",
+      "canvas": {
+        "title": "קנבס אינטראקטיבי",
+        "description": "הנח סמנים לערים, הרים, נהרות ועוד על קנבס אינטראקטיבי עם גרירה ושחרור"
+      },
+      "prompt": {
+        "title": "יצירת פרומפט AI",
+        "description": "צור פרומפטים מפורטים לכלי תמונות AI כמו Midjourney, DALL-E או Stable Diffusion"
+      },
+      "export": {
+        "title": "ייצוא והעלאה",
+        "description": "ייצא את הקנבס כ-PNG/JPG/PDF, או העלה את המפה הסופית שיצרת בכלי AI חזרה לפרויקט"
+      }
+    },
+    "modules": {
+      "title": "מודולים",
+      "subtitle": "כלים שתוכננו עבור סופרי פנטזיה",
+      "available": "זמין כעת"
+    },
+    "maps": {
+      "title": "מפות",
+      "description": "צור מפות אינטראקטיביות לעולם הפנטזיה שלך עם כלים מונחי AI"
+    },
+    "characters": {
+      "title": "דמויות",
+      "description": "נהל פרופילי דמויות, מראה חיצוני ועקוב אחר תיאורים לאורך הסיפור"
+    },
+    "environment": {
+      "title": "סביבות",
+      "description": "בנה פרופילי סביבה למיקומים ועקוב אחר ההשפעה שלהם על העלילה"
+    },
+    "magic": {
+      "title": "קסם ויכולות",
+      "description": "תעד מערכות קסם, יכולות והכללים הלוגיים שלהם"
+    },
+    "footer": {
+      "languages": "זמין באנגלית ובעברית"
+    }
+  },
+  "auth": {
+    "login": "התחבר",
+    "signup": "הירשם",
+    "logout": "התנתק",
+    "email": "אימייל",
+    "password": "סיסמה",
+    "confirmPassword": "אשר סיסמה",
+    "loginWithGoogle": "המשך עם Google",
+    "noAccount": "אין לך חשבון?",
+    "hasAccount": "כבר יש לך חשבון?"
+  },
+  "projects": {
+    "title": "היצירות שלי",
+    "create": "פרויקט חדש",
+    "empty": "אין פרויקטים עדיין. צור את הראשון!",
+    "trash": "אשפה",
+    "restore": "שחזר",
+    "deletePermanently": "מחק לצמיתות",
+    "daysRemaining": "{{days}} ימים עד מחיקה לצמיתות",
+    "name": "שם הפרויקט",
+    "description": "תיאור"
+  },
+  "maps": {
+    "create": "מפה חדשה",
+    "wizard": {
+      "materialTitle": "בחר חומר",
+      "materialSubtitle": "על מה המפה שלך \"תודפס\"?",
+      "typeTitle": "בחר סוג מפה",
+      "typeSubtitle": "איזה אזור המפה מכסה?",
+      "descriptionTitle": "תאר את המפה שלך",
+      "descriptionSubtitle": "תאר את המבנה והפריסה הכלליים",
+      "mapName": "שם המפה",
+      "mapNamePlaceholder": "לדוגמה: ממלכת אלדוריה",
+      "descriptionPlaceholder": "תאר את הפריסה הכללית: יבשות, תכונות גיאוגרפיות מרכזיות, מיקום מקומות מפתח..."
+    },
+    "materials": {
+      "parchment": "קלף",
+      "paper": "נייר",
+      "aged": "נייר מיושן",
+      "leather": "עור",
+      "stone": "אבן"
+    },
+    "types": {
+      "world": "עולם",
+      "continent": "יבשת",
+      "country": "מדינה",
+      "city": "עיר",
+      "region": "אזור מותאם"
+    }
+  },
+  "editor": {
+    "toolbar": {
+      "zoomIn": "הגדל",
+      "zoomOut": "הקטן",
+      "fitToScreen": "התאם למסך",
+      "resetView": "אפס תצוגה",
+      "undo": "בטל",
+      "redo": "בצע שוב"
+    },
+    "markers": {
+      "title": "סמנים",
+      "water": "מים (ים/אגם/נהר)",
+      "mountains": "הרים",
+      "city": "עיר",
+      "capital": "עיר בירה",
+      "borders": "גבולות",
+      "desert": "מדבר",
+      "forest": "יער/חורש",
+      "village": "כפר/עיירה",
+      "custom": "איור ייחודי",
+      "instructions": "לחץ לבחירת כלי, ואז לחץ על המפה להנחה. או גרור סמן ישירות לקנבס."
+    },
+    "naming": {
+      "title": "שמות מקומות",
+      "unnamed": "מקומות ללא שם",
+      "noNameNeeded": "לא נדרש שם",
+      "suggestName": "הצע שם",
+      "enterName": "הכנס שם...",
+      "allNamed": "לכל המקומות יש שם!"
+    },
+    "prompt": {
+      "title": "ייצור פרומפט",
+      "generate": "ייצר פרומפט AI",
+      "copy": "העתק ללוח",
+      "copied": "הועתק!",
+      "edit": "ערוך פרומפט",
+      "history": "היסטוריית פרומפטים"
+    },
+    "upload": {
+      "title": "העלה מפה סופית",
+      "dropzone": "גרור ושחרר את המפה שיצרת כאן, או לחץ לעיון",
+      "preview": "תצוגה מקדימה",
+      "confirm": "אשר העלאה"
+    }
+  },
+  "export": {
+    "title": "ייצוא מפה",
+    "format": "פורמט",
+    "quality": "איכות",
+    "download": "הורד"
+  }
+}
