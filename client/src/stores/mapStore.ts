@@ -41,6 +41,9 @@ interface MapState {
   updateRegion: (id: string, updates: Partial<CanvasRegion>) => void
   removeRegion: (id: string) => void
 
+  // Clear all
+  clearAll: () => void
+
   // History
   undo: () => void
   redo: () => void
@@ -157,6 +160,17 @@ export const useMapStore = create<MapState>((set, get) => ({
       markers: state.markers.map(m => m.regionId === id ? { ...m, regionId: null } : m),
       isDirty: true,
     }))
+  },
+
+  clearAll: () => {
+    get().pushHistory()
+    set({
+      markers: [],
+      regions: [],
+      selectedMarkerId: null,
+      activeToolType: null,
+      isDirty: true,
+    })
   },
 
   pushHistory: () => {

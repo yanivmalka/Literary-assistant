@@ -142,10 +142,14 @@ function buildPromptFromCanvas(
   const getPosition = (x: number, y: number): string => {
     const col = x < canvasWidth / 3 ? 'western' : x > (canvasWidth * 2) / 3 ? 'eastern' : 'central'
     const row = y < canvasHeight / 3 ? 'northern' : y > (canvasHeight * 2) / 3 ? 'southern' : 'central'
-    if (col === 'central' && row === 'central') return 'in the center'
-    if (row === 'central') return `in the ${col} part`
-    if (col === 'central') return `in the ${row} part`
-    return `in the ${row}-${col}`
+    const pctX = Math.round((x / canvasWidth) * 100)
+    const pctY = Math.round((y / canvasHeight) * 100)
+    let pos = ''
+    if (col === 'central' && row === 'central') pos = 'in the center'
+    else if (row === 'central') pos = `in the ${col} part`
+    else if (col === 'central') pos = `in the ${row} part`
+    else pos = `in the ${row}-${col}`
+    return `${pos} (at ~${pctX}% from left, ~${pctY}% from top)`
   }
 
   let prompt = `Create a fantasy map illustration: ${mapTypeDesc[mapType] || 'a fantasy map'}, ${materialStyles[material] || materialStyles.parchment}.\n\n`

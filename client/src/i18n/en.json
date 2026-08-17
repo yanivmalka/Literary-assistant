@@ -121,7 +121,11 @@
       "fitToScreen": "Fit to Screen",
       "resetView": "Reset View",
       "undo": "Undo",
-      "redo": "Redo"
+      "redo": "Redo",
+      "deleteSelected": "Delete Selected Marker",
+      "clearAll": "Clear All",
+      "clearAllTitle": "Clear All Markers",
+      "clearAllWarning": "This will remove all markers and regions from the canvas. This action can be undone."
     },
     "markers": {
       "title": "Markers",
@@ -134,7 +138,12 @@
       "forest": "Forest",
       "village": "Village/Town",
       "custom": "Custom Illustration",
-      "instructions": "Click to select tool, then click on map to place. Or drag marker directly onto the canvas."
+      "instructions": "Click to select tool, then click on map to place. Or drag marker directly onto the canvas.",
+      "addCustom": "Add Custom Marker",
+      "editMarker": "Edit Marker",
+      "markerName": "Name",
+      "markerColor": "Color",
+      "markerShape": "Shape"
     },
     "naming": {
       "title": "Place Names",

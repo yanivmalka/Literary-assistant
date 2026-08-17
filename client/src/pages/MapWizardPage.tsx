@@ -167,7 +167,7 @@ export default function MapWizardPage() {
           onClick={() => step > 1 ? setStep(step - 1) : navigate(-1)}
           className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-accent transition-colors"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" />
           {t('common.back')}
         </button>
 
@@ -177,7 +177,7 @@ export default function MapWizardPage() {
             className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
           >
             {t('common.next')}
-            <ArrowRight className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" />
           </button>
         ) : (
           <button

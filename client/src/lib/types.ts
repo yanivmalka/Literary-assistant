@@ -116,6 +116,7 @@ export interface CanvasState {
   viewportX: number
   viewportY: number
   scale: number
+  customMarkerDefs?: MarkerDefinition[]
 }
 
 // ============================================
@@ -126,8 +127,9 @@ export interface MarkerDefinition {
   type: MarkerType
   labelKey: string
   color: string
-  shape: 'circle' | 'triangle' | 'crown' | 'dot'
+  shape: 'circle' | 'triangle' | 'crown' | 'dot' | 'polygon' | 'line'
   size: number
+  isCustom?: boolean
 }
 
 export const MARKER_DEFINITIONS: MarkerDefinition[] = [

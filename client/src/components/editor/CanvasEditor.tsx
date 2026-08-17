@@ -1,5 +1,5 @@
-import { useRef, useCallback } from 'react'
-import { Stage, Layer, Circle, Line, Text, RegularPolygon } from 'react-konva'
+import { useRef, useCallback, useEffect, useState } from 'react'
+import { Stage, Layer, Circle, Line, Text, RegularPolygon, Image as KonvaImage, Rect } from 'react-konva'
 import { useMapStore } from '@/stores/mapStore'
 import { MARKER_DEFINITIONS } from '@/lib/types'
 import type { MarkerType, CanvasMarker } from '@/lib/types'
@@ -8,6 +8,7 @@ import type Konva from 'konva'
 export default function CanvasEditor() {
   const stageRef = useRef<Konva.Stage>(null)
   const {
+    currentMap,
     markers,
     regions,
     scale,
@@ -22,6 +23,20 @@ export default function CanvasEditor() {
     selectMarker,
     setActiveTool,
   } = useMapStore()
+
+  const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
+
+  // Load uploaded final image as background
+  useEffect(() => {
+    if (currentMap?.final_image_url) {
+      const img = new window.Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => setBgImage(img)
+      img.src = currentMap.final_image_url
+    } else {
+      setBgImage(null)
+    }
+  }, [currentMap?.final_image_url])
 
   const generateId = () => crypto.randomUUID()
 
@@ -56,8 +71,7 @@ export default function CanvasEditor() {
 
   // Handle click to place marker
   const handleStageClick = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
-    // If clicking on empty space (not on a shape), deselect
-    if (e.target === e.currentTarget) {
+    if (e.target === e.currentTarget || e.target.getClassName() === 'Image' || e.target.getClassName() === 'Rect') {
       if (activeToolType) {
         const stage = stageRef.current
         if (!stage) return
@@ -124,6 +138,9 @@ export default function CanvasEditor() {
   const getMarkerDef = (type: MarkerType) =>
     MARKER_DEFINITIONS.find(d => d.type === type) || MARKER_DEFINITIONS[0]
 
+  const stageWidth = typeof window !== 'undefined' ? window.innerWidth - 224 - 288 : 800
+  const stageHeight = typeof window !== 'undefined' ? window.innerHeight - 120 : 600
+
   return (
     <div
       className="w-full h-full bg-muted/30"
@@ -133,8 +150,8 @@ export default function CanvasEditor() {
     >
       <Stage
         ref={stageRef}
-        width={window.innerWidth - 56 * 4 - 72 * 4} // approximate
-        height={window.innerHeight - 120}
+        width={stageWidth}
+        height={stageHeight}
         scaleX={scale}
         scaleY={scale}
         x={viewportX}
@@ -149,6 +166,27 @@ export default function CanvasEditor() {
         }}
       >
         <Layer>
+          {/* Background - uploaded image or placeholder rect */}
+          {bgImage ? (
+            <KonvaImage
+              image={bgImage}
+              x={0}
+              y={0}
+              width={bgImage.naturalWidth || stageWidth}
+              height={bgImage.naturalHeight || stageHeight}
+              listening={false}
+            />
+          ) : (
+            <Rect
+              x={0}
+              y={0}
+              width={stageWidth / scale}
+              height={stageHeight / scale}
+              fill="#f8f9fa"
+              listening={false}
+            />
+          )}
+
           {/* Region boundaries */}
           {regions.map((region) => {
             if (region.boundaryPoints.length < 3) return null

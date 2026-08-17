@@ -1,15 +1,68 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import { useMapStore } from '@/stores/mapStore'
 import { MARKER_DEFINITIONS } from '@/lib/types'
-import type { MarkerType } from '@/lib/types'
+import type { MarkerType, MarkerDefinition } from '@/lib/types'
 
 export default function MarkerPalette() {
   const { t } = useTranslation()
   const { activeToolType, setActiveTool } = useMapStore()
+  const [customMarkers, setCustomMarkers] = useState<MarkerDefinition[]>([])
+  const [showEditor, setShowEditor] = useState(false)
+  const [editingMarker, setEditingMarker] = useState<MarkerDefinition | null>(null)
+  const [newName, setNewName] = useState('')
+  const [newColor, setNewColor] = useState('#6366F1')
+  const [newShape, setNewShape] = useState<MarkerDefinition['shape']>('circle')
+
+  const allMarkers = [...MARKER_DEFINITIONS, ...customMarkers]
 
   const handleDragStart = (e: React.DragEvent, type: MarkerType) => {
     e.dataTransfer.setData('marker-type', type)
     e.dataTransfer.effectAllowed = 'copy'
+  }
+
+  const handleAddCustom = () => {
+    setEditingMarker(null)
+    setNewName('')
+    setNewColor('#6366F1')
+    setNewShape('circle')
+    setShowEditor(true)
+  }
+
+  const handleEditCustom = (marker: MarkerDefinition) => {
+    setEditingMarker(marker)
+    setNewName(marker.labelKey)
+    setNewColor(marker.color)
+    setNewShape(marker.shape)
+    setShowEditor(true)
+  }
+
+  const handleDeleteCustom = (type: string) => {
+    setCustomMarkers(prev => prev.filter(m => m.type !== type))
+  }
+
+  const handleSaveCustom = () => {
+    if (!newName.trim()) return
+
+    if (editingMarker) {
+      setCustomMarkers(prev => prev.map(m =>
+        m.type === editingMarker.type
+          ? { ...m, labelKey: newName.trim(), color: newColor, shape: newShape }
+          : m
+      ))
+    } else {
+      const id = `custom_${Date.now()}`
+      setCustomMarkers(prev => [...prev, {
+        type: id as MarkerType,
+        labelKey: newName.trim(),
+        color: newColor,
+        shape: newShape,
+        size: 12,
+        isCustom: true,
+      }])
+    }
+    setShowEditor(false)
   }
 
   return (
@@ -18,32 +71,135 @@ export default function MarkerPalette() {
         {t('editor.markers.title')}
       </h3>
       <div className="space-y-1">
-        {MARKER_DEFINITIONS.map((def) => (
-          <button
-            key={def.type}
-            draggable
-            onDragStart={(e) => handleDragStart(e, def.type)}
-            onClick={() => setActiveTool(activeToolType === def.type ? null : def.type)}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors text-start ${
-              activeToolType === def.type
-                ? 'bg-primary/10 text-primary border border-primary/30'
-                : 'hover:bg-accent'
-            }`}
-          >
-            <MarkerIcon type={def.type} color={def.color} shape={def.shape} size={16} />
-            <span className="truncate">{t(def.labelKey)}</span>
-          </button>
+        {allMarkers.map((def) => (
+          <div key={def.type} className="flex items-center group">
+            <button
+              draggable
+              onDragStart={(e) => handleDragStart(e, def.type)}
+              onClick={() => setActiveTool(activeToolType === def.type ? null : def.type)}
+              className={`flex-1 flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors text-start ${
+                activeToolType === def.type
+                  ? 'bg-primary/10 text-primary border border-primary/30'
+                  : 'hover:bg-accent'
+              }`}
+            >
+              <MarkerIcon type={def.type} color={def.color} shape={def.shape} size={16} />
+              <span className="truncate">{def.isCustom ? def.labelKey : t(def.labelKey)}</span>
+            </button>
+            {def.isCustom && (
+              <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={() => handleEditCustom(def)}
+                  className="p-1 hover:bg-accent rounded"
+                >
+                  <Pencil className="h-3 w-3" />
+                </button>
+                <button
+                  onClick={() => handleDeleteCustom(def.type)}
+                  className="p-1 hover:bg-accent rounded text-destructive"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+          </div>
         ))}
       </div>
+
+      {/* Add custom marker button */}
+      <button
+        onClick={handleAddCustom}
+        className="w-full mt-3 flex items-center gap-2 px-3 py-2 rounded-md text-sm border border-dashed hover:bg-accent transition-colors"
+      >
+        <Plus className="h-4 w-4" />
+        {t('editor.markers.addCustom')}
+      </button>
+
       <p className="text-xs text-muted-foreground mt-4 px-1">
-        Click to select tool, then click on map to place. Or drag marker directly onto the canvas.
+        {t('editor.markers.instructions')}
       </p>
+
+      {/* Custom Marker Editor Dialog */}
+      {showEditor && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border rounded-lg p-5 w-full max-w-xs">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold">
+                {editingMarker ? t('editor.markers.editMarker') : t('editor.markers.addCustom')}
+              </h3>
+              <button onClick={() => setShowEditor(false)} className="p-1 hover:bg-accent rounded">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium mb-1">{t('editor.markers.markerName')}</label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full px-2 py-1.5 text-sm border rounded bg-background"
+                  placeholder="e.g. River, Castle..."
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1">{t('editor.markers.markerColor')}</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={newColor}
+                    onChange={(e) => setNewColor(e.target.value)}
+                    className="h-8 w-8 rounded border cursor-pointer"
+                  />
+                  <span className="text-xs text-muted-foreground">{newColor}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium mb-1">{t('editor.markers.markerShape')}</label>
+                <div className="grid grid-cols-4 gap-1">
+                  {(['circle', 'dot', 'polygon', 'line', 'triangle'] as const).map((shape) => (
+                    <button
+                      key={shape}
+                      onClick={() => setNewShape(shape)}
+                      className={`p-2 border rounded flex items-center justify-center ${
+                        newShape === shape ? 'border-primary bg-primary/10' : 'hover:bg-accent'
+                      }`}
+                    >
+                      <MarkerIcon type="custom" color={newColor} shape={shape} size={16} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setShowEditor(false)}
+                className="px-3 py-1.5 text-sm border rounded hover:bg-accent"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                onClick={handleSaveCustom}
+                disabled={!newName.trim()}
+                className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 function MarkerIcon({ color, shape, size }: { type: string; color: string; shape: string; size: number }) {
-  if (shape === 'triangle') {
+  if (shape === 'triangle' || shape === 'polygon') {
     return (
       <svg width={size} height={size} viewBox="0 0 16 16">
         <polygon points="8,2 14,14 2,14" fill={color} />
@@ -57,6 +213,13 @@ function MarkerIcon({ color, shape, size }: { type: string; color: string; shape
         <circle cx="4" cy="4" r="1.5" fill={color} />
         <circle cx="8" cy="2" r="1.5" fill={color} />
         <circle cx="12" cy="4" r="1.5" fill={color} />
+      </svg>
+    )
+  }
+  if (shape === 'line') {
+    return (
+      <svg width={size} height={size} viewBox="0 0 16 16">
+        <line x1="2" y1="14" x2="14" y2="2" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
       </svg>
     )
   }
