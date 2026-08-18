@@ -75,7 +75,7 @@ CREATE TABLE document_chunks (
   chapter_number INT,
   chapter_title TEXT,
   page INT,                      -- page number if available from extraction
-  position INT NOT NULL,         -- sequential position within the document version
+  "position" INT NOT NULL,       -- sequential position within the document version
   scene_break BOOLEAN DEFAULT FALSE,
   content TEXT NOT NULL,         -- original text, preserved exactly
   token_count INT,
@@ -84,7 +84,7 @@ CREATE TABLE document_chunks (
 );
 
 CREATE INDEX idx_chunks_version_id ON document_chunks(version_id);
-CREATE INDEX idx_chunks_version_position ON document_chunks(version_id, position);
+CREATE INDEX idx_chunks_version_position ON document_chunks(version_id, "position");
 CREATE INDEX idx_chunks_chapter ON document_chunks(version_id, chapter_number);
 
 -- Full-text search index using 'simple' config (language-agnostic, works for Hebrew)
@@ -115,10 +115,9 @@ CREATE TABLE chunk_embeddings (
 CREATE INDEX idx_chunk_embeddings_chunk_id ON chunk_embeddings(chunk_id);
 CREATE INDEX idx_chunk_embeddings_stale ON chunk_embeddings(is_stale) WHERE is_stale = true;
 
--- Vector similarity search index (IVFFlat for cosine distance)
--- For small datasets in MVP, exact search is fine. Index helps at scale.
-CREATE INDEX idx_chunk_embeddings_vector ON chunk_embeddings
-  USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+-- Vector similarity search index — will be created after first data is inserted
+-- CREATE INDEX idx_chunk_embeddings_vector ON chunk_embeddings
+--   USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- ============================================
 -- ENTITIES TABLE

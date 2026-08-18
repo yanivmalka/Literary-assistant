@@ -9,7 +9,7 @@
 -- Uses pgvector cosine similarity, scoped to a project.
 -- ============================================
 CREATE OR REPLACE FUNCTION search_chunks_semantic(
-  query_embedding text,           -- JSON array string of the query vector
+  query_embedding text,
   match_project_id UUID,
   match_model_name TEXT,
   match_count INT DEFAULT 5
@@ -21,7 +21,7 @@ RETURNS TABLE (
   chapter_number INT,
   chapter_title TEXT,
   page INT,
-  position INT,
+  "position" INT,
   version_id UUID,
   document_id UUID,
   document_name TEXT
@@ -37,7 +37,7 @@ BEGIN
     dc.chapter_number,
     dc.chapter_title,
     dc.page,
-    dc.position,
+    dc."position",
     dc.version_id,
     d.id AS document_id,
     d.name AS document_name
@@ -69,7 +69,7 @@ RETURNS TABLE (
   chapter_number INT,
   chapter_title TEXT,
   page INT,
-  position INT,
+  "position" INT,
   version_id UUID,
   document_id UUID,
   document_name TEXT
@@ -85,7 +85,7 @@ BEGIN
     dc.chapter_number,
     dc.chapter_title,
     dc.page,
-    dc.position,
+    dc."position",
     dc.version_id,
     d.id AS document_id,
     d.name AS document_name

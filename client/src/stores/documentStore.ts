@@ -161,7 +161,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       }
 
       // Create version record
-      const { error: versionError } = await supabase
+      const { data: versionData, error: versionError } = await supabase
         .from('document_versions')
         .insert({
           document_id: docId,
@@ -170,11 +170,24 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           file_size: file.size,
           status: 'uploaded',
         })
+        .select('id')
+        .single()
 
-      if (versionError) {
+      if (versionError || !versionData) {
         set({ uploading: false })
         return { success: false, error: 'Failed to create version record' }
       }
+
+      // Trigger processing via Edge Function (background task)
+      supabase.functions.invoke('process-document', {
+        body: {
+          version_id: versionData.id,
+          document_id: docId,
+          project_id: projectId,
+        },
+      }).catch((err) => {
+        console.warn('Edge function trigger failed (processing may need manual retry):', err)
+      })
 
       set({ uploading: false, uploadProgress: 100 })
       await get().fetchDocuments(projectId)
