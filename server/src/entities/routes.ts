@@ -336,12 +336,16 @@ router.post(
       const supabase = getServiceClient()
 
       // Get chunks batch
+      console.log(`[Entities] Querying chunks: version_id=${version_id}, offset=${offset}, limit=${limit}`)
+      
       const { data: chunks, error: chunksError } = await supabase
         .from('document_chunks')
         .select('id, content')
         .eq('version_id', version_id)
         .order('position', { ascending: true })
         .range(offset, offset + limit - 1)
+
+      console.log(`[Entities] Query result: ${chunks?.length || 0} chunks, error: ${chunksError?.message || 'none'}`)
 
       if (chunksError || !chunks || chunks.length === 0) {
         res.json({ done: true, saved: 0, entities_found: 0, next_offset: offset })
