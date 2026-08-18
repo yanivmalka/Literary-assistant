@@ -514,7 +514,10 @@ ${combined} [/INST]`
       res.json({ done, saved, entities_found: entities.length, next_offset: offset + limit })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
+      const stack = error instanceof Error ? error.stack : ''
       console.error('[Entities] Error:', message)
+      console.error('[Entities] Stack:', stack)
+      console.error('[Entities] HF API Key present:', !!process.env.HUGGINGFACE_API_KEY)
       res.status(500).json({ error: message })
     }
   }
