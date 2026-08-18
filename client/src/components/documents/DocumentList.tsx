@@ -15,6 +15,15 @@ export default function DocumentList({ projectId }: DocumentListProps) {
     return null
   }
 
+  const isDocStuck = (doc: Document): boolean => {
+    const v = doc.latest_version
+    if (!v || !v.processing_started_at) return false
+    const terminal = ['ready', 'error', 'skipped_no_provider']
+    if (terminal.includes(v.status)) return false
+    const elapsed = Date.now() - new Date(v.processing_started_at).getTime()
+    return elapsed > 120000
+  }
+
   const handleDelete = async (docId: string) => {
     if (window.confirm(t('documents.confirmDelete'))) {
       await deleteDocument(projectId, docId)
@@ -63,7 +72,10 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                 status={doc.latest_version.status}
                 errorMessage={doc.latest_version.error_message}
                 errorStage={doc.latest_version.error_stage}
-                onRetry={doc.latest_version.status === 'error' ? () => handleRetry(doc) : undefined}
+                processingStartedAt={doc.latest_version.processing_started_at}
+                onRetry={['error'].includes(doc.latest_version.status) || isDocStuck(doc)
+                  ? () => handleRetry(doc)
+                  : undefined}
               />
             </div>
           )}

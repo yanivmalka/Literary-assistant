@@ -23,7 +23,18 @@ export default function DocumentsPage() {
 
     const hasProcessing = documents.some(d => {
       const status = d.latest_version?.status
-      return status && !['ready', 'error', 'skipped_no_provider'].includes(status)
+      if (!status) return false
+      // Active processing states
+      if (['uploaded', 'extracting', 'extracted', 'chunking', 'chunked', 'indexing', 'analyzing'].includes(status)) {
+        // Check if stuck: if processing started more than 120s ago, consider it failed
+        const startedAt = d.latest_version?.processing_started_at
+        if (startedAt) {
+          const elapsed = Date.now() - new Date(startedAt).getTime()
+          if (elapsed > 120000) return false // stop polling — it's stuck
+        }
+        return true
+      }
+      return false
     })
 
     if (hasProcessing) {

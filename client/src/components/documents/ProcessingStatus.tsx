@@ -5,6 +5,7 @@ interface ProcessingStatusProps {
   status: string
   errorMessage?: string | null
   errorStage?: string | null
+  processingStartedAt?: string | null
   onRetry?: () => void
 }
 
@@ -28,22 +29,43 @@ function getStageIndex(status: string): number {
     case 'analyzing': return 3
     case 'ready': return 4
     case 'error': return -2
-    case 'skipped_no_provider': return 2 // indexed but no AI
+    case 'skipped_no_provider': return 2
     default: return -1
   }
 }
 
-export default function ProcessingStatus({ status, errorMessage, errorStage, onRetry }: ProcessingStatusProps) {
+function isStuck(status: string, processingStartedAt?: string | null): boolean {
+  if (!processingStartedAt) return false
+  const terminalStatuses = ['ready', 'error', 'skipped_no_provider']
+  if (terminalStatuses.includes(status)) return false
+  const elapsed = Date.now() - new Date(processingStartedAt).getTime()
+  return elapsed > 120000 // 2 minutes
+}
+
+export default function ProcessingStatus({ status, errorMessage, errorStage, processingStartedAt, onRetry }: ProcessingStatusProps) {
   const { t } = useTranslation()
   const currentIndex = getStageIndex(status)
   const isError = status === 'error'
   const isSkipped = status === 'skipped_no_provider'
+  const stuck = isStuck(status, processingStartedAt)
 
   if (status === 'ready') {
     return (
       <div className="flex items-center gap-2 text-green-600">
         <CheckCircle className="h-5 w-5" />
         <span className="text-sm font-medium">{t('documents.status.ready')}</span>
+      </div>
+    )
+  }
+
+  if (status === 'indexed') {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-green-600">
+          <CheckCircle className="h-5 w-5" />
+          <span className="text-sm font-medium">{t('documents.status.indexed')}</span>
+        </div>
+        <p className="text-xs text-muted-foreground">{t('documents.status.embeddingsInProgress')}</p>
       </div>
     )
   }
@@ -56,6 +78,29 @@ export default function ProcessingStatus({ status, errorMessage, errorStage, onR
           <span className="text-sm font-medium">{t('documents.status.skippedNoProvider')}</span>
         </div>
         <p className="text-xs text-muted-foreground">{t('documents.status.searchAvailable')}</p>
+      </div>
+    )
+  }
+
+  // Stuck state — processing took too long
+  if (stuck) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 text-destructive">
+          <XCircle className="h-5 w-5" />
+          <span className="text-sm font-medium">{t('documents.status.stuck')}</span>
+        </div>
+        <div className="p-3 bg-destructive/10 rounded-md">
+          <p className="text-sm text-destructive">{t('documents.status.stuckDescription')}</p>
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className="mt-2 text-xs px-3 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+            >
+              {t('documents.status.retry')}
+            </button>
+          )}
+        </div>
       </div>
     )
   }
@@ -91,9 +136,14 @@ export default function ProcessingStatus({ status, errorMessage, errorStage, onR
       </div>
 
       {/* Error display */}
-      {isError && errorMessage && (
+      {isError && (
         <div className="mt-3 p-3 bg-destructive/10 rounded-md">
-          <p className="text-sm text-destructive">{errorMessage}</p>
+          <p className="text-sm text-destructive">
+            {errorMessage || t('documents.status.genericError')}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {t('documents.status.errorAction')}
+          </p>
           {onRetry && (
             <button
               onClick={onRetry}

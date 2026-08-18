@@ -198,11 +198,17 @@
       "extracting": "Extracting text",
       "chunking": "Analyzing structure",
       "indexing": "Building search index",
+      "indexed": "Indexed — generating embeddings",
+      "embeddingsInProgress": "Embeddings are being generated in the background...",
       "analyzing": "Extracting entities",
       "ready": "Ready",
       "skippedNoProvider": "Search ready (AI analysis unavailable)",
       "searchAvailable": "Document is searchable. Entity extraction requires an AI provider.",
-      "retry": "Retry"
+      "retry": "Try Again",
+      "stuck": "Processing failed",
+      "stuckDescription": "The document processing took too long and was interrupted. Try uploading the document again or contact support if the issue persists.",
+      "genericError": "An error occurred during processing.",
+      "errorAction": "Delete this document and upload it again. If the problem persists, try a smaller file."
     }
   },
   "entities": {
