@@ -402,8 +402,11 @@ ${combined}`
         return
       }
 
-      const hfData = await hfResponse.json() as { choices?: Array<{ message?: { content?: string } }> }
-      const responseText = hfData.choices?.[0]?.message?.content || ''
+      const hfData = await hfResponse.json() as { choices?: Array<{ message?: { content?: string; reasoning_content?: string } }> }
+      const choice = hfData.choices?.[0]?.message
+      const responseText = choice?.content || choice?.reasoning_content || ''
+      
+      console.log(`[Entities] LLM response length: ${responseText.length}, first 200 chars: ${responseText.slice(0, 200)}`)
 
       // Parse entities
       let entities: Array<{ name: string; type: string; aliases: string[]; attributes: Record<string, string>; context: string }> = []
