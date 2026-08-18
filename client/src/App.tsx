@@ -16,6 +16,7 @@ import DocumentsPage from './pages/DocumentsPage'
 import EntityReviewPage from './pages/EntityReviewPage'
 import QAPage from './pages/QAPage'
 import ContradictionsPage from './pages/ContradictionsPage'
+import DevTestPage from './pages/DevTestPage'
 
 function App() {
   const { i18n } = useTranslation()
@@ -46,6 +47,7 @@ function App() {
         <Route path="projects/:projectId/qa" element={<QAPage />} />
         <Route path="projects/:projectId/contradictions" element={<ContradictionsPage />} />
         <Route path="trash" element={<TrashPage />} />
+        <Route path="dev" element={<DevTestPage />} />
       </Route>
     </Routes>
   )
