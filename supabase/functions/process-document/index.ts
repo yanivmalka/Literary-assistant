@@ -397,38 +397,46 @@ async function processDocument(
     // Use built-in gte-small model (384 dimensions, no external API needed)
     const session = new Supabase.ai.Session("gte-small");
 
-    // Process embeddings in batches of 5 (to stay within memory/time limits)
-    const EMBED_BATCH_SIZE = 5;
-    for (let i = 0; i < savedChunks.length; i += EMBED_BATCH_SIZE) {
-      const batch = savedChunks.slice(i, i + EMBED_BATCH_SIZE);
+    // Process embeddings ONE AT A TIME with delays to avoid CPU time limit
+    let embeddingsGenerated = 0;
+    for (let i = 0; i < savedChunks.length; i++) {
+      const chunk = savedChunks[i];
 
-      const embeddingRecords = [];
-      for (const chunk of batch) {
-        // Truncate to ~500 words to stay within 512 token limit
-        const truncated = chunk.content.split(/\s+/).slice(0, 500).join(" ");
+      try {
+        // Truncate to ~400 words to stay within 512 token limit
+        const truncated = chunk.content.split(/\s+/).slice(0, 400).join(" ");
         const embedding = await session.run(truncated, {
           mean_pool: true,
           normalize: true,
         });
 
-        embeddingRecords.push({
-          chunk_id: chunk.id,
-          model_name: "gte-small",
-          dimensions: 384,
-          embedding: JSON.stringify(Array.from(embedding)),
-          is_stale: false,
-        });
+        const { error } = await supabase
+          .from("chunk_embeddings")
+          .insert({
+            chunk_id: chunk.id,
+            model_name: "gte-small",
+            dimensions: 384,
+            embedding: JSON.stringify(Array.from(embedding)),
+            is_stale: false,
+          });
+
+        if (!error) {
+          embeddingsGenerated++;
+        } else {
+          console.error(`Embedding insert error for chunk ${i}:`, error.message);
+        }
+      } catch (embError) {
+        console.error(`Embedding generation error for chunk ${i}:`, embError);
+        // Continue with other chunks
       }
 
-      const { error } = await supabase
-        .from("chunk_embeddings")
-        .insert(embeddingRecords);
-
-      if (error) {
-        console.error(`Embedding insert error at batch ${i}:`, error);
-        // Continue rather than fail entirely
+      // Small delay every 3 chunks to spread CPU usage
+      if (i > 0 && i % 3 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
+
+    console.log(`[Pipeline] Generated ${embeddingsGenerated}/${savedChunks.length} embeddings`);
 
     // --- Done ---
     await updateStatus(supabase, versionId, "ready", {
@@ -438,7 +446,7 @@ async function processDocument(
         detectedLanguage,
         fullTextLength: fullText.length,
         chunkCount: chunks.length,
-        embeddingsGenerated: savedChunks.length,
+        embeddingsGenerated,
       },
     });
 
