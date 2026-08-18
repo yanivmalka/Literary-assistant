@@ -296,7 +296,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
         // Delay between batches to respect Gemini rate limits (7s)
         if (!done) {
-          await new Promise(resolve => setTimeout(resolve, 7000))
+          await new Promise(resolve => setTimeout(resolve, 15000))
         }
       } catch (err) {
         console.error('[Knowledge] Extraction failed:', err)

@@ -1,18 +1,18 @@
 // ============================================
 // Edge Function: test-gemini
-// Smoke test: sends a prompt to Gemini 2.5 Flash and returns the response.
+// Smoke test: sends a prompt to Gemini and returns the response (with multi-model fallback).
 // Used to verify connectivity: Frontend → Edge Function → Gemini API.
 // Does NOT save anything to DB.
 // ============================================
+
+import { callGeminiWithFallback } from "../_shared/gemini-client.ts";
+import { DEFAULT_MODEL } from "../_shared/gemini-config.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
-
-const GEMINI_MODEL = "gemini-2.5-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 interface TestRequest {
   prompt: string;
@@ -62,67 +62,43 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --- Call Gemini API ---
-    const startTime = Date.now();
-
-    const geminiResponse = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    // --- Call Gemini API (with multi-model fallback) ---
+    const geminiResult = await callGeminiWithFallback(
+      {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 1024,
         },
-      }),
-    });
+      },
+      apiKey,
+      { timeoutMs: 30_000 }
+    );
 
-    const latencyMs = Date.now() - startTime;
+    if (!geminiResult.success) {
+      console.error("[test-gemini] Fallback chain:", JSON.stringify(geminiResult.fallbackChain));
+      return errorResponse(geminiResult.error, geminiResult.status, geminiResult.details);
+    }
 
-    // --- Handle Gemini errors ---
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text().catch(() => "Unable to read error body");
-      const status = geminiResponse.status;
+    const { data, modelUsed, latencyMs } = geminiResult;
 
-      let message: string;
-      switch (status) {
-        case 400:
-          message = "Bad request — malformed prompt or invalid parameters sent to Gemini";
-          break;
-        case 401:
-          message = "Unauthorized — GEMINI_API_KEY is invalid or expired";
-          break;
-        case 403:
-          message = "Forbidden — API key does not have permission to access Gemini 2.5 Flash";
-          break;
-        case 429:
-          message = "Rate limit exceeded — Gemini Free Tier quota reached. Wait and try again.";
-          break;
-        default:
-          if (status >= 500) {
-            message = `Gemini service error (HTTP ${status}) — try again later`;
-          } else {
-            message = `Unexpected Gemini error (HTTP ${status})`;
-          }
-      }
-
-      return errorResponse(message, status, errorText.slice(0, 500));
+    // Log if fallback was used
+    if (modelUsed !== DEFAULT_MODEL) {
+      console.log(`[test-gemini] Used fallback model: ${modelUsed} (primary: ${DEFAULT_MODEL})`);
     }
 
     // --- Parse successful response ---
-    const data = await geminiResponse.json();
-
     const responseText =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text || "[No text in response]";
+      (data as Record<string, unknown>)?.candidates?.[0]?.content?.parts?.[0]?.text || "[No text in response]";
 
     // Extract token usage from usageMetadata
-    const usage = data?.usageMetadata || {};
+    const usage = (data as Record<string, unknown>)?.usageMetadata || {};
     const telemetry = {
-      model: GEMINI_MODEL,
-      input_tokens: usage.promptTokenCount ?? null,
-      output_tokens: usage.candidatesTokenCount ?? null,
-      total_tokens: usage.totalTokenCount ?? null,
-      cached_tokens: usage.cachedContentTokenCount ?? null,
+      model: modelUsed,
+      input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
+      output_tokens: (usage as Record<string, unknown>).candidatesTokenCount ?? null,
+      total_tokens: (usage as Record<string, unknown>).totalTokenCount ?? null,
+      cached_tokens: (usage as Record<string, unknown>).cachedContentTokenCount ?? null,
       latency_ms: latencyMs,
     };
 

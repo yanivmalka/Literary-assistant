@@ -1,6 +1,6 @@
 // ============================================
 // Edge Function: extract-knowledge
-// Production version: Extracts entities from document chunks via Gemini 3.6 Flash.
+// Production version: Extracts entities from document chunks via Gemini (with multi-model fallback).
 // Fetches chunks internally from DB (like the old Express route).
 // Normalizes and saves to knowledge layer tables.
 // Idempotent via UNIQUE constraints (upsert).
@@ -8,6 +8,8 @@
 // ============================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGeminiWithFallback } from "../_shared/gemini-client.ts";
+import { DEFAULT_MODEL } from "../_shared/gemini-config.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,8 +17,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const GEMINI_MODEL = "gemini-3.6-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const BATCH_SIZE = 5;
 
 // ============================================
@@ -273,53 +273,81 @@ Deno.serve(async (req) => {
     }));
 
     // ==============================
-    // Step 2: Call Gemini
+    // Step 2: Call Gemini (with multi-model fallback)
     // ==============================
     const prompt = buildPrompt(chunkData);
     const totalChars = chunkData.reduce((sum, c) => sum + c.content.length, 0);
-    const startTime = Date.now();
 
-    const geminiResponse = await fetch(`${GEMINI_URL}?key=${geminiApiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const geminiResult = await callGeminiWithFallback(
+      {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 16384,
-          responseMimeType: "application/json",
-          thinkingConfig: { thinkingLevel: "minimal" },
         },
-      }),
-    });
+      },
+      geminiApiKey,
+      { timeoutMs: 60_000 }
+    );
 
-    const latencyMs = Date.now() - startTime;
-
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text().catch(() => "");
+    if (!geminiResult.success) {
+      console.error("[extract-knowledge] Gemini fallback chain exhausted:", JSON.stringify(geminiResult.fallbackChain));
       return errorResponse(
-        `Gemini error (HTTP ${geminiResponse.status})`,
-        geminiResponse.status,
-        errorText.slice(0, 500)
+        geminiResult.error,
+        geminiResult.status,
+        geminiResult.details
       );
     }
 
-    const geminiData = await geminiResponse.json();
-    const responseText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const usage = geminiData?.usageMetadata || {};
+    const { data: geminiData, modelUsed, latencyMs } = geminiResult;
+    // Extract text from response - handle multi-part responses (thinking models return thought + text parts)
+    const candidate = (geminiData as any)?.candidates?.[0];
+    const parts = candidate?.content?.parts || [];
+    // Filter out thought parts (they have thought: true) and get only text output parts
+    const textParts = parts.filter((p: any) => p.text && !p.thought);
+    const responseText = textParts.length > 0
+      ? textParts.map((p: any) => p.text).join("")
+      : parts.map((p: any) => p.text || "").filter(Boolean).join("");
+    console.log(`[extract-knowledge] Model: ${modelUsed}, Response length: ${responseText.length}, Parts: ${parts.length}, TextParts: ${textParts.length}`);
+    const usage = (geminiData as Record<string, unknown>)?.usageMetadata || {};
+
+    // Log fallback info if we didn't use the primary model
+    if (modelUsed !== DEFAULT_MODEL) {
+      console.log(`[extract-knowledge] Used fallback model: ${modelUsed} (primary: ${DEFAULT_MODEL})`);
+      console.log(`[extract-knowledge] Fallback chain: ${JSON.stringify(geminiResult.fallbackChain)}`);
+    }
 
     // ==============================
-    // Step 3: Parse JSON
+    // Step 3: Parse JSON (robust - handles code blocks, leading text, partial JSON)
     // ==============================
     let extraction: GeminiExtraction;
     try {
       extraction = JSON.parse(responseText);
     } catch {
-      const match = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (match) {
-        extraction = JSON.parse(match[1].trim());
+      // Try markdown code block
+      const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        try {
+          extraction = JSON.parse(codeBlockMatch[1].trim());
+        } catch {
+          console.error(`[extract-knowledge] Code block JSON parse failed. First 500: ${responseText.slice(0, 500)}`);
+          return errorResponse("Failed to parse Gemini JSON from code block", 500, responseText.slice(0, 500));
+        }
       } else {
-        return errorResponse("Failed to parse Gemini JSON", 500, responseText.slice(0, 500));
+        // Try to find a raw JSON object in the text
+        const jsonStart = responseText.indexOf("{");
+        const jsonEnd = responseText.lastIndexOf("}");
+        if (jsonStart !== -1 && jsonEnd > jsonStart) {
+          try {
+            extraction = JSON.parse(responseText.slice(jsonStart, jsonEnd + 1));
+          } catch {
+            console.error(`[extract-knowledge] Raw JSON parse failed. First 500: ${responseText.slice(0, 500)}`);
+            return errorResponse("Failed to parse Gemini JSON", 500, responseText.slice(0, 500));
+          }
+        } else {
+          console.error(`[extract-knowledge] No JSON found. First 500: ${responseText.slice(0, 500)}`);
+          return errorResponse("Failed to parse Gemini JSON", 500, responseText.slice(0, 500));
+        }
       }
     }
 
@@ -333,13 +361,13 @@ Deno.serve(async (req) => {
         document_id: body.document_id,
         version_id: body.version_id,
         user_id: body.user_id,
-        model: GEMINI_MODEL,
+        model: modelUsed,
         raw_response: extraction,
-        input_tokens: usage.promptTokenCount ?? null,
-        output_tokens: usage.candidatesTokenCount ?? null,
-        thinking_tokens: usage.thoughtsTokenCount ?? null,
-        total_tokens: usage.totalTokenCount ?? null,
-        cached_tokens: usage.cachedContentTokenCount ?? null,
+        input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
+        output_tokens: (usage as Record<string, unknown>).candidatesTokenCount ?? null,
+        thinking_tokens: (usage as Record<string, unknown>).thoughtsTokenCount ?? null,
+        total_tokens: (usage as Record<string, unknown>).totalTokenCount ?? null,
+        cached_tokens: (usage as Record<string, unknown>).cachedContentTokenCount ?? null,
         latency_ms: latencyMs,
         chunks_count: chunks.length,
       })
@@ -513,10 +541,10 @@ Deno.serve(async (req) => {
         done,
         next_offset: offset + limit,
         telemetry: {
-          model: GEMINI_MODEL,
-          input_tokens: usage.promptTokenCount ?? null,
-          output_tokens: usage.candidatesTokenCount ?? null,
-          total_tokens: usage.totalTokenCount ?? null,
+          model: modelUsed,
+          input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
+          output_tokens: (usage as Record<string, unknown>).candidatesTokenCount ?? null,
+          total_tokens: (usage as Record<string, unknown>).totalTokenCount ?? null,
           latency_ms: latencyMs,
           chunks_sent: chunks.length,
           total_chars: totalChars,
