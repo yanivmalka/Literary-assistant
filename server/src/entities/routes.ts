@@ -318,7 +318,6 @@ router.patch(
  */
 router.post(
   '/extract-entities',
-  requireAuth,
   async (req: Request, res: Response): Promise<void> => {
     try {
       const { version_id, project_id, user_id, offset = 0, limit = 3 } = req.body
