@@ -34,6 +34,7 @@ interface DocumentState {
   fetchDocuments: (projectId: string) => Promise<void>
   uploadDocument: (projectId: string, file: File, documentId?: string) => Promise<{ success: boolean; error?: string }>
   deleteDocument: (projectId: string, documentId: string) => Promise<void>
+  triggerEntityExtraction: (versionId: string, projectId: string) => Promise<void>
   startPolling: (projectId: string) => void
   stopPolling: () => void
 }
@@ -187,6 +188,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           document_id: docId,
           project_id: projectId,
         },
+      }).then(() => {
+        // After chunking completes, trigger entity extraction
+        get().triggerEntityExtraction(versionData.id, projectId)
       }).catch((err) => {
         console.warn('Edge function trigger failed:', err)
       })
@@ -218,6 +222,58 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     } catch (error) {
       console.error('Failed to delete document:', error)
     }
+  },
+
+  triggerEntityExtraction: async (versionId: string, projectId: string) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const BATCH_SIZE = 3
+    let offset = 0
+    let done = false
+
+    console.log('[Entities] Starting extraction for version', versionId)
+
+    while (!done) {
+      try {
+        const { data, error } = await supabase.functions.invoke('extract-entities', {
+          body: {
+            version_id: versionId,
+            project_id: projectId,
+            user_id: user.id,
+            offset,
+            limit: BATCH_SIZE,
+          },
+        })
+
+        if (error) {
+          console.error('[Entities] Batch error:', error)
+          break
+        }
+
+        const result = data as { done: boolean; saved: number; entities_found: number; next_offset: number; skipped?: boolean }
+
+        if (result.skipped) {
+          console.warn('[Entities] Skipped — no API key configured')
+          break
+        }
+
+        done = result.done
+        offset = result.next_offset
+
+        console.log(`[Entities] Batch done: ${result.entities_found} found, ${result.saved} saved`)
+
+        // Delay between batches to respect rate limits
+        if (!done) {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+      } catch (err) {
+        console.error('[Entities] Extraction failed:', err)
+        break
+      }
+    }
+
+    console.log('[Entities] Extraction complete')
   },
 
   startPolling: (projectId: string) => {
