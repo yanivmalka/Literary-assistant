@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { FileText, Trash2 } from 'lucide-react'
+import { FileText, Trash2, Brain } from 'lucide-react'
 import { useDocumentStore, type Document } from '@/stores/documentStore'
 import ProcessingStatus from './ProcessingStatus'
 
@@ -9,7 +9,7 @@ interface DocumentListProps {
 
 export default function DocumentList({ projectId }: DocumentListProps) {
   const { t } = useTranslation()
-  const { documents, deleteDocument } = useDocumentStore()
+  const { documents, deleteDocument, triggerEntityExtraction } = useDocumentStore()
 
   if (documents.length === 0) {
     return null
@@ -36,6 +36,12 @@ export default function DocumentList({ projectId }: DocumentListProps) {
     window.location.reload()
   }
 
+  const handleExtractKnowledge = async (doc: Document) => {
+    if (!doc.latest_version) return
+    console.log('[Knowledge] Manual extraction triggered for', doc.name)
+    await triggerEntityExtraction(doc.latest_version.id, projectId)
+  }
+
   return (
     <div className="space-y-3">
       {documents.map(doc => (
@@ -55,6 +61,16 @@ export default function DocumentList({ projectId }: DocumentListProps) {
             </div>
 
             <div className="flex items-center gap-1">
+              {doc.latest_version?.status === 'ready' && (
+                <button
+                  onClick={() => handleExtractKnowledge(doc)}
+                  className="flex items-center gap-1 px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-100 rounded transition-colors"
+                  title="Extract Knowledge (Gemini)"
+                >
+                  <Brain className="h-3.5 w-3.5" />
+                  Extract
+                </button>
+              )}
               <button
                 onClick={() => handleDelete(doc.id)}
                 className="p-1.5 text-muted-foreground hover:text-destructive rounded transition-colors"
