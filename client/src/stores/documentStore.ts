@@ -38,6 +38,41 @@ interface DocumentState {
   stopPolling: () => void
 }
 
+/**
+ * Generate embeddings in batches by calling the Edge Function repeatedly.
+ * Each call processes up to 10 chunks to stay within CPU limits.
+ */
+async function generateEmbeddingsInBatches(versionId: string) {
+  const BATCH_SIZE = 5
+  let offset = 0
+  let done = false
+
+  while (!done) {
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-embeddings', {
+        body: { version_id: versionId, offset, limit: BATCH_SIZE },
+      })
+
+      if (error) {
+        console.error('Embedding batch error:', error)
+        break
+      }
+
+      const result = data as { done: boolean; processed: number; next_offset: number }
+      done = result.done
+      offset = result.next_offset
+
+      // Small delay between batches to be respectful of rate limits
+      if (!done) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+    } catch (err) {
+      console.error('Embedding generation failed:', err)
+      break
+    }
+  }
+}
+
 export const useDocumentStore = create<DocumentState>((set, get) => ({
   documents: [],
   loading: false,
@@ -179,14 +214,19 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       }
 
       // Trigger processing via Edge Function (background task)
+      // Step 1: Extract text and chunk (process-document)
+      // Step 2: Generate embeddings in batches (generate-embeddings, called from polling)
       supabase.functions.invoke('process-document', {
         body: {
           version_id: versionData.id,
           document_id: docId,
           project_id: projectId,
         },
+      }).then(() => {
+        // After process-document completes (chunking done), start embedding generation
+        generateEmbeddingsInBatches(versionData.id)
       }).catch((err) => {
-        console.warn('Edge function trigger failed (processing may need manual retry):', err)
+        console.warn('Edge function trigger failed:', err)
       })
 
       set({ uploading: false, uploadProgress: 100 })
