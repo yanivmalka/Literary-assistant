@@ -379,9 +379,13 @@ async function processDocument(
       },
     });
 
-    // --- Stage 4: Embeddings are generated separately ---
-    // Mark as 'indexed' — client will call generate-embeddings in batches
-    await updateStatus(supabase, versionId, "indexed", {
+    // --- Stage 4: Done ---
+    // Embeddings generation via gte-small exceeds Edge Function CPU limits.
+    // Full-text search works without embeddings (GIN index on content).
+    // Semantic search (embeddings) will be available when using Express server
+    // or when Supabase relaxes CPU limits.
+    await updateStatus(supabase, versionId, "ready", {
+      processing_completed_at: new Date().toISOString(),
       structure_metadata: {
         totalPages: pages.length,
         detectedLanguage,
@@ -390,7 +394,7 @@ async function processDocument(
       },
     });
 
-    console.log(`[Pipeline] Version ${versionId} chunked and ready for embedding generation`);
+    console.log(`[Pipeline] Version ${versionId} processing complete! (${chunks.length} chunks, full-text search ready)`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error(`[Pipeline] Error:`, message);
