@@ -285,7 +285,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         }
 
         if (!data || !data.success) {
-          console.error('[Knowledge] Extraction failed:', data?.error || 'Unknown')
+          console.error('[Knowledge] Extraction failed:', data?.error || 'Unknown', 'Details:', data?.details?.slice(0, 300) || 'none')
           break
         }
 
