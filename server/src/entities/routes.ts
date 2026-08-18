@@ -311,4 +311,210 @@ router.patch(
   }
 )
 
+/**
+ * POST /api/extract-entities
+ * Extract entities from document chunks using HuggingFace LLM.
+ * Called by client in batches after document reaches 'ready' status.
+ */
+router.post(
+  '/extract-entities',
+  requireAuth,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { version_id, project_id, user_id, offset = 0, limit = 3 } = req.body
+
+      if (!version_id || !project_id || !user_id) {
+        res.status(400).json({ error: 'version_id, project_id, and user_id are required' })
+        return
+      }
+
+      const apiKey = process.env.HUGGINGFACE_API_KEY
+      if (!apiKey) {
+        res.json({ error: 'HUGGINGFACE_API_KEY not configured', skipped: true })
+        return
+      }
+
+      const supabase = getServiceClient()
+
+      // Get chunks batch
+      const { data: chunks, error: chunksError } = await supabase
+        .from('document_chunks')
+        .select('id, content')
+        .eq('version_id', version_id)
+        .order('position', { ascending: true })
+        .range(offset, offset + limit - 1)
+
+      if (chunksError || !chunks || chunks.length === 0) {
+        res.json({ done: true, saved: 0, entities_found: 0, next_offset: offset })
+        return
+      }
+
+      // Build prompt
+      const combined = chunks.map((c: { content: string }) => c.content).join('\n---\n')
+      const prompt = `<s>[INST] You are an entity extractor for fantasy novels. Extract ALL named entities from the following text passages.
+
+For each entity, provide:
+- name: the entity's name exactly as it appears
+- type: one of [character, location, country, continent, region, object, ability, magic_system, event]
+- aliases: alternative names or references (empty array if none)
+- attributes: key-value pairs of properties mentioned (e.g. {"eye_color": "blue", "hair": "black"})
+- context: a short quote (max 20 words) showing where this entity appears
+
+Important rules:
+- This is a FANTASY novel. Names are invented and won't appear in any dictionary.
+- Include ALL proper nouns referring to characters, places, items, or abilities.
+- For characters: extract appearance details (hair, eyes, height, build, scars, clothing).
+- For locations: extract terrain, climate, architecture, atmosphere.
+- Do NOT include common nouns or generic descriptions.
+- The text may be in Hebrew or English. Extract entities in the language they appear.
+
+Return ONLY a valid JSON array. No other text before or after.
+
+Text:
+${combined} [/INST]`
+
+      // Call HuggingFace
+      const hfResponse = await fetch(
+        'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            inputs: prompt,
+            parameters: { max_new_tokens: 2048, temperature: 0.1, return_full_text: false },
+          }),
+        }
+      )
+
+      if (!hfResponse.ok) {
+        const errorText = await hfResponse.text()
+        res.status(502).json({ error: `HuggingFace API error: ${hfResponse.status} ${errorText}` })
+        return
+      }
+
+      const hfData = await hfResponse.json() as Array<{ generated_text: string }>
+      const responseText = hfData[0]?.generated_text || ''
+
+      // Parse entities
+      let entities: Array<{ name: string; type: string; aliases: string[]; attributes: Record<string, string>; context: string }> = []
+      try {
+        let jsonStr = responseText.trim()
+        const codeBlock = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/)
+        if (codeBlock) jsonStr = codeBlock[1].trim()
+        const arrStart = jsonStr.indexOf('[')
+        const arrEnd = jsonStr.lastIndexOf(']')
+        if (arrStart !== -1 && arrEnd > arrStart) jsonStr = jsonStr.slice(arrStart, arrEnd + 1)
+        const parsed = JSON.parse(jsonStr)
+        if (Array.isArray(parsed)) {
+          entities = parsed.filter((e: unknown) => {
+            if (typeof e !== 'object' || e === null) return false
+            return typeof (e as Record<string, unknown>).name === 'string'
+          }).map((e: Record<string, unknown>) => ({
+            name: (e.name as string).trim(),
+            type: typeof e.type === 'string' ? e.type : 'character',
+            aliases: Array.isArray(e.aliases) ? e.aliases.filter((a: unknown) => typeof a === 'string') : [],
+            attributes: typeof e.attributes === 'object' && e.attributes !== null ? e.attributes as Record<string, string> : {},
+            context: typeof e.context === 'string' ? e.context : '',
+          }))
+        }
+      } catch { /* parsing failed, entities stays empty */ }
+
+      // Save to DB
+      let saved = 0
+      const validTypes = ['character', 'location', 'country', 'continent', 'region', 'object', 'ability', 'magic_system', 'event']
+      const chunkIds = chunks.map((c: { id: string }) => c.id)
+
+      // Deduplicate
+      const uniqueMap = new Map<string, typeof entities[0]>()
+      for (const entity of entities) {
+        const key = entity.name.toLowerCase()
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, entity)
+        } else {
+          const existing = uniqueMap.get(key)!
+          existing.attributes = { ...existing.attributes, ...entity.attributes }
+        }
+      }
+
+      for (const [, entity] of uniqueMap) {
+        try {
+          const { data: existing } = await supabase
+            .from('entities')
+            .select('id, aliases')
+            .eq('project_id', project_id)
+            .ilike('name', entity.name)
+            .limit(1)
+            .maybeSingle()
+
+          let entityId: string
+
+          if (existing) {
+            entityId = existing.id
+            if (entity.aliases.length > 0) {
+              const merged = [...new Set([...(existing.aliases || []), ...entity.aliases])]
+              await supabase.from('entities').update({ aliases: merged }).eq('id', entityId)
+            }
+          } else {
+            const entityType = validTypes.includes(entity.type) ? entity.type : 'character'
+            const { data: newEntity, error: insertError } = await supabase
+              .from('entities')
+              .insert({
+                project_id,
+                user_id,
+                name: entity.name,
+                entity_type: entityType,
+                status: 'pending',
+                aliases: entity.aliases,
+                metadata: { extracted_attributes: entity.attributes },
+              })
+              .select('id')
+              .single()
+
+            if (insertError || !newEntity) continue
+            entityId = newEntity.id
+          }
+
+          // Save mention
+          if (chunkIds.length > 0) {
+            await supabase.from('entity_mentions').insert({
+              entity_id: entityId,
+              chunk_id: chunkIds[0],
+              context_snippet: entity.context.slice(0, 500),
+              mention_text: entity.name,
+            })
+          }
+
+          // Save attributes
+          const attrRecords = Object.entries(entity.attributes).map(([name, value]) => ({
+            entity_id: entityId,
+            attribute_name: name,
+            attribute_value: String(value),
+            source_chunk_id: chunkIds[0] || null,
+            confidence: 0.8,
+            data_origin: 'ai_extracted',
+          }))
+
+          if (attrRecords.length > 0) {
+            await supabase.from('entity_attributes').insert(attrRecords)
+          }
+
+          saved++
+        } catch (err) {
+          console.error(`[Entities] Error saving '${entity.name}':`, err)
+        }
+      }
+
+      const done = chunks.length < limit
+      res.json({ done, saved, entities_found: entities.length, next_offset: offset + limit })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      console.error('[Entities] Error:', message)
+      res.status(500).json({ error: message })
+    }
+  }
+)
+
 export default router

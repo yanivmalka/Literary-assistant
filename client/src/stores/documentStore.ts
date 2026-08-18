@@ -228,6 +228,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
+    // Use the Express server (Railway) for entity extraction
+    // It has no network restrictions and can call HuggingFace
+    const { apiCall } = await import('@/lib/api')
+
     const BATCH_SIZE = 3
     let offset = 0
     let done = false
@@ -236,7 +240,14 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
     while (!done) {
       try {
-        const { data, error } = await supabase.functions.invoke('extract-entities', {
+        const { data, error } = await apiCall<{
+          done: boolean
+          saved: number
+          entities_found: number
+          next_offset: number
+          skipped?: boolean
+        }>('/api/extract-entities', {
+          method: 'POST',
           body: {
             version_id: versionId,
             project_id: projectId,
@@ -251,17 +262,17 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           break
         }
 
-        const result = data as { done: boolean; saved: number; entities_found: number; next_offset: number; skipped?: boolean }
+        if (!data) break
 
-        if (result.skipped) {
+        if (data.skipped) {
           console.warn('[Entities] Skipped — no API key configured')
           break
         }
 
-        done = result.done
-        offset = result.next_offset
+        done = data.done
+        offset = data.next_offset
 
-        console.log(`[Entities] Batch done: ${result.entities_found} found, ${result.saved} saved`)
+        console.log(`[Entities] Batch done: ${data.entities_found} found, ${data.saved} saved`)
 
         // Delay between batches to respect rate limits
         if (!done) {
