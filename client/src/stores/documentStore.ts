@@ -139,7 +139,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       }
 
       // Upload to Supabase Storage
-      const storagePath = `${user.id}/${projectId}/${docId}/${versionNumber}/${file.name}`
+      // Sanitize filename: remove special chars, keep extension
+      const ext = file.name.split('.').pop() || fileType
+      const sanitizedName = `document_v${versionNumber}.${ext}`
+      const storagePath = `${user.id}/${projectId}/${docId}/${versionNumber}/${sanitizedName}`
 
       const { error: uploadError } = await supabase.storage
         .from('project-documents')
