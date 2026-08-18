@@ -245,29 +245,34 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // Use the Express server (Railway) for entity extraction
-    // It has no network restrictions and can call HuggingFace
-    const { apiCall } = await import('@/lib/api')
-
-    const BATCH_SIZE = 3
+    // Use Supabase Edge Function (Gemini 3.6 Flash) for entity extraction
+    const BATCH_SIZE = 5
     let offset = 0
     let done = false
 
-    console.log('[Entities] Starting extraction for version', versionId)
+    console.log('[Knowledge] Starting extraction for version', versionId)
+
+    // Get document_id from version
+    const { data: version } = await supabase
+      .from('document_versions')
+      .select('document_id')
+      .eq('id', versionId)
+      .single()
+
+    if (!version) {
+      console.error('[Knowledge] Could not find version', versionId)
+      return
+    }
+
+    const documentId = version.document_id
 
     while (!done) {
       try {
-        const { data, error } = await apiCall<{
-          done: boolean
-          saved: number
-          entities_found: number
-          next_offset: number
-          skipped?: boolean
-        }>('/api/extract-entities', {
-          method: 'POST',
+        const { data, error } = await supabase.functions.invoke('extract-knowledge', {
           body: {
             version_id: versionId,
             project_id: projectId,
+            document_id: documentId,
             user_id: user.id,
             offset,
             limit: BATCH_SIZE,
@@ -275,33 +280,31 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         })
 
         if (error) {
-          console.error('[Entities] Batch error:', error)
+          console.error('[Knowledge] Batch error:', error.message)
           break
         }
 
-        if (!data) break
-
-        if (data.skipped) {
-          console.warn('[Entities] Skipped — no API key configured')
+        if (!data || !data.success) {
+          console.error('[Knowledge] Extraction failed:', data?.error || 'Unknown')
           break
         }
 
         done = data.done
         offset = data.next_offset
 
-        console.log(`[Entities] Batch done: ${data.entities_found} found, ${data.saved} saved`)
+        console.log(`[Knowledge] Batch done: ${data.summary?.entities_saved || 0} entities, ${data.summary?.events_saved || 0} events saved`)
 
-        // Delay between batches to respect rate limits (5s to avoid 429)
+        // Delay between batches to respect Gemini rate limits (7s)
         if (!done) {
-          await new Promise(resolve => setTimeout(resolve, 5000))
+          await new Promise(resolve => setTimeout(resolve, 7000))
         }
       } catch (err) {
-        console.error('[Entities] Extraction failed:', err)
+        console.error('[Knowledge] Extraction failed:', err)
         break
       }
     }
 
-    console.log('[Entities] Extraction complete')
+    console.log('[Knowledge] Extraction complete')
   },
 
   startPolling: (projectId: string) => {

@@ -10,6 +10,10 @@ export interface Entity {
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string
+  // New knowledge layer fields
+  entity_types?: string[]
+  description?: string | null
+  attributes?: Record<string, unknown>
 }
 
 export interface EntityMention {
@@ -61,20 +65,18 @@ export const useEntityStore = create<EntityState>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { set({ loading: false }); return }
 
+      // Query from knowledge_entities (new Gemini-based knowledge layer)
       let query = supabase
-        .from('entities')
-        .select('id, name, entity_type, status, aliases, metadata, created_at, updated_at')
+        .from('knowledge_entities')
+        .select('id, canonical_name, entity_type, entity_types, description, attributes, created_at, updated_at')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
-        .neq('status', 'merged')
-        .order('name')
+        .order('canonical_name')
 
       if (filters?.type) {
         query = query.eq('entity_type', filters.type)
       }
-      if (filters?.status) {
-        query = query.eq('status', filters.status)
-      }
+      // Note: knowledge_entities doesn't have 'status' column yet — filter ignored
 
       const { data, error } = await query
 
@@ -82,7 +84,21 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         console.error('Failed to fetch entities:', error)
         set({ entities: [] })
       } else {
-        set({ entities: (data as Entity[]) || [] })
+        // Map knowledge_entities format to Entity interface
+        const mapped: Entity[] = (data || []).map((e: Record<string, unknown>) => ({
+          id: e.id as string,
+          name: e.canonical_name as string,
+          entity_type: e.entity_type as string,
+          status: 'confirmed',
+          aliases: [],
+          metadata: (e.attributes as Record<string, unknown>) || {},
+          created_at: e.created_at as string,
+          updated_at: e.updated_at as string,
+          entity_types: e.entity_types as string[],
+          description: e.description as string | null,
+          attributes: (e.attributes as Record<string, unknown>) || {},
+        }))
+        set({ entities: mapped })
       }
     } catch (error) {
       console.error('Failed to fetch entities:', error)
@@ -97,40 +113,14 @@ export const useEntityStore = create<EntityState>((set, get) => ({
     set({ mergeSuggestions: [] })
   },
 
-  confirmEntity: async (_projectId, entityId) => {
-    try {
-      const { error } = await supabase
-        .from('entities')
-        .update({ status: 'confirmed' })
-        .eq('id', entityId)
-
-      if (!error) {
-        set({
-          entities: get().entities.map(e =>
-            e.id === entityId ? { ...e, status: 'confirmed' } : e
-          ),
-        })
-      }
-    } catch (error) {
-      console.error('Failed to confirm entity:', error)
-    }
+  confirmEntity: async (_projectId, _entityId) => {
+    // knowledge_entities does not have a status column yet — no-op
+    console.log('[Knowledge] confirmEntity: status management not yet implemented for knowledge_entities')
   },
 
   dismissEntity: async (_projectId, entityId) => {
-    try {
-      const { error } = await supabase
-        .from('entities')
-        .update({ status: 'dismissed' })
-        .eq('id', entityId)
-
-      if (!error) {
-        set({
-          entities: get().entities.filter(e => e.id !== entityId),
-        })
-      }
-    } catch (error) {
-      console.error('Failed to dismiss entity:', error)
-    }
+    // For now, remove from local state only (knowledge_entities has no status column)
+    set({ entities: get().entities.filter(e => e.id !== entityId) })
   },
 
   mergeEntities: async (projectId, _entityAId, _entityBId) => {
@@ -142,23 +132,50 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   fetchEntityDetail: async (_projectId, entityId) => {
     try {
       const { data: entity } = await supabase
-        .from('entities')
+        .from('knowledge_entities')
         .select('*')
         .eq('id', entityId)
         .single()
 
       const { data: mentions } = await supabase
-        .from('entity_mentions')
-        .select(`
-          id, context_snippet, mention_text, created_at,
-          document_chunks (id, chapter_number, chapter_title, page, position)
-        `)
+        .from('knowledge_entity_mentions')
+        .select('id, chunk_position, evidence, created_at')
         .eq('entity_id', entityId)
-        .order('created_at')
+        .order('chunk_position')
+
+      // Map to Entity interface
+      const mappedEntity: Entity | null = entity ? {
+        id: entity.id,
+        name: entity.canonical_name,
+        entity_type: entity.entity_type,
+        status: 'confirmed',
+        aliases: [],
+        metadata: entity.attributes || {},
+        created_at: entity.created_at,
+        updated_at: entity.updated_at,
+        entity_types: entity.entity_types,
+        description: entity.description,
+        attributes: entity.attributes,
+      } : null
+
+      // Map mentions to EntityMention interface
+      const mappedMentions: EntityMention[] = (mentions || []).map((m: Record<string, unknown>) => ({
+        id: m.id as string,
+        context_snippet: (m.evidence as string) || '',
+        mention_text: '',
+        created_at: m.created_at as string,
+        document_chunks: {
+          id: '',
+          chapter_number: null,
+          chapter_title: null,
+          page: null,
+          position: m.chunk_position as number,
+        },
+      }))
 
       set({
-        selectedEntity: entity as Entity | null,
-        entityMentions: (mentions as unknown as EntityMention[]) || [],
+        selectedEntity: mappedEntity,
+        entityMentions: mappedMentions,
       })
     } catch (error) {
       console.error('Failed to fetch entity detail:', error)
