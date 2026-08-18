@@ -188,9 +188,26 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           document_id: docId,
           project_id: projectId,
         },
-      }).then(() => {
-        // After chunking completes, trigger entity extraction
-        get().triggerEntityExtraction(versionData.id, projectId)
+      }).then(async () => {
+        // After chunking completes, find the latest ready version and trigger entity extraction
+        // Wait a moment for the Edge Function to finish processing
+        await new Promise(resolve => setTimeout(resolve, 5000))
+        
+        // Get the actual ready version from DB
+        const { data: readyVersion } = await supabase
+          .from('document_versions')
+          .select('id')
+          .eq('document_id', docId)
+          .eq('status', 'ready')
+          .order('version_number', { ascending: false })
+          .limit(1)
+          .single()
+        
+        if (readyVersion) {
+          get().triggerEntityExtraction(readyVersion.id, projectId)
+        } else {
+          console.warn('[Entities] No ready version found after processing')
+        }
       }).catch((err) => {
         console.warn('Edge function trigger failed:', err)
       })
