@@ -45,29 +45,30 @@ interface DocumentChunk {
 }
 
 // ============================================
-// PDF Extraction (using pdf-parse via npm compat)
+// PDF Extraction (using unpdf — works in Deno/serverless)
 // ============================================
 
 async function extractPdfText(buffer: ArrayBuffer): Promise<{
   pages: ExtractedPage[];
   fullText: string;
 }> {
-  // Dynamic import of pdf-parse for Deno compatibility
-  const pdfParse = (await import("npm:pdf-parse/lib/pdf-parse.js")).default;
-  const data = await pdfParse(Buffer.from(buffer));
+  const { extractText, getDocumentProxy } = await import("npm:unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const { totalPages, text } = await extractText(pdf, { mergePages: true });
 
-  const fullText: string = data.text || "";
-  // pdf-parse v1 returns full text; split by form-feeds for pages
+  const fullText: string = typeof text === "string" ? text : (text as string[]).join("\n\n");
+
+  // Try to split by form-feeds for per-page text
   const parts = fullText.split("\f").filter((p: string) => p.trim().length > 0);
   const pages: ExtractedPage[] =
     parts.length > 1
-      ? parts.map((text: string, i: number) => ({
+      ? parts.map((t: string, i: number) => ({
           pageNumber: i + 1,
-          text: text.trim(),
+          text: t.trim(),
         }))
       : [{ pageNumber: 1, text: fullText.trim() }];
 
-  return { pages, fullText };
+  return { pages, fullText: fullText.trim() };
 }
 
 // ============================================
