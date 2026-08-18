@@ -291,9 +291,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
         console.log(`[Entities] Batch done: ${data.entities_found} found, ${data.saved} saved`)
 
-        // Delay between batches to respect rate limits
+        // Delay between batches to respect rate limits (5s to avoid 429)
         if (!done) {
-          await new Promise(resolve => setTimeout(resolve, 2000))
+          await new Promise(resolve => setTimeout(resolve, 5000))
         }
       } catch (err) {
         console.error('[Entities] Extraction failed:', err)
