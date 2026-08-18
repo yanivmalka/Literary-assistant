@@ -354,7 +354,7 @@ router.post(
 
       // Build prompt
       const combined = chunks.map((c: { content: string }) => c.content).join('\n---\n')
-      const prompt = `<s>[INST] You are an entity extractor for fantasy novels. Extract ALL named entities from the following text passages.
+      const prompt = `You are an entity extractor for fantasy novels. Extract ALL named entities from the following text passages.
 
 For each entity, provide:
 - name: the entity's name exactly as it appears
@@ -374,11 +374,11 @@ Important rules:
 Return ONLY a valid JSON array. No other text before or after.
 
 Text:
-${combined} [/INST]`
+${combined}`
 
-      // Call HuggingFace
+      // Call HuggingFace Inference via router (OpenAI-compatible API)
       const hfResponse = await fetch(
-        'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3',
+        'https://router.huggingface.co/v1/chat/completions',
         {
           method: 'POST',
           headers: {
@@ -386,8 +386,12 @@ ${combined} [/INST]`
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            inputs: prompt,
-            parameters: { max_new_tokens: 2048, temperature: 0.1, return_full_text: false },
+            model: 'deepseek-ai/DeepSeek-V4-Flash-0731',
+            messages: [
+              { role: 'user', content: prompt }
+            ],
+            max_tokens: 2048,
+            temperature: 0.1,
           }),
         }
       )
@@ -398,8 +402,8 @@ ${combined} [/INST]`
         return
       }
 
-      const hfData = await hfResponse.json() as Array<{ generated_text: string }>
-      const responseText = hfData[0]?.generated_text || ''
+      const hfData = await hfResponse.json() as { choices?: Array<{ message?: { content?: string } }> }
+      const responseText = hfData.choices?.[0]?.message?.content || ''
 
       // Parse entities
       let entities: Array<{ name: string; type: string; aliases: string[]; attributes: Record<string, string>; context: string }> = []
