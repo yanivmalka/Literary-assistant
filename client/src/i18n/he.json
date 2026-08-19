@@ -253,6 +253,17 @@
       "magic_system": "מערכות קסם",
       "event": "אירועים"
     },
+    "typesSingular": {
+      "character": "דמות",
+      "location": "מקום",
+      "country": "מדינה",
+      "continent": "יבשת",
+      "region": "אזור",
+      "object": "חפץ",
+      "ability": "יכולת",
+      "magic_system": "מערכת קסם",
+      "event": "אירוע"
+    },
     "status": {
       "pending": "ממתין",
       "confirmed": "מאושר",

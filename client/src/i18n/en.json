@@ -253,6 +253,17 @@
       "magic_system": "Magic Systems",
       "event": "Events"
     },
+    "typesSingular": {
+      "character": "Character",
+      "location": "Location",
+      "country": "Country",
+      "continent": "Continent",
+      "region": "Region",
+      "object": "Object",
+      "ability": "Ability",
+      "magic_system": "Magic System",
+      "event": "Event"
+    },
     "status": {
       "pending": "Pending",
       "confirmed": "Confirmed",

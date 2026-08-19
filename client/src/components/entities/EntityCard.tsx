@@ -32,7 +32,7 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
           <div className="flex items-center gap-2">
             <h4 className="font-medium text-sm truncate">{entity.name}</h4>
             <span className={`text-xs px-1.5 py-0.5 rounded ${typeColor}`}>
-              {t(`entities.types.${entity.entity_type}`)}
+              {t(`entities.typesSingular.${entity.entity_type}`)}
             </span>
           </div>
           {entity.aliases.length > 0 && (
