@@ -279,9 +279,117 @@ export async function createBranchEntityMention(
   return data
 }
 
+export const INITIAL_RELATIONSHIP_TYPES = [
+  'owns',
+  'uses',
+  'located_in',
+  'knows',
+  'parent_of',
+  'involves',
+  'occurs_at',
+  'contained_in',
+] as const
+
+export type RelationshipOperation = 'add' | 'remove'
+export type RelationshipReviewStatus = 'pending' | 'approved' | 'rejected'
+
+export interface BranchRelationshipRecord {
+  id?: string
+  branch_id: string | null
+  source_entity_id: string
+  target_entity_id: string
+  relationship_type: string
+  operation?: RelationshipOperation
+  review_status?: RelationshipReviewStatus
+  base_exists?: boolean
+  [key: string]: unknown
+}
+
+export function validateRelationshipType(relationshipType: string): void {
+  if (!(INITIAL_RELATIONSHIP_TYPES as readonly string[]).includes(relationshipType)) {
+    throw new Error(`Unsupported relationship type: ${relationshipType}`)
+  }
+}
+
+export function buildBranchRelationshipRecord(params: {
+  projectId: string
+  sourceEntityId: string
+  targetEntityId: string
+  relationshipType: string
+  branchId: string
+  operation?: RelationshipOperation
+  reviewStatus?: RelationshipReviewStatus
+  baseExists: boolean
+  evidence?: string | null
+  chunkPosition?: number | null
+  rawExtractionId?: string | null
+}): BranchRelationshipRecord {
+  validateBranchContext(params.branchId)
+  validateRelationshipType(params.relationshipType)
+
+  return {
+    project_id: params.projectId,
+    source_entity_id: params.sourceEntityId,
+    target_entity_id: params.targetEntityId,
+    relationship_type: params.relationshipType,
+    branch_id: params.branchId,
+    operation: params.operation || 'add',
+    review_status: params.reviewStatus || 'pending',
+    base_exists: params.baseExists,
+    evidence: params.evidence || undefined,
+    chunk_position: params.chunkPosition ?? undefined,
+    raw_extraction_id: params.rawExtractionId || undefined,
+  }
+}
+
+export function buildRelationshipReviewUpdate(
+  reviewStatus: RelationshipReviewStatus
+): { review_status: RelationshipReviewStatus } {
+  return { review_status: reviewStatus }
+}
+
+function relationshipKey(relationship: BranchRelationshipRecord): string {
+  return `${relationship.source_entity_id}:${relationship.target_entity_id}:${relationship.relationship_type}`
+}
+
 /**
- * Create relationship between entities in same branch
- * Enforces that both entities belong to the same branch
+ * Build the effective graph for one Branch without changing Main rows.
+ * Pending/rejected proposals remain review data but do not affect the graph.
+ */
+export function getEffectiveBranchRelationships(
+  mainRelationships: BranchRelationshipRecord[],
+  branchRelationships: BranchRelationshipRecord[],
+  branchId: string
+): BranchRelationshipRecord[] {
+  validateBranchContext(branchId)
+  const effective = new Map<string, BranchRelationshipRecord>()
+
+  for (const relationship of mainRelationships) {
+    if (
+      relationship.branch_id === null &&
+      (relationship.review_status || 'approved') === 'approved' &&
+      (relationship.operation || 'add') === 'add'
+    ) {
+      effective.set(relationshipKey(relationship), relationship)
+    }
+  }
+
+  for (const relationship of branchRelationships) {
+    if (relationship.branch_id !== branchId || relationship.review_status !== 'approved') continue
+    const key = relationshipKey(relationship)
+    if (relationship.operation === 'remove') {
+      effective.delete(key)
+    } else if (relationship.operation === 'add') {
+      effective.set(key, relationship)
+    }
+  }
+
+  return Array.from(effective.values())
+}
+
+/**
+ * Create an independent Branch relationship proposal. Main is only queried to
+ * calculate base_exists and is never updated.
  */
 export async function createBranchEntityRelationship(
   projectId: string,
@@ -290,61 +398,122 @@ export async function createBranchEntityRelationship(
   relationshipType: string,
   branchId: string,
   evidence?: string | null,
-  chunkPosition?: number | null
+  chunkPosition?: number | null,
+  options: {
+    operation?: RelationshipOperation
+    reviewStatus?: RelationshipReviewStatus
+    baseExists?: boolean
+    rawExtractionId?: string | null
+  } = {}
 ) {
-  validateBranchContext(branchId)
+  const activeBranch = await getActiveBranch(projectId)
+  if (activeBranch.id !== branchId) {
+    throw new Error('Relationship must target the active Branch')
+  }
 
-  // Verify both entities belong to same branch
   const [sourceData, targetData] = await Promise.all([
     supabase
       .from('knowledge_entities')
-      .select('branch_id, layer')
+      .select('branch_id, layer, project_id, user_id')
       .eq('id', sourceEntityId)
       .single(),
     supabase
       .from('knowledge_entities')
-      .select('branch_id, layer')
+      .select('branch_id, layer, project_id, user_id')
       .eq('id', targetEntityId)
       .single(),
   ])
 
-  if (sourceData.error || targetData.error) {
+  if (sourceData.error || targetData.error || !sourceData.data || !targetData.data) {
     throw new Error('One or both entities not found')
   }
 
-  // Enforce branch boundary: both entities must be in same branch
-  const sourceBranch = sourceData.data.branch_id
-  const targetBranch = targetData.data.branch_id
+  for (const entity of [sourceData.data, targetData.data]) {
+    if (entity.project_id !== projectId) throw new Error('Entity does not belong to this project')
+    if (entity.branch_id && entity.branch_id !== branchId) {
+      throw new Error('Cannot create relationship across Branches')
+    }
+    if (entity.layer === 'branch' && entity.branch_id !== branchId) {
+      throw new Error('Branch-only entity does not belong to the requested Branch')
+    }
+  }
 
-  if (
-    (sourceBranch && targetBranch && sourceBranch !== targetBranch) ||
-    (sourceBranch && !targetBranch) ||
-    (!sourceBranch && targetBranch)
-  ) {
-    throw new Error(
-      'Cannot create relationship between entities from different branches. ' +
-      'Both entities must belong to the same branch or both to Main.'
-    )
+  let baseExists = options.baseExists
+  if (baseExists === undefined) {
+    const { data: mainRelationship, error: mainError } = await supabase
+      .from('knowledge_entity_relationships')
+      .select('id')
+      .is('branch_id', null)
+      .eq('project_id', projectId)
+      .eq('source_entity_id', sourceEntityId)
+      .eq('target_entity_id', targetEntityId)
+      .eq('relationship_type', relationshipType)
+      .limit(1)
+      .maybeSingle()
+
+    if (mainError) throw new Error(`Failed to inspect Main relationship: ${mainError.message}`)
+    baseExists = Boolean(mainRelationship)
   }
 
   const { data, error } = await supabase
     .from('knowledge_entity_relationships')
-    .insert({
-      project_id: projectId,
-      source_entity_id: sourceEntityId,
-      target_entity_id: targetEntityId,
-      relationship_type: relationshipType,
-      evidence: evidence || undefined,
-      chunk_position: chunkPosition || undefined,
-      branch_id: branchId,
-    })
+    .insert(buildBranchRelationshipRecord({
+      projectId,
+      sourceEntityId,
+      targetEntityId,
+      relationshipType,
+      branchId,
+      operation: options.operation,
+      reviewStatus: options.reviewStatus,
+      baseExists,
+      evidence,
+      chunkPosition,
+      rawExtractionId: options.rawExtractionId,
+    }))
     .select('*')
     .single()
 
-  if (error) {
-    throw new Error(`Failed to create branch entity relationship: ${error.message}`)
-  }
+  if (error) throw new Error(`Failed to create Branch relationship: ${error.message}`)
+  return data
+}
 
+export async function removeBranchEntityRelationship(
+  projectId: string,
+  sourceEntityId: string,
+  targetEntityId: string,
+  relationshipType: string,
+  branchId: string,
+  evidence?: string | null,
+  chunkPosition?: number | null
+) {
+  return createBranchEntityRelationship(
+    projectId,
+    sourceEntityId,
+    targetEntityId,
+    relationshipType,
+    branchId,
+    evidence,
+    chunkPosition,
+    { operation: 'remove', baseExists: true },
+  )
+}
+
+export async function reviewBranchRelationship(
+  relationshipId: string,
+  branchId: string,
+  reviewStatus: 'approved' | 'rejected'
+) {
+  validateBranchContext(branchId)
+
+  const { data, error } = await supabase
+    .from('knowledge_entity_relationships')
+    .update(buildRelationshipReviewUpdate(reviewStatus))
+    .eq('id', relationshipId)
+    .eq('branch_id', branchId)
+    .select('*')
+    .single()
+
+  if (error) throw new Error(`Failed to review Branch relationship: ${error.message}`)
   return data
 }
 

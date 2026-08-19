@@ -121,6 +121,17 @@ interface ExtractedRelationship {
   chunk_positions?: number[];
 }
 
+const INITIAL_RELATIONSHIP_TYPES = new Set([
+  "owns",
+  "uses",
+  "located_in",
+  "knows",
+  "parent_of",
+  "involves",
+  "occurs_at",
+  "contained_in",
+]);
+
 interface GeminiExtraction {
   characters?: ExtractedEntity[];
   locations?: ExtractedEntity[];
@@ -863,25 +874,56 @@ Deno.serve(async (req) => {
     // ==============================
     let relationshipsSaved = 0;
     for (const rel of extraction.relationships || []) {
+      const relationshipType = rel.relationship_type?.trim();
+      if (!relationshipType || !INITIAL_RELATIONSHIP_TYPES.has(relationshipType)) continue;
+
       const sourceId = entityIdMap.get(rel.character_a?.trim().toLowerCase());
       const targetId = entityIdMap.get(rel.character_b?.trim().toLowerCase());
       if (!sourceId || !targetId) continue;
 
-      await supabase.from("knowledge_entity_relationships").upsert(
-        {
-          project_id: body.project_id,
-          document_id: body.document_id,
-          version_id: body.version_id,
-          source_entity_id: sourceId,
-          target_entity_id: targetId,
-          relationship_type: rel.relationship_type || "unknown",
-          evidence: rel.evidence?.join(" | ")?.slice(0, 1000) || null,
-          chunk_position: rel.chunk_positions?.[0] || null,
-          raw_extraction_id: rawExtractionId,
-          branch_id: activeBranch.id,
-        },
-        { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" }
-      );
+      // A Branch proposal records whether the same edge existed in Main at the
+      // time of extraction. Main is queried only; it is never updated here.
+      const { data: baseRelationship, error: baseError } = await supabase
+        .from("knowledge_entity_relationships")
+        .select("id")
+        .eq("project_id", body.project_id)
+        .is("branch_id", null)
+        .eq("source_entity_id", sourceId)
+        .eq("target_entity_id", targetId)
+        .eq("relationship_type", relationshipType)
+        .limit(1)
+        .maybeSingle();
+
+      if (baseError) {
+        console.error(`Failed to inspect Main relationship '${relationshipType}':`, baseError.message);
+        continue;
+      }
+
+      const { error: relationshipError } = await supabase
+        .from("knowledge_entity_relationships")
+        .upsert(
+          {
+            project_id: body.project_id,
+            document_id: body.document_id,
+            version_id: body.version_id,
+            source_entity_id: sourceId,
+            target_entity_id: targetId,
+            relationship_type: relationshipType,
+            evidence: rel.evidence?.join(" | ")?.slice(0, 1000) || null,
+            chunk_position: rel.chunk_positions?.[0] || null,
+            raw_extraction_id: rawExtractionId,
+            branch_id: activeBranch.id,
+            operation: "add",
+            review_status: "pending",
+            base_exists: Boolean(baseRelationship),
+          },
+          { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" }
+        );
+
+      if (relationshipError) {
+        console.error(`Failed to save Branch relationship '${relationshipType}':`, relationshipError.message);
+        continue;
+      }
       relationshipsSaved++;
     }
 
