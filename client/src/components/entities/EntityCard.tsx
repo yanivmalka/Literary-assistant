@@ -23,10 +23,22 @@ const TYPE_COLORS: Record<string, string> = {
   event: 'bg-rose-100 text-rose-800',
 }
 
+/** Resolve a field value from structured_fields first, then attributes, then null */
+function getField(entity: Entity, field: string): string | null {
+  const sf = entity.structured_fields as Record<string, unknown> | undefined
+  if (sf && sf[field] != null && sf[field] !== '') return String(sf[field])
+  const attr = entity.attributes as Record<string, unknown> | undefined
+  if (attr && attr[field] != null && attr[field] !== '') return String(attr[field])
+  return null
+}
+
+const UNKNOWN_LABEL = 'לא ידוע'
+
 export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails, onClick }: EntityCardProps) {
   const { t } = useTranslation()
   const typeColor = TYPE_COLORS[entity.entity_type] || 'bg-gray-100 text-gray-800'
   const typeKey = entity.entity_type === 'magic' ? 'magic_system' : entity.entity_type
+  const isCharacter = entity.entity_type === 'character'
 
   return (
     <div
@@ -49,7 +61,19 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
               </span>
             )}
           </div>
-          {entity.description && (
+
+          {/* Character quick attributes */}
+          {isCharacter && (
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+              <CharacterAttr label={t('entityFields.age')} value={getField(entity, 'age')} />
+              <CharacterAttr label={t('entityFields.height')} value={getField(entity, 'height')} />
+              <CharacterAttr label={t('entityFields.eye_color')} value={getField(entity, 'eye_color')} />
+              <CharacterAttr label={t('entityFields.hair_color')} value={getField(entity, 'hair_color')} />
+            </div>
+          )}
+
+          {/* Description for non-character entities */}
+          {!isCharacter && entity.description && (
             <p className="text-xs text-muted-foreground mt-1 truncate">
               {entity.description}
             </p>
@@ -102,5 +126,18 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
         </div>
       </div>
     </div>
+  )
+}
+
+/** A single attribute line shown on character cards */
+function CharacterAttr({ label, value }: { label: string; value: string | null }) {
+  const display = value || UNKNOWN_LABEL
+  const isUnknown = !value || value === UNKNOWN_LABEL
+
+  return (
+    <span className="truncate">
+      <span className="font-medium text-muted-foreground">{label}:</span>{' '}
+      <span className={isUnknown ? 'text-muted-foreground/60 italic' : ''}>{display}</span>
+    </span>
   )
 }

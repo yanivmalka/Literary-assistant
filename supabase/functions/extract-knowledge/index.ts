@@ -149,6 +149,16 @@ Return JSON with these arrays (omit empty arrays):
 - events: [{description, name, participants[], location, what_happened, evidence[], chunk_positions[]}]
 - relationships: [{character_a, character_b, relationship_type, evidence[], chunk_positions[]}]
 
+IMPORTANT — Character physical attributes:
+For every character, pay special attention to these 4 fields: age, height, eye_color, hair_color.
+- Extract them even when mentioned indirectly. Examples:
+  "חגג את יום הולדתו השמונה עשרה" → age: "18"
+  "התנשא לגובה של מטר ושמונים" → height: "1.80 מ'"
+  "שערו השחור נפל על עיניו" → hair_color: "שחור"
+  "הביט בה בעיניים ירוקות" → eye_color: "ירוק"
+- If a description is vague and cannot be converted to a concrete value (e.g. "גבוה למדי"), set the field to null. Do NOT guess a numeric value.
+- If no information exists for a field, set it to null.
+
 Notes:
 - A magic_system is a system or method of magic (e.g. "the Force", "Allomancy"). An ability is a specific power a character can use.
 - For each entity, only include fields that have actual information from the text. Fields without information should be null or omitted.
@@ -515,7 +525,8 @@ Deno.serve(async (req) => {
     const rawExtractionId = rawExtraction.id;
 
     // ==============================
-    // Step 5: Normalize & upsert entities
+    // Step 5: Normalize & upsert entities (incremental merge)
+    // Priority: user data > existing extracted data > new extracted data > null
     // ==============================
     const normalizedEntities = normalizeEntities(extraction);
     const entityIdMap = new Map<string, string>();
@@ -525,10 +536,74 @@ Deno.serve(async (req) => {
     let branchEntitiesSaved = 0;
 
     for (const entity of normalizedEntities) {
-      const { data: upserted, error: upsertError } = await supabase
+      // Check if entity already exists for this project+user+name+type
+      const { data: existing } = await supabase
         .from("knowledge_entities")
-        .insert(
-          {
+        .select("id, structured_fields, attributes, source, description, entity_types")
+        .eq("project_id", body.project_id)
+        .eq("user_id", body.user_id)
+        .eq("layer", "main")
+        .ilike("canonical_name", entity.canonical_name)
+        .maybeSingle();
+
+      let entityId: string;
+
+      if (existing) {
+        // --- Incremental merge: don't overwrite existing non-null values ---
+        const existingStructured = (existing.structured_fields || {}) as Record<string, unknown>;
+        const existingAttrs = (existing.attributes || {}) as Record<string, unknown>;
+        const isUserSource = existing.source === "user";
+
+        // Merge structured_fields: only fill in null fields (never overwrite user data or previous values)
+        const mergedStructured: Record<string, unknown> = { ...existingStructured };
+        for (const [key, newVal] of Object.entries(entity.structured_fields)) {
+          if (newVal == null) continue; // AI returned null — skip
+          const existingVal = existingStructured[key];
+          if (existingVal != null && existingVal !== "") continue; // already has a value — keep it
+          // If entity was user-created, only fill fields that user left empty
+          mergedStructured[key] = newVal;
+        }
+
+        // Merge attributes: same logic — only add keys that don't exist or are null
+        const mergedAttrs: Record<string, unknown> = { ...existingAttrs };
+        for (const [key, newVal] of Object.entries(entity.attributes)) {
+          if (newVal == null) continue;
+          if (mergedAttrs[key] != null) continue;
+          mergedAttrs[key] = newVal;
+        }
+
+        // Merge entity_types array
+        const existingTypes = (existing.entity_types || []) as string[];
+        const mergedTypes = [...new Set([...existingTypes, ...entity.entity_types])];
+
+        // Merge description: only if currently null
+        const mergedDescription = existing.description || entity.description;
+
+        const { error: updateError } = await supabase
+          .from("knowledge_entities")
+          .update({
+            structured_fields: mergedStructured,
+            attributes: mergedAttrs,
+            entity_types: mergedTypes,
+            description: mergedDescription,
+            raw_extraction_id: rawExtractionId,
+            updated_at: new Date().toISOString(),
+            // Keep source as-is if user created it
+            ...(isUserSource ? {} : { source: "ai" }),
+          })
+          .eq("id", existing.id);
+
+        if (updateError) {
+          console.error(`Failed to update entity '${entity.canonical_name}':`, updateError.message);
+          continue;
+        }
+
+        entityId = existing.id;
+      } else {
+        // --- New entity: insert fresh ---
+        const { data: inserted, error: insertError } = await supabase
+          .from("knowledge_entities")
+          .insert({
             project_id: body.project_id,
             document_id: body.document_id,
             version_id: body.version_id,
@@ -543,17 +618,18 @@ Deno.serve(async (req) => {
             layer: "main",
             structured_fields: entity.structured_fields,
             source: "ai",
-          },
-        )
-        .select("id")
-        .single();
+          })
+          .select("id")
+          .single();
 
-      if (upsertError || !upserted) {
-        console.error(`Failed to upsert entity '${entity.canonical_name}':`, upsertError?.message);
-        continue;
+        if (insertError || !inserted) {
+          console.error(`Failed to insert entity '${entity.canonical_name}':`, insertError?.message);
+          continue;
+        }
+
+        entityId = inserted.id;
       }
 
-      const entityId = upserted.id;
       entityIdMap.set(entity.canonical_name.toLowerCase(), entityId);
       entitiesSaved++;
 
