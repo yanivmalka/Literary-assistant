@@ -8,6 +8,17 @@ interface DocumentListProps {
   projectId: string
 }
 
+const PROCESSING_STATUSES = new Set([
+  'uploaded',
+  'extracting',
+  'extracted',
+  'chunking',
+  'chunked',
+  'indexing',
+  'indexed',
+  'analyzing',
+])
+
 export default function DocumentList({ projectId }: DocumentListProps) {
   const { t } = useTranslation()
   const {
@@ -29,6 +40,11 @@ export default function DocumentList({ projectId }: DocumentListProps) {
     if (terminal.includes(v.status)) return false
     const elapsed = Date.now() - new Date(v.processing_started_at).getTime()
     return elapsed > 120000
+  }
+
+  const isProcessing = (doc: Document): boolean => {
+    const status = doc.latest_version?.status
+    return Boolean(status && PROCESSING_STATUSES.has(status) && !isDocStuck(doc))
   }
 
   const handleDelete = async (docId: string) => {
@@ -57,7 +73,13 @@ export default function DocumentList({ projectId }: DocumentListProps) {
             <div className="flex items-center gap-3">
               <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
               <div>
-                <h4 className={`font-medium text-sm ${doc.latest_version?.status === 'ready' ? 'text-green-600' : ''}`}>{doc.name}</h4>
+                <h4 className={`font-medium text-sm ${
+                  doc.latest_version?.status === 'ready'
+                    ? 'text-green-600'
+                    : isProcessing(doc)
+                      ? 'document-name-shimmer'
+                      : ''
+                }`}>{doc.name}</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {doc.file_type.toUpperCase()} • v{doc.version_count}
                   {doc.latest_version?.file_size && (
@@ -97,8 +119,8 @@ export default function DocumentList({ projectId }: DocumentListProps) {
             </div>
           </div>
 
-          {/* Processing status */}
-          {doc.latest_version && doc.latest_version.status !== 'ready' && (
+          {/* Processing status / retry feedback */}
+          {doc.latest_version && doc.latest_version.status !== 'ready' && !isProcessing(doc) && (
             <div className="mt-3 ps-8">
               <ProcessingStatus
                 status={doc.latest_version.status}
