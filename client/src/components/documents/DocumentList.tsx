@@ -57,7 +57,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
             <div className="flex items-center gap-3">
               <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
               <div>
-                <h4 className="font-medium text-sm">{doc.name}</h4>
+                <h4 className={`font-medium text-sm ${doc.latest_version?.status === 'ready' ? 'text-green-600' : ''}`}>{doc.name}</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {doc.file_type.toUpperCase()} • v{doc.version_count}
                   {doc.latest_version?.file_size && (
@@ -98,7 +98,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
           </div>
 
           {/* Processing status */}
-          {doc.latest_version && (
+          {doc.latest_version && doc.latest_version.status !== 'ready' && (
             <div className="mt-3 ps-8">
               <ProcessingStatus
                 status={doc.latest_version.status}
