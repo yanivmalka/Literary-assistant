@@ -34,7 +34,7 @@ export const useContradictionStore = create<ContradictionState>((set, get) => ({
 
       // Get entity IDs for this project
       const { data: entities } = await supabase
-        .from('entities')
+        .from('knowledge_entities')
         .select('id')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
