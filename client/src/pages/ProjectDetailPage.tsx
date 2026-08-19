@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Plus, Map, ArrowLeft, Users, TreePine, Sparkles, FileText, MessageSquare, AlertTriangle, GitBranch } from 'lucide-react'
+import { Plus, Map, ArrowLeft, Users, MapPin, Sword, Sparkles, FileText, MessageSquare, AlertTriangle, GitBranch } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useEntityStore } from '@/stores/entityStore'
@@ -94,6 +94,7 @@ export default function ProjectDetailPage() {
         <KnowledgeOverview
           projectId={projectId!}
           documents={documents}
+          entities={entities}
           contradictions={contradictions}
         />
       </section>
@@ -151,40 +152,63 @@ export default function ProjectDetailPage() {
         )}
       </section>
 
-      {/* Future Module Placeholders — disabled unless document ready */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <section className={`border rounded-lg p-5 bg-muted/30 ${hasReadyDocument ? '' : 'opacity-60'}`}>
+      {/* Entity categories */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Link
+          to={`/projects/${projectId}/entities?type=character`}
+          className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
+        >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
-            <Users className="h-5 w-5 text-muted-foreground" />
-            {t('home.characters.title')}
+            <Users className="h-5 w-5 text-blue-500" />
+            {t('entities.types.character')}
           </h3>
           <p className="text-sm text-muted-foreground">{t('home.characters.description')}</p>
-          <span className="inline-block mt-3 text-xs bg-secondary px-2 py-1 rounded">
-            {t('common.comingSoon')}
-          </span>
-        </section>
+          <p className="text-lg font-bold mt-3">
+            {entities.filter(e => e.entity_type === 'character').length}
+          </p>
+        </Link>
 
-        <section className={`border rounded-lg p-5 bg-muted/30 ${hasReadyDocument ? '' : 'opacity-60'}`}>
+        <Link
+          to={`/projects/${projectId}/entities?type=location`}
+          className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
+        >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
-            <TreePine className="h-5 w-5 text-muted-foreground" />
-            {t('home.environment.title')}
+            <MapPin className="h-5 w-5 text-green-500" />
+            {t('entities.types.location')}
           </h3>
           <p className="text-sm text-muted-foreground">{t('home.environment.description')}</p>
-          <span className="inline-block mt-3 text-xs bg-secondary px-2 py-1 rounded">
-            {t('common.comingSoon')}
-          </span>
-        </section>
+          <p className="text-lg font-bold mt-3">
+            {entities.filter(e => e.entity_type === 'location').length}
+          </p>
+        </Link>
 
-        <section className={`border rounded-lg p-5 bg-muted/30 ${hasReadyDocument ? '' : 'opacity-60'}`}>
+        <Link
+          to={`/projects/${projectId}/entities?type=object`}
+          className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
+        >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
-            <Sparkles className="h-5 w-5 text-muted-foreground" />
-            {t('home.magic.title')}
+            <Sword className="h-5 w-5 text-amber-500" />
+            {t('entities.types.object')}
           </h3>
           <p className="text-sm text-muted-foreground">{t('home.magic.description')}</p>
-          <span className="inline-block mt-3 text-xs bg-secondary px-2 py-1 rounded">
-            {t('common.comingSoon')}
-          </span>
-        </section>
+          <p className="text-lg font-bold mt-3">
+            {entities.filter(e => e.entity_type === 'object').length}
+          </p>
+        </Link>
+
+        <Link
+          to={`/projects/${projectId}/entities?type=ability`}
+          className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
+        >
+          <h3 className="font-semibold flex items-center gap-2 mb-2">
+            <Sparkles className="h-5 w-5 text-purple-500" />
+            {t('entities.types.ability')}
+          </h3>
+          <p className="text-sm text-muted-foreground">{t('home.magic.description')}</p>
+          <p className="text-lg font-bold mt-3">
+            {entities.filter(e => e.entity_type === 'ability').length}
+          </p>
+        </Link>
       </div>
     </div>
   )

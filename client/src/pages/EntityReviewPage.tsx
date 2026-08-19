@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Users, MapPin, Sword, Sparkles, Globe } from 'lucide-react'
 import { useEntityStore } from '@/stores/entityStore'
 import EntityCard from '@/components/entities/EntityCard'
@@ -17,6 +17,7 @@ const TYPE_FILTERS = [
 export default function EntityReviewPage() {
   const { t } = useTranslation()
   const { projectId } = useParams<{ projectId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const {
     entities,
     mergeSuggestions,
@@ -28,8 +29,17 @@ export default function EntityReviewPage() {
     mergeEntities,
   } = useEntityStore()
 
-  const [typeFilter, setTypeFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '')
   const [statusFilter, setStatusFilter] = useState('')
+
+  const handleTypeFilter = (value: string) => {
+    setTypeFilter(value)
+    if (value) {
+      setSearchParams({ type: value })
+    } else {
+      setSearchParams({})
+    }
+  }
 
   useEffect(() => {
     if (projectId) {
@@ -78,7 +88,7 @@ export default function EntityReviewPage() {
         {TYPE_FILTERS.map(filter => (
           <button
             key={filter.value}
-            onClick={() => setTypeFilter(filter.value)}
+            onClick={() => handleTypeFilter(filter.value)}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
               typeFilter === filter.value
                 ? 'bg-primary text-primary-foreground'

@@ -1,25 +1,21 @@
 import { useTranslation } from 'react-i18next'
-import { FileText, Users, AlertTriangle, Search } from 'lucide-react'
+import { FileText, AlertTriangle, Search } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Document } from '@/stores/documentStore'
-import type { Entity } from '@/stores/entityStore'
 import type { Contradiction } from '@/stores/contradictionStore'
 
 interface KnowledgeOverviewProps {
   projectId: string
   documents: Document[]
-  entities: Entity[]
   contradictions: Contradiction[]
 }
 
-export default function KnowledgeOverview({ projectId, documents, entities, contradictions }: KnowledgeOverviewProps) {
+export default function KnowledgeOverview({ projectId, documents, contradictions }: KnowledgeOverviewProps) {
   const { t } = useTranslation()
 
   const readyDocs = documents.filter(d =>
     d.latest_version && ['ready', 'skipped_no_provider', 'indexed'].includes(d.latest_version.status)
   )
-  const confirmedEntities = entities.filter(e => e.status === 'confirmed')
-  const pendingEntities = entities.filter(e => e.status === 'pending')
   const openContradictions = contradictions.filter(c => c.status === 'open')
 
   const hasDocuments = documents.length > 0
@@ -28,7 +24,7 @@ export default function KnowledgeOverview({ projectId, documents, entities, cont
   return (
     <div className="space-y-4">
       {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <Link
           to={`/projects/${projectId}/documents`}
           className="border rounded-lg p-3 hover:shadow-sm transition-shadow"
@@ -43,19 +39,7 @@ export default function KnowledgeOverview({ projectId, documents, entities, cont
           )}
         </Link>
 
-        <Link
-          to={`/projects/${projectId}/entities`}
-          className="border rounded-lg p-3 hover:shadow-sm transition-shadow"
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">{t('knowledge.entities')}</span>
-          </div>
-          <p className="text-lg font-bold">{confirmedEntities.length}</p>
-          {pendingEntities.length > 0 && (
-            <p className="text-xs text-amber-600">{pendingEntities.length} {t('knowledge.pending')}</p>
-          )}
-        </Link>
+
 
         <div className="border rounded-lg p-3">
           <div className="flex items-center gap-2 mb-1">
