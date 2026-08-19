@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Auto commit and push on session end",
+      "trigger": "Stop",
+      "description": "Automatically commits and pushes all changes when a Kiro session ends",
+      "action": {
+        "type": "command",
+        "command": "powershell -Command \"Set-Location 'c:\\Users\\yanivm\\Literary assistant'; $status = git status --porcelain; if ($status) { git add -A; git commit -m 'chore: auto-commit changes'; git push }\""
+      }
+    }
+  ]
+}
