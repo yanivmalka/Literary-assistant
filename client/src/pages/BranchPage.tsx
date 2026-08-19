@@ -350,7 +350,7 @@ export default function BranchPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <ProjectBreadcrumb currentPage="branches" />
+      <ProjectBreadcrumb currentPage="branches" showTabs={false} />
 
       {/* Header */}
       <div className="mb-6">

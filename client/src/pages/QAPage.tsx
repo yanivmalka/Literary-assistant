@@ -12,7 +12,7 @@ export default function QAPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <ProjectBreadcrumb currentPage="qa" />
+      <ProjectBreadcrumb currentPage="qa" showTabs={false} />
 
       <div className="mb-4">
         <h2 className="text-xl font-bold flex items-center gap-2">

@@ -28,7 +28,7 @@ export default function ContradictionsPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      <ProjectBreadcrumb currentPage="contradictions" />
+      <ProjectBreadcrumb currentPage="contradictions" showTabs={false} />
 
       <div className="mb-6">
         <h2 className="text-xl font-bold flex items-center gap-2">
