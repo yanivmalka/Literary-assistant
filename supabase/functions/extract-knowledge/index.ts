@@ -47,6 +47,48 @@ interface ExtractedEntity {
   users?: string[];
   members?: string[];
   purpose?: string | null;
+  // Character fields
+  age?: string | null;
+  gender?: string | null;
+  height?: string | null;
+  hair_color?: string | null;
+  eye_color?: string | null;
+  face_structure?: string | null;
+  common_clothing?: string | null;
+  scars?: string | null;
+  tattoos?: string | null;
+  narrative_role?: string | null;
+  // Location fields
+  location_type?: string | null;
+  parent_location?: string | null;
+  continent?: string | null;
+  country?: string | null;
+  region?: string | null;
+  city?: string | null;
+  narrative_importance?: string | null;
+  related_characters?: string | null;
+  // Object fields
+  object_type?: string | null;
+  appearance?: string | null;
+  materials?: string | null;
+  special_properties?: string | null;
+  origin?: string | null;
+  current_location?: string | null;
+  owners?: string | null;
+  // Ability fields
+  ability_type?: string | null;
+  mechanism?: string | null;
+  activation_conditions?: string | null;
+  limitations?: string | null;
+  cost?: string | null;
+  power_level?: string | null;
+  magic_system?: string | null;
+  // Magic system fields
+  source?: string | null;
+  rules?: string | null;
+  requirements?: string | null;
+  unique_properties?: string | null;
+  world_impact?: string | null;
 }
 
 interface ExtractedEvent {
@@ -71,6 +113,7 @@ interface GeminiExtraction {
   characters?: ExtractedEntity[];
   locations?: ExtractedEntity[];
   objects?: ExtractedEntity[];
+  magic_systems?: ExtractedEntity[];
   abilities?: ExtractedEntity[];
   organizations?: ExtractedEntity[];
   events?: ExtractedEvent[];
@@ -91,14 +134,24 @@ function buildPrompt(chunks: { position: number; content: string }[]): string {
 RULES:
 - Return entity names in Hebrew exactly as written.
 - Do NOT invent information. Only extract what appears in the text.
+- If information about a field is NOT in the text, set it to null.
 - Keep evidence SHORT (max 10 words each, max 2 per entity).
-- Be concise. Minimal attributes.
+- Be concise.
 
 Return JSON with these arrays (omit empty arrays):
-- characters: [{name, aliases[], attributes:{}, evidence[], chunk_positions[]}]
-- locations: [{name, description, evidence[], chunk_positions[]}]
-- events: [{description, participants[], chunk_positions[]}]
-- relationships: [{character_a, character_b, relationship_type, chunk_positions[]}]
+
+- characters: [{name, aliases[], age, gender, height, hair_color, eye_color, face_structure, common_clothing, scars, tattoos, description, narrative_role, evidence[], chunk_positions[]}]
+- locations: [{name, aliases[], location_type, parent_location, description, continent, country, region, city, narrative_importance, related_characters, evidence[], chunk_positions[]}]
+- objects: [{name, aliases[], object_type, description, appearance, materials, special_properties, origin, current_location, owners, narrative_importance, evidence[], chunk_positions[]}]
+- magic_systems: [{name, aliases[], description, source, users, rules, requirements, limitations, cost, unique_properties, world_impact, evidence[], chunk_positions[]}]
+- abilities: [{name, aliases[], ability_type, description, mechanism, activation_conditions, limitations, cost, power_level, magic_system, users, evidence[], chunk_positions[]}]
+- organizations: [{name, aliases[], description, members[], purpose, evidence[], chunk_positions[]}]
+- events: [{description, name, participants[], location, what_happened, evidence[], chunk_positions[]}]
+- relationships: [{character_a, character_b, relationship_type, evidence[], chunk_positions[]}]
+
+Notes:
+- A magic_system is a system or method of magic (e.g. "the Force", "Allomancy"). An ability is a specific power a character can use.
+- For each entity, only include fields that have actual information from the text. Fields without information should be null or omitted.
 
 TEXT:
 ${chunksText}`;
@@ -114,9 +167,90 @@ interface NormalizedEntity {
   entity_types: string[];
   description: string | null;
   attributes: Record<string, unknown>;
+  structured_fields: Record<string, unknown>;
   aliases: string[];
   evidence: string[];
   chunk_positions: number[];
+}
+
+/** Build structured_fields from the entity's flat fields based on its type */
+function buildStructuredFields(type: string, entity: ExtractedEntity): Record<string, unknown> {
+  const fields: Record<string, unknown> = {};
+  fields.name = entity.name || null;
+  fields.description = entity.description || entity.significance || null;
+
+  if (type === "character") {
+    fields.age = entity.age || null;
+    fields.gender = entity.gender || null;
+    fields.height = entity.height || null;
+    fields.hair_color = entity.hair_color || null;
+    fields.eye_color = entity.eye_color || null;
+    fields.face_structure = entity.face_structure || null;
+    fields.cheekbones = null;
+    fields.eye_shape = null;
+    fields.forehead = null;
+    fields.nose = null;
+    fields.beard_mustache = null;
+    fields.common_clothing = entity.common_clothing || null;
+    fields.jewelry = null;
+    fields.scars = entity.scars || null;
+    fields.tattoos = entity.tattoos || null;
+    fields.other_visual_features = null;
+    fields.narrative_role = entity.narrative_role || null;
+    fields.narrative_impact = null;
+  } else if (type === "location") {
+    fields.location_type = entity.location_type || null;
+    fields.parent_location = entity.parent_location || null;
+    fields.continent = entity.continent || null;
+    fields.country = entity.country || null;
+    fields.region = entity.region || null;
+    fields.city = entity.city || null;
+    fields.narrative_impact = null;
+    fields.narrative_importance = entity.narrative_importance || null;
+    fields.related_events = null;
+    fields.related_characters = entity.related_characters || null;
+  } else if (type === "object") {
+    fields.object_type = entity.object_type || null;
+    fields.appearance = entity.appearance || null;
+    fields.materials = entity.materials || null;
+    fields.special_properties = entity.special_properties || null;
+    fields.origin = entity.origin || null;
+    fields.current_location = entity.current_location || null;
+    fields.owners = entity.owners || null;
+    fields.narrative_importance = entity.narrative_importance || null;
+    fields.narrative_impact = null;
+    fields.related_characters = entity.related_characters || null;
+    fields.related_events = null;
+  } else if (type === "ability") {
+    fields.ability_type = entity.ability_type || null;
+    fields.mechanism = entity.mechanism || null;
+    fields.activation_conditions = entity.activation_conditions || null;
+    fields.limitations = entity.limitations || null;
+    fields.cost = entity.cost || null;
+    fields.power_level = entity.power_level || null;
+    fields.magic_system = entity.magic_system || null;
+    fields.users = entity.users ? entity.users.join(", ") : null;
+    fields.narrative_impact = null;
+    fields.related_events = null;
+  } else if (type === "magic") {
+    fields.source = entity.source || null;
+    fields.users = entity.users ? entity.users.join(", ") : null;
+    fields.rules = entity.rules || null;
+    fields.requirements = entity.requirements || null;
+    fields.limitations = entity.limitations || null;
+    fields.cost = entity.cost || null;
+    fields.unique_properties = entity.unique_properties || null;
+    fields.world_impact = entity.world_impact || null;
+    fields.narrative_impact = null;
+    fields.related_characters = null;
+  }
+  // organization — store what we have
+  if (type === "organization") {
+    // Organizations map to whatever we have
+    fields.users = entity.members ? entity.members.join(", ") : null;
+  }
+
+  return fields;
 }
 
 function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
@@ -160,6 +294,13 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
         existing.attributes.members = [...((existing.attributes.members as string[]) || []), ...entity.members];
       }
       if (entity.purpose) existing.attributes.purpose = entity.purpose;
+      // Merge structured_fields: keep existing non-null values, add new ones
+      const newStructured = buildStructuredFields(type, entity);
+      for (const [k, v] of Object.entries(newStructured)) {
+        if (v != null && existing.structured_fields[k] == null) {
+          existing.structured_fields[k] = v;
+        }
+      }
     } else {
       const attrs: Record<string, unknown> = { ...(entity.attributes || {}) };
       if (entity.abilities && entity.abilities.length > 0) attrs.abilities = entity.abilities;
@@ -174,6 +315,7 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
         entity_types: [type],
         description: entity.description || entity.significance || null,
         attributes: attrs,
+        structured_fields: buildStructuredFields(type, entity),
         aliases: (entity.aliases || []).filter(Boolean),
         evidence: entity.evidence || [],
         chunk_positions: entity.chunk_positions || [],
@@ -184,6 +326,7 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
   for (const char of extraction.characters || []) addEntity(char.name, "character", char);
   for (const loc of extraction.locations || []) addEntity(loc.name, "location", loc);
   for (const obj of extraction.objects || []) addEntity(obj.name, "object", obj);
+  for (const magic of extraction.magic_systems || []) addEntity(magic.name, "magic", magic);
   for (const ab of extraction.abilities || []) addEntity(ab.name, "ability", ab);
   for (const org of extraction.organizations || []) addEntity(org.name, "organization", org);
 
@@ -398,7 +541,7 @@ Deno.serve(async (req) => {
             raw_extraction_id: rawExtractionId,
             updated_at: new Date().toISOString(),
             layer: "main",
-            structured_fields: {},
+            structured_fields: entity.structured_fields,
             source: "ai",
           },
         )
@@ -429,6 +572,7 @@ Deno.serve(async (req) => {
               entity_types: entity.entity_types || [],
               description: entity.description || null,
               attributes: entity.attributes || {},
+              structured_fields: entity.structured_fields || {},
               is_modified: false,
               modified_fields: [],
             },

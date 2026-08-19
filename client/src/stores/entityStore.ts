@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import { type EntityType } from '@/lib/entityTypes'
 
 export interface Entity {
   id: string
@@ -10,10 +11,12 @@ export interface Entity {
   metadata: Record<string, unknown>
   created_at: string
   updated_at: string
-  // New knowledge layer fields
+  // Knowledge layer fields
   entity_types?: string[]
   description?: string | null
   attributes?: Record<string, unknown>
+  structured_fields?: Record<string, unknown>
+  source?: string
 }
 
 export interface EntityMention {
@@ -50,6 +53,9 @@ interface EntityState {
   dismissEntity: (projectId: string, entityId: string) => Promise<void>
   mergeEntities: (projectId: string, entityAId: string, entityBId: string) => Promise<void>
   fetchEntityDetail: (projectId: string, entityId: string) => Promise<void>
+  createEntity: (projectId: string, entityType: EntityType, structuredFields: Record<string, unknown>) => Promise<Entity | null>
+  updateEntity: (entityId: string, updates: { canonical_name?: string; description?: string | null; structured_fields?: Record<string, unknown>; attributes?: Record<string, unknown> }) => Promise<boolean>
+  deleteEntity: (entityId: string) => Promise<boolean>
 }
 
 export const useEntityStore = create<EntityState>((set, get) => ({
@@ -65,18 +71,23 @@ export const useEntityStore = create<EntityState>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { set({ loading: false }); return }
 
-      // Query from knowledge_entities (new Gemini-based knowledge layer)
+      // Query from knowledge_entities (Gemini-based knowledge layer)
       let query = supabase
         .from('knowledge_entities')
-        .select('id, canonical_name, entity_type, entity_types, description, attributes, created_at, updated_at')
+        .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, created_at, updated_at')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
+        .eq('layer', 'main')
         .order('canonical_name')
 
       if (filters?.type) {
-        query = query.eq('entity_type', filters.type)
+        // Handle magic/magic_system dual type for backwards compatibility
+        if (filters.type === 'magic') {
+          query = query.in('entity_type', ['magic', 'magic_system'])
+        } else {
+          query = query.eq('entity_type', filters.type)
+        }
       }
-      // Note: knowledge_entities doesn't have 'status' column yet — filter ignored
 
       const { data, error } = await query
 
@@ -97,6 +108,8 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           entity_types: e.entity_types as string[],
           description: e.description as string | null,
           attributes: (e.attributes as Record<string, unknown>) || {},
+          structured_fields: (e.structured_fields as Record<string, unknown>) || {},
+          source: (e.source as string) || 'ai',
         }))
         set({ entities: mapped })
       }
@@ -156,6 +169,8 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         entity_types: entity.entity_types,
         description: entity.description,
         attributes: entity.attributes,
+        structured_fields: entity.structured_fields || {},
+        source: entity.source || 'ai',
       } : null
 
       // Map mentions to EntityMention interface
@@ -179,6 +194,142 @@ export const useEntityStore = create<EntityState>((set, get) => ({
       })
     } catch (error) {
       console.error('Failed to fetch entity detail:', error)
+    }
+  },
+
+  // ==============================
+  // Create a new entity manually
+  // ==============================
+  createEntity: async (projectId, entityType, structuredFields) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return null
+
+      const name = (structuredFields.name as string) || 'ישות חדשה'
+
+      const { data, error } = await supabase
+        .from('knowledge_entities')
+        .insert({
+          project_id: projectId,
+          user_id: user.id,
+          canonical_name: name,
+          entity_type: entityType,
+          entity_types: [entityType],
+          description: (structuredFields.description as string) || null,
+          attributes: {},
+          structured_fields: structuredFields,
+          layer: 'main',
+          source: 'user',
+        })
+        .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, created_at, updated_at')
+        .single()
+
+      if (error || !data) {
+        console.error('Failed to create entity:', error)
+        return null
+      }
+
+      const newEntity: Entity = {
+        id: data.id,
+        name: data.canonical_name,
+        entity_type: data.entity_type,
+        status: 'confirmed',
+        aliases: [],
+        metadata: data.attributes || {},
+        created_at: data.created_at,
+        updated_at: data.updated_at,
+        entity_types: data.entity_types,
+        description: data.description,
+        attributes: data.attributes || {},
+        structured_fields: data.structured_fields || {},
+        source: data.source || 'user',
+      }
+
+      set({ entities: [...get().entities, newEntity] })
+      return newEntity
+    } catch (error) {
+      console.error('Failed to create entity:', error)
+      return null
+    }
+  },
+
+  // ==============================
+  // Update an existing entity
+  // ==============================
+  updateEntity: async (entityId, updates) => {
+    try {
+      const dbUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+
+      if (updates.canonical_name !== undefined) dbUpdates.canonical_name = updates.canonical_name
+      if (updates.description !== undefined) dbUpdates.description = updates.description
+      if (updates.structured_fields !== undefined) dbUpdates.structured_fields = updates.structured_fields
+      if (updates.attributes !== undefined) dbUpdates.attributes = updates.attributes
+
+      const { error } = await supabase
+        .from('knowledge_entities')
+        .update(dbUpdates)
+        .eq('id', entityId)
+
+      if (error) {
+        console.error('Failed to update entity:', error)
+        return false
+      }
+
+      // Update local state
+      set({
+        entities: get().entities.map(e => {
+          if (e.id !== entityId) return e
+          return {
+            ...e,
+            name: updates.canonical_name ?? e.name,
+            description: updates.description !== undefined ? updates.description : e.description,
+            structured_fields: updates.structured_fields ?? e.structured_fields,
+            attributes: updates.attributes ?? e.attributes,
+            metadata: updates.attributes ?? e.metadata,
+            updated_at: new Date().toISOString(),
+          }
+        }),
+        selectedEntity: get().selectedEntity?.id === entityId
+          ? {
+              ...get().selectedEntity!,
+              name: updates.canonical_name ?? get().selectedEntity!.name,
+              description: updates.description !== undefined ? updates.description : get().selectedEntity!.description,
+              structured_fields: updates.structured_fields ?? get().selectedEntity!.structured_fields,
+              attributes: updates.attributes ?? get().selectedEntity!.attributes,
+              updated_at: new Date().toISOString(),
+            }
+          : get().selectedEntity,
+      })
+      return true
+    } catch (error) {
+      console.error('Failed to update entity:', error)
+      return false
+    }
+  },
+
+  // ==============================
+  // Delete an entity
+  // ==============================
+  deleteEntity: async (entityId) => {
+    try {
+      const { error } = await supabase
+        .from('knowledge_entities')
+        .delete()
+        .eq('id', entityId)
+
+      if (error) {
+        console.error('Failed to delete entity:', error)
+        return false
+      }
+
+      set({
+        entities: get().entities.filter(e => e.id !== entityId),
+        selectedEntity: get().selectedEntity?.id === entityId ? null : get().selectedEntity,
+      })
+      return true
+    } catch (error) {
+      console.error('Failed to delete entity:', error)
+      return false
     }
   },
 }))

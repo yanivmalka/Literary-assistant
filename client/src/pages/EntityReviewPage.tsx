@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { Users, MapPin, Sword, Sparkles, GitBranch } from 'lucide-react'
+import { Users, MapPin, Sword, Sparkles, Wand2, GitBranch, Plus } from 'lucide-react'
 import { useEntityStore } from '@/stores/entityStore'
 import EntityCard from '@/components/entities/EntityCard'
 import MergeSuggestionComponent from '@/components/entities/MergeSuggestion'
+import EntityModal from '@/components/entities/EntityModal'
 import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
+import { type EntityType } from '@/lib/entityTypes'
 
 const TYPE_FILTERS = [
   { value: 'character', label: 'entities.types.character', icon: Users },
   { value: 'location', label: 'entities.types.location', icon: MapPin },
   { value: 'object', label: 'entities.types.object', icon: Sword },
+  { value: 'magic', label: 'entities.types.magic_system', icon: Wand2 },
   { value: 'ability', label: 'entities.types.ability', icon: Sparkles },
 ]
 
@@ -31,6 +34,8 @@ export default function EntityReviewPage() {
 
   const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || 'character')
   const [statusFilter, setStatusFilter] = useState('')
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editingEntity, setEditingEntity] = useState<ReturnType<typeof useEntityStore.getState>['entities'][0] | null>(null)
 
   const handleTypeFilter = (value: string) => {
     setTypeFilter(value)
@@ -62,17 +67,42 @@ export default function EntityReviewPage() {
     mergeEntities(projectId, entityAId, entityBId)
   }
 
+  const handleCreateNew = () => {
+    setEditingEntity(null)
+    setModalOpen(true)
+  }
+
+  const handleEditEntity = (entity: typeof entities[0]) => {
+    setEditingEntity(entity)
+    setModalOpen(true)
+  }
+
+  const handleModalSaved = () => {
+    if (projectId) {
+      fetchEntities(projectId, { type: typeFilter || undefined })
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <ProjectBreadcrumb currentPage="entities" showTabs={false} />
 
-      <div className="mb-6">
-        <h2 className="text-xl font-bold">
-          {typeFilter ? t(`entities.types.${typeFilter}`) : t('entities.title')}
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          {typeFilter ? t('entities.subtitleByType', { type: t(`entities.types.${typeFilter}`) }) : t('entities.subtitle')}
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold">
+            {typeFilter ? t(`entities.types.${typeFilter === 'magic' ? 'magic_system' : typeFilter}`) : t('entities.title')}
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            {typeFilter ? t('entities.subtitleByType', { type: t(`entities.types.${typeFilter === 'magic' ? 'magic_system' : typeFilter}`) }) : t('entities.subtitle')}
+          </p>
+        </div>
+        <button
+          onClick={handleCreateNew}
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          {t('entityModal.createNew')}
+        </button>
       </div>
 
       {/* Merge suggestions */}
@@ -147,10 +177,21 @@ export default function EntityReviewPage() {
               entity={entity}
               onConfirm={handleConfirm}
               onDismiss={handleDismiss}
+              onClick={() => handleEditEntity(entity)}
             />
           ))}
         </div>
       )}
+
+      {/* Entity Modal */}
+      <EntityModal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        entityType={(typeFilter || 'character') as EntityType}
+        projectId={projectId}
+        entity={editingEntity}
+        onSaved={handleModalSaved}
+      />
     </div>
   )
 }
