@@ -11,6 +11,133 @@
 
 import { supabase } from '@/lib/supabase'
 
+export interface BranchEntityData {
+  canonical_name: string
+  entity_type: string
+  description?: string | null
+  attributes?: Record<string, unknown>
+  structured_fields?: Record<string, unknown>
+}
+
+export interface MainEntityRoutingData {
+  id: string
+  canonical_name: string
+  entity_type: string
+  description: string | null
+  attributes: Record<string, unknown>
+  structured_fields: Record<string, unknown>
+}
+
+/**
+ * Build the exact branch-only entity row used by AI extraction.
+ * Branch context is applied last so callers cannot accidentally override it.
+ */
+export function buildBranchEntityRecord(
+  projectId: string,
+  userId: string,
+  branchId: string,
+  entityData: BranchEntityData
+): Record<string, unknown> {
+  validateBranchContext(branchId)
+
+  return {
+    project_id: projectId,
+    user_id: userId,
+    ...entityData,
+    layer: 'branch',
+    branch_id: branchId,
+    source: 'ai',
+  }
+}
+
+/**
+ * Build an overlay row for an existing Main entity without changing Main.
+ */
+export function buildEntityOverlayRecord(
+  branchId: string,
+  mainEntityId: string,
+  overrides: Record<string, unknown>,
+  baseValues: Record<string, unknown>,
+  metadata: Record<string, unknown> = {}
+): Record<string, unknown> {
+  validateBranchContext(branchId)
+
+  return {
+    ...metadata,
+    branch_id: branchId,
+    source_entity_id: mainEntityId,
+    entity_id: mainEntityId,
+    overrides,
+    base_values: baseValues,
+    is_modified: Object.keys(overrides).length > 0,
+    modified_fields: Object.keys(overrides),
+  }
+}
+
+export function buildBranchEntityAliasRecord(
+  entityId: string,
+  alias: string,
+  branchId: string
+): Record<string, unknown> {
+  validateBranchContext(branchId)
+  return { entity_id: entityId, alias, branch_id: branchId }
+}
+
+export function buildBranchEntityMentionRecord(
+  entityId: string,
+  chunkPosition: number,
+  evidence: string | null,
+  branchId: string
+): Record<string, unknown> {
+  validateBranchContext(branchId)
+  return {
+    entity_id: entityId,
+    chunk_position: chunkPosition,
+    evidence: evidence || undefined,
+    branch_id: branchId,
+  }
+}
+
+export function buildRawExtractionRecord(
+  projectId: string,
+  documentId: string,
+  versionId: string,
+  userId: string,
+  branchId: string,
+  extractionData: Record<string, unknown>
+): Record<string, unknown> {
+  validateBranchContext(branchId)
+  return {
+    project_id: projectId,
+    document_id: documentId,
+    version_id: versionId,
+    user_id: userId,
+    branch_id: branchId,
+    ...extractionData,
+  }
+}
+
+export function buildExtractionRequest(
+  versionId: string,
+  projectId: string,
+  documentId: string,
+  userId: string,
+  branchId: string,
+  offset: number,
+  limit: number
+): Record<string, unknown> {
+  validateBranchContext(branchId)
+  return {
+    version_id: versionId,
+    project_id: projectId,
+    document_id: documentId,
+    user_id: userId,
+    target_branch_id: branchId,
+    offset,
+    limit,
+  }
+}
+
 /**
  * Get the active branch for a project
  * Required before any extraction
@@ -67,26 +194,11 @@ export async function createBranchEntity(
   projectId: string,
   userId: string,
   branchId: string,
-  entityData: {
-    canonical_name: string
-    entity_type: string
-    description?: string | null
-    attributes?: Record<string, unknown>
-    structured_fields?: Record<string, unknown>
-  }
+  entityData: BranchEntityData
 ) {
-  validateBranchContext(branchId)
-
   const { data, error } = await supabase
     .from('knowledge_entities')
-    .insert({
-      project_id: projectId,
-      user_id: userId,
-      layer: 'branch',
-      branch_id: branchId,
-      source: 'ai',
-      ...entityData,
-    })
+    .insert(buildBranchEntityRecord(projectId, userId, branchId, entityData))
     .select('*')
     .single()
 
@@ -109,19 +221,9 @@ export async function createEntityOverlay(
   overrides: Record<string, unknown>,
   baseValues: Record<string, unknown>
 ) {
-  validateBranchContext(branchId)
-
   const { data, error } = await supabase
     .from('knowledge_branch_entities')
-    .insert({
-      branch_id: branchId,
-      source_entity_id: mainEntityId,
-      entity_id: mainEntityId,
-      overrides,
-      base_values: baseValues,
-      is_modified: Object.keys(overrides).length > 0,
-      modified_fields: Object.keys(overrides),
-    })
+    .insert(buildEntityOverlayRecord(branchId, mainEntityId, overrides, baseValues))
     .select('*')
     .single()
 
@@ -141,15 +243,9 @@ export async function createBranchEntityAlias(
   alias: string,
   branchId: string
 ) {
-  validateBranchContext(branchId)
-
   const { data, error } = await supabase
     .from('knowledge_entity_aliases')
-    .insert({
-      entity_id: entityId,
-      alias,
-      branch_id: branchId,
-    })
+    .insert(buildBranchEntityAliasRecord(entityId, alias, branchId))
     .select('*')
     .single()
 
@@ -170,16 +266,9 @@ export async function createBranchEntityMention(
   evidence: string | null,
   branchId: string
 ) {
-  validateBranchContext(branchId)
-
   const { data, error } = await supabase
     .from('knowledge_entity_mentions')
-    .insert({
-      entity_id: entityId,
-      chunk_position: chunkPosition,
-      evidence: evidence || undefined,
-      branch_id: branchId,
-    })
+    .insert(buildBranchEntityMentionRecord(entityId, chunkPosition, evidence, branchId))
     .select('*')
     .single()
 
@@ -315,18 +404,16 @@ export async function recordRawExtraction(
     chunks_count?: number
   }
 ) {
-  validateBranchContext(branchId)
-
   const { data, error } = await supabase
     .from('raw_extractions')
-    .insert({
-      project_id: projectId,
-      document_id: documentId,
-      version_id: versionId,
-      user_id: userId,
-      branch_id: branchId,
-      ...extractionData,
-    })
+    .insert(buildRawExtractionRecord(
+      projectId,
+      documentId,
+      versionId,
+      userId,
+      branchId,
+      extractionData,
+    ))
     .select('*')
     .single()
 

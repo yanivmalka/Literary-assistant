@@ -47,7 +47,7 @@ interface ExtractRequest {
   user_id: string;
   offset?: number;
   limit?: number;
-  target_branch_id?: string;
+  target_branch_id: string;
 }
 
 interface ExtractedEntity {
@@ -462,6 +462,41 @@ function errorResponse(message: string, status: number, details?: string): Respo
   );
 }
 
+function buildOverlayChanges(
+  existing: {
+    canonical_name: string;
+    entity_type: string;
+    structured_fields: unknown;
+    attributes: unknown;
+    description: string | null;
+  },
+  entity: NormalizedEntity,
+): { overrides: Record<string, unknown>; baseValues: Record<string, unknown> } {
+  const overrides: Record<string, unknown> = {};
+  const baseValues: Record<string, unknown> = {};
+  const existingStructured = (existing.structured_fields || {}) as Record<string, unknown>;
+  const existingAttributes = (existing.attributes || {}) as Record<string, unknown>;
+
+  const addChange = (field: string, nextValue: unknown, currentValue: unknown) => {
+    if (nextValue == null || JSON.stringify(nextValue) === JSON.stringify(currentValue)) return;
+    overrides[field] = nextValue;
+    baseValues[field] = currentValue ?? null;
+  };
+
+  addChange('canonical_name', entity.canonical_name, existing.canonical_name);
+  addChange('entity_type', entity.entity_type, existing.entity_type);
+  addChange('description', entity.description, existing.description);
+
+  for (const [key, value] of Object.entries(entity.attributes)) {
+    addChange(`attributes.${key}`, value, existingAttributes[key]);
+  }
+  for (const [key, value] of Object.entries(entity.structured_fields)) {
+    addChange(`structured_fields.${key}`, value, existingStructured[key]);
+  }
+
+  return { overrides, baseValues };
+}
+
 // ============================================
 // Main Handler
 // ============================================
@@ -474,8 +509,8 @@ Deno.serve(async (req) => {
   try {
     const body = (await req.json()) as ExtractRequest;
 
-    if (!body.version_id || !body.project_id || !body.document_id || !body.user_id) {
-      return errorResponse("Missing version_id, project_id, document_id, or user_id", 400);
+    if (!body.version_id || !body.project_id || !body.document_id || !body.user_id || !body.target_branch_id) {
+      return errorResponse("Missing version_id, project_id, document_id, user_id, or active target_branch_id. AI extraction cannot write directly to Main.", 400);
     }
 
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
@@ -488,7 +523,26 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    console.log(`[extract-knowledge] Version: 2.4.0 | Filters: character-blockPatterns-v2 + location-blockWords | Consolidation: evidence-based (threshold ${CONSOLIDATION_THRESHOLDS.SUGGEST_CONSOLIDATION_THRESHOLD}+) | NO magic_systems`);
+    // Service-role writes are allowed only after validating the requested branch.
+    // The branch must belong to the same user/project and be the active branch.
+    const { data: activeBranch, error: branchError } = await supabase
+      .from("knowledge_branches")
+      .select("id")
+      .eq("id", body.target_branch_id)
+      .eq("project_id", body.project_id)
+      .eq("user_id", body.user_id)
+      .eq("is_current", true)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (branchError) {
+      return errorResponse(`Failed to validate active branch: ${branchError.message}`, 500);
+    }
+    if (!activeBranch) {
+      return errorResponse("Extraction rejected: target_branch_id is not the active Branch for this project. AI cannot modify Main directly.", 400);
+    }
+
+    console.log(`[extract-knowledge] Version: 2.5.0 | Branch: ${activeBranch.id} | Main writes disabled`);
 
     const offset = body.offset ?? 0;
     const limit = body.limit ?? BATCH_SIZE;
@@ -599,6 +653,7 @@ Deno.serve(async (req) => {
         document_id: body.document_id,
         version_id: body.version_id,
         user_id: body.user_id,
+        branch_id: activeBranch.id,
         model: modelUsed,
         raw_response: extraction,
         input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,

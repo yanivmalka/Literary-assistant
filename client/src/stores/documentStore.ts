@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import { buildExtractionRequest, getActiveBranch } from '@/lib/extractionBranching'
 
 export interface DocumentVersion {
   id: string
@@ -257,6 +258,19 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
+    let activeBranch: { id: string }
+    try {
+      activeBranch = await getActiveBranch(projectId)
+    } catch (error) {
+      console.error('[Knowledge] Extraction rejected: no active branch', error)
+      set({
+        extractionInProgress: false,
+        extractionError: 'ui.documents.extractionError',
+        extractionDocumentId: documentId,
+      })
+      return
+    }
+
     // Reset state
     set({
       extractionInProgress: true,
@@ -308,14 +322,15 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
       try {
         const { data, error } = await supabase.functions.invoke('extract-knowledge', {
-          body: {
-            version_id: versionId,
-            project_id: projectId,
-            document_id: documentId,
-            user_id: user.id,
+          body: buildExtractionRequest(
+            versionId,
+            projectId,
+            documentId,
+            user.id,
+            activeBranch.id,
             offset,
-            limit: BATCH_SIZE,
-          },
+            BATCH_SIZE,
+          ),
         })
 
         if (error) {
