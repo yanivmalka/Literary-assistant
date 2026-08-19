@@ -48,12 +48,7 @@ export const useContradictionStore = create<ContradictionState>((set, get) => ({
 
       let query = supabase
         .from('contradictions')
-        .select(`
-          id, contradiction_type, status, description, resolution_note, created_at, resolved_at,
-          entities (id, name, entity_type),
-          attribute_a:attribute_a_id (id, attribute_name, attribute_value, source_chunk_id),
-          attribute_b:attribute_b_id (id, attribute_name, attribute_value, source_chunk_id)
-        `)
+        .select('id, contradiction_type, status, description, resolution_note, created_at, resolved_at, entity_id')
         .in('entity_id', entityIds)
         .order('created_at', { ascending: false })
 

@@ -382,7 +382,7 @@ Deno.serve(async (req) => {
     for (const entity of normalizedEntities) {
       const { data: upserted, error: upsertError } = await supabase
         .from("knowledge_entities")
-        .upsert(
+        .insert(
           {
             project_id: body.project_id,
             document_id: body.document_id,
@@ -397,9 +397,8 @@ Deno.serve(async (req) => {
             updated_at: new Date().toISOString(),
             layer: "main",
             structured_fields: {},
-            source: "gemini",
+            source: "ai",
           },
-          { onConflict: "version_id,canonical_name" }
         )
         .select("id")
         .single();
