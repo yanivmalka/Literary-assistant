@@ -82,45 +82,24 @@ interface GeminiExtraction {
 
 function buildPrompt(chunks: { position: number; content: string }[]): string {
   const chunksText = chunks
-    .map((c) => `=== CHUNK ${c.position} ===\n[position: ${c.position}]\n${c.content}`)
+    .map((c) => `[chunk ${c.position}]: ${c.content}`)
     .join("\n\n");
 
-  return `You are a literary entity extractor for Hebrew fiction. Analyze the following text chunks and extract all narratively significant information.
+  return `You are a literary entity extractor for Hebrew fiction. Extract entities from these text chunks.
 
 RULES:
-- The text is in Hebrew. Return entity names EXACTLY as they appear in the text.
-- Do NOT invent information that does not appear in the text.
-- If information is unknown, return null or an empty array.
-- Prefer over-extraction over missing a significant entity.
-- Focus on narratively meaningful information, not every noun.
-- Merge appearances of the same entity across chunks into one entry.
-- If a character appears in chunk 1 and chunk 4, return: "chunk_positions": [1, 4]
-- Distinguish between character, location, object, event, ability, and organization.
-- "evidence" should be short quotes from the text itself.
-- Return ONLY valid JSON. No explanation outside the JSON.
+- Return entity names in Hebrew exactly as written.
+- Do NOT invent information. Only extract what appears in the text.
+- Keep evidence SHORT (max 10 words each, max 2 per entity).
+- Be concise. Minimal attributes.
 
-EXTRACT:
-1. Characters: name, aliases, attributes (appearance/traits), relationships, abilities, evidence, chunk_positions
-2. Locations: name, description, significance, evidence, chunk_positions
-3. Objects: name, description, significance, evidence, chunk_positions
-4. Events: description, participants, location, what_happened, evidence, chunk_positions
-5. Abilities/Magic: name, description, users, evidence, chunk_positions
-6. Organizations/Groups: name, members, purpose, evidence, chunk_positions
-7. Relationships: character_a, character_b, relationship_type, evidence, chunk_positions
+Return JSON with these arrays (omit empty arrays):
+- characters: [{name, aliases[], attributes:{}, evidence[], chunk_positions[]}]
+- locations: [{name, description, evidence[], chunk_positions[]}]
+- events: [{description, participants[], chunk_positions[]}]
+- relationships: [{character_a, character_b, relationship_type, chunk_positions[]}]
 
-Return this exact JSON structure:
-{
-  "characters": [{ "name": "", "aliases": [], "attributes": {}, "relationships": [], "abilities": [], "evidence": [], "chunk_positions": [] }],
-  "locations": [{ "name": "", "description": "", "significance": "", "evidence": [], "chunk_positions": [] }],
-  "objects": [{ "name": "", "description": "", "significance": "", "evidence": [], "chunk_positions": [] }],
-  "events": [{ "description": "", "participants": [], "location": null, "what_happened": "", "evidence": [], "chunk_positions": [] }],
-  "abilities": [{ "name": "", "description": "", "users": [], "evidence": [], "chunk_positions": [] }],
-  "organizations": [{ "name": "", "members": [], "purpose": null, "evidence": [], "chunk_positions": [] }],
-  "relationships": [{ "character_a": "", "character_b": "", "relationship_type": "", "evidence": [], "chunk_positions": [] }]
-}
-
-TEXT CHUNKS:
-
+TEXT:
 ${chunksText}`;
 }
 
@@ -284,6 +263,7 @@ Deno.serve(async (req) => {
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 65536,
+          responseMimeType: "application/json",
         },
       },
       geminiApiKey,
@@ -330,65 +310,34 @@ Deno.serve(async (req) => {
 
 
     // ==============================
-    // Step 3: Parse JSON (robust - handles truncated code blocks, partial JSON)
+    // Step 3: Parse JSON — skip batch on failure (do not stop extraction)
     // ==============================
     let extraction: GeminiExtraction;
-    const jsonToParse = (() => {
-      let text = responseText.trim();
-      // Strip code block markers (opening and closing)
-      if (text.startsWith("```")) {
-        // Remove opening ```json or ```
-        text = text.replace(/^```(?:json)?\s*\n?/, "");
-        // Remove closing ``` if present
-        text = text.replace(/\n?```\s*$/, "");
-      }
-      return text.trim();
-    })();
-
     try {
-      extraction = JSON.parse(jsonToParse);
+      // Strip code block markers if present
+      let jsonText = responseText.trim();
+      jsonText = jsonText.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "").trim();
+      
+      // Try direct parse
+      extraction = JSON.parse(jsonText);
     } catch {
-      // JSON might be truncated due to maxOutputTokens - try to repair by closing brackets
-      const jsonStart = jsonToParse.indexOf("{");
-      if (jsonStart !== -1) {
-        let partial = jsonToParse.slice(jsonStart);
-        // Count open/close braces and brackets to attempt repair
-        let braces = 0, brackets = 0;
-        for (const ch of partial) {
-          if (ch === "{") braces++;
-          else if (ch === "}") braces--;
-          else if (ch === "[") brackets++;
-          else if (ch === "]") brackets--;
-        }
-        // Try truncating at the last complete entry and closing
-        // Find last complete object/array close
-        const lastClose = Math.max(partial.lastIndexOf("}"), partial.lastIndexOf("]"));
-        if (lastClose > 0) {
-          let repaired = partial.slice(0, lastClose + 1);
-          // Close remaining open brackets/braces
-          let rb = 0, rk = 0;
-          for (const ch of repaired) {
-            if (ch === "{") rb++;
-            else if (ch === "}") rb--;
-            else if (ch === "[") rk++;
-            else if (ch === "]") rk--;
-          }
-          while (rk > 0) { repaired += "]"; rk--; }
-          while (rb > 0) { repaired += "}"; rb--; }
-          try {
-            extraction = JSON.parse(repaired);
-            console.log(`[extract-knowledge] JSON was truncated but repaired successfully`);
-          } catch {
-            console.error(`[extract-knowledge] JSON repair failed. First 500: ${responseText.slice(0, 500)}`);
-            return errorResponse("Failed to parse Gemini JSON", 500, responseText.slice(0, 500));
-          }
+      // Try finding JSON object in text
+      try {
+        const start = responseText.indexOf("{");
+        const end = responseText.lastIndexOf("}");
+        if (start !== -1 && end > start) {
+          extraction = JSON.parse(responseText.slice(start, end + 1));
         } else {
-          console.error(`[extract-knowledge] No closable JSON. First 500: ${responseText.slice(0, 500)}`);
-          return errorResponse("Failed to parse Gemini JSON", 500, responseText.slice(0, 500));
+          throw new Error("no JSON object found");
         }
-      } else {
-        console.error(`[extract-knowledge] No JSON found. First 500: ${responseText.slice(0, 500)}`);
-        return errorResponse("Failed to parse Gemini JSON", 500, responseText.slice(0, 500));
+      } catch {
+        // Skip this batch — return success so the loop continues
+        console.warn(`[extract-knowledge] Skipping batch offset=${offset}: unparseable JSON (len=${responseText.length})`);
+        const done = chunks.length < limit;
+        return new Response(
+          JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, latency_ms: latencyMs, skipped: true }, summary: { entities_saved: 0, events_saved: 0, skipped_parse_error: true } }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
     }
 
