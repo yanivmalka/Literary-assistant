@@ -419,5 +419,64 @@
     "aliases": "כינויים",
     "aliasesPlaceholder": "כינויים מופרדים בפסיק",
     "aliasesHint": "שמות נוספים או כינויים של הישות, מופרדים בפסיק"
+  },
+  "ui": {
+    "common": {
+      "or": "או",
+      "unknown": "לא ידוע",
+      "switchLanguage": "החלף שפה",
+      "notAuthenticated": "יש להתחבר כדי להמשיך",
+      "unexpectedError": "משהו השתבש. נסה שוב."
+    },
+    "documents": {
+      "extractKnowledge": "חלץ",
+      "extractKnowledgeTitle": "חלץ ידע מהמסמך",
+      "uploadNotAuthenticated": "יש להתחבר לפני העלאת מסמך",
+      "uploadFailed": "העלאת המסמך נכשלה. נסה שוב.",
+      "extractionError": "חילוץ הידע נכשל. נסה שוב."
+    },
+    "qa": {
+      "noDocuments": "עדיין לא הועלו מסמכים. העלה מסמך כדי להתחיל לשאול שאלות.",
+      "processing": "המסמכים עדיין בעיבוד. המתן עד לסיום העיבוד.",
+      "noResults": "לא נמצאו קטעים רלוונטיים לשאלה. נסה מילות מפתח אחרות.",
+      "staticModeAnswer": "אלה הקטעים הרלוונטיים שנמצאו במסמכים שלך. תשובות מלאות שנוצרו באמצעות AI דורשות את שרת Express.",
+      "searchError": "אירעה שגיאה במהלך החיפוש. נסה שוב."
+    },
+    "projects": {
+      "namePlaceholder": "העולם שלי",
+      "descriptionPlaceholder": "תיאור אופציונלי...",
+      "trashEmpty": "האשפה ריקה",
+      "confirmPermanentDelete": "האם אתה בטוח? לא ניתן לבטל פעולה זו."
+    },
+    "maps": {
+      "untitled": "מפה ללא שם",
+      "mapName": "שם המפה",
+      "mapNamePlaceholder": "לדוגמה: ממלכת אלדוריה",
+      "description": "תיאור",
+      "descriptionPlaceholder": "תאר את הפריסה הכללית: יבשות, תכונות גיאוגרפיות מרכזיות, מיקום מקומות מפתח...",
+      "empty": "אין מפות עדיין"
+    },
+    "editor": {
+      "title": "עורך מפות",
+      "unsaved": "לא נשמר",
+      "previewAlt": "תצוגה מקדימה של המפה",
+      "finalMapAlt": "המפה הסופית"
+    },
+    "entities": {
+      "manual": "ידני",
+      "unknownType": "ישות"
+    },
+    "branch": {
+      "main": "ראשי",
+      "branch": "ענף",
+      "comparisonMain": "ראשי",
+      "comparisonBranch": "ענף"
+    },
+    "auth": {
+      "passwordMismatch": "הסיסמאות אינן תואמות",
+      "passwordMinLength": "הסיסמה חייבת להכיל לפחות 6 תווים",
+      "confirmationTitle": "בדוק את האימייל שלך",
+      "confirmationBody": "שלחנו אליך קישור אישור. אמת את כתובת האימייל לפני ההתחברות."
+    }
   }
 }

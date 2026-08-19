@@ -31,12 +31,15 @@ function getField(entity: Entity, field: string): string | null {
   return null
 }
 
-const UNKNOWN_LABEL = 'לא ידוע'
+const UNKNOWN_LABEL_KEY = 'ui.common.unknown'
 
 export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails, onClick }: EntityCardProps) {
   const { t } = useTranslation()
   const typeColor = TYPE_COLORS[entity.entity_type] || 'bg-gray-100 text-gray-800'
   const isCharacter = entity.entity_type === 'character'
+  const typeLabel = t(`entities.typesSingular.${entity.entity_type}`, {
+    defaultValue: t('ui.entities.unknownType'),
+  })
 
   return (
     <div
@@ -51,11 +54,11 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
           <div className="flex items-center gap-2">
             <h4 className="font-medium text-sm truncate">{entity.name}</h4>
             <span className={`text-xs px-1.5 py-0.5 rounded ${typeColor}`}>
-              {t(`entities.typesSingular.${entity.entity_type}`)}
+              {typeLabel}
             </span>
             {entity.source === 'user' && (
               <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                ידני
+                {t('ui.entities.manual')}
               </span>
             )}
           </div>
@@ -130,8 +133,8 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
 
 /** A single attribute line shown on character cards */
 function CharacterAttr({ label, value }: { label: string; value: string | null }) {
-  const display = value || UNKNOWN_LABEL
-  const isUnknown = !value || value === UNKNOWN_LABEL
+  const display = value || t(UNKNOWN_LABEL_KEY)
+  const isUnknown = !value
 
   return (
     <span className="truncate">

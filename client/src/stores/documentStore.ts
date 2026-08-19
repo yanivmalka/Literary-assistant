@@ -129,7 +129,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         set({ uploading: false })
-        return { success: false, error: 'Not authenticated' }
+        return { success: false, error: 'ui.common.notAuthenticated' }
       }
 
       const fileType = file.name.endsWith('.docx') ? 'docx' : 'pdf'
@@ -162,7 +162,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
         if (createError || !newDoc) {
           set({ uploading: false })
-          return { success: false, error: 'Failed to create document record' }
+          return { success: false, error: 'ui.documents.uploadFailed' }
         }
         docId = newDoc.id
       }
@@ -186,7 +186,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           await supabase.from('documents').delete().eq('id', docId)
         }
         set({ uploading: false })
-        return { success: false, error: `Upload failed: ${uploadError.message}` }
+        return { success: false, error: 'ui.documents.uploadFailed' }
       }
 
       // Create version record
@@ -204,7 +204,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
       if (versionError || !versionData) {
         set({ uploading: false })
-        return { success: false, error: 'Failed to create version record' }
+        return { success: false, error: 'ui.documents.uploadFailed' }
       }
 
       // Trigger processing via Edge Function (background task)
@@ -229,7 +229,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       return { success: true }
     } catch (error) {
       set({ uploading: false })
-      return { success: false, error: 'Unexpected error during upload' }
+      return { success: false, error: 'ui.common.unexpectedError' }
     }
   },
 
@@ -322,13 +322,13 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           console.error('[Knowledge] Batch error:', error.message)
           set({
             extractionInProgress: false,
-            extractionError: error.message,
+            extractionError: 'ui.documents.extractionError',
           })
           break
         }
 
         if (!data || !data.success) {
-          const errorMsg = data?.error || 'Unknown error'
+          const errorMsg = data?.error ? 'ui.documents.extractionError' : 'ui.documents.extractionError'
           console.error('[Knowledge] Extraction failed:', errorMsg, 'Details:', data?.details?.slice(0, 300) || 'none')
           set({
             extractionInProgress: false,
@@ -364,7 +364,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         console.error('[Knowledge] Extraction failed:', err)
         set({
           extractionInProgress: false,
-          extractionError: err instanceof Error ? err.message : 'Unexpected error',
+          extractionError: 'ui.documents.extractionError',
         })
         break
       }

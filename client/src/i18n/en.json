@@ -419,5 +419,64 @@
     "aliases": "Aliases",
     "aliasesPlaceholder": "Aliases separated by comma",
     "aliasesHint": "Alternative names or nicknames for this entity, separated by commas"
+  },
+  "ui": {
+    "common": {
+      "or": "or",
+      "unknown": "Unknown",
+      "switchLanguage": "Switch language",
+      "notAuthenticated": "Please log in to continue",
+      "unexpectedError": "Something went wrong. Please try again."
+    },
+    "documents": {
+      "extractKnowledge": "Extract",
+      "extractKnowledgeTitle": "Extract knowledge from this document",
+      "uploadNotAuthenticated": "Please log in before uploading a document",
+      "uploadFailed": "The document upload failed. Please try again.",
+      "extractionError": "Knowledge extraction failed. Please try again."
+    },
+    "qa": {
+      "noDocuments": "No documents uploaded yet. Upload a document to start asking questions.",
+      "processing": "Documents are still being processed. Please wait until processing is complete.",
+      "noResults": "No relevant passages found for this question. Try different keywords.",
+      "staticModeAnswer": "Here are the relevant passages found in your documents. Full AI-generated answers require the Express server.",
+      "searchError": "An error occurred while searching. Please try again."
+    },
+    "projects": {
+      "namePlaceholder": "My Fantasy World",
+      "descriptionPlaceholder": "Optional description...",
+      "trashEmpty": "Trash is empty",
+      "confirmPermanentDelete": "Are you sure? This cannot be undone."
+    },
+    "maps": {
+      "untitled": "Untitled Map",
+      "mapName": "Map Name",
+      "mapNamePlaceholder": "e.g. The Realm of Eldoria",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe the general layout: continents, major geographical features, position of key locations...",
+      "empty": "No maps yet"
+    },
+    "editor": {
+      "title": "Map Editor",
+      "unsaved": "unsaved",
+      "previewAlt": "Map preview",
+      "finalMapAlt": "Final map"
+    },
+    "entities": {
+      "manual": "Manual",
+      "unknownType": "Entity"
+    },
+    "branch": {
+      "main": "Main",
+      "branch": "Branch",
+      "comparisonMain": "Main",
+      "comparisonBranch": "Branch"
+    },
+    "auth": {
+      "passwordMismatch": "Passwords do not match",
+      "passwordMinLength": "Password must be at least 6 characters",
+      "confirmationTitle": "Check your email",
+      "confirmationBody": "We sent you a confirmation link. Please verify your email before logging in."
+    }
   }
 }

@@ -57,7 +57,9 @@ export default function DocumentUploader({ projectId, documentId, onUploadComple
       setSelectedFile(null)
       onUploadComplete?.()
     } else {
-      setError(result.error || t('documents.upload.failed'))
+      setError(t(result.error || 'ui.documents.uploadFailed', {
+        defaultValue: t('ui.documents.uploadFailed'),
+      }))
     }
   }
 

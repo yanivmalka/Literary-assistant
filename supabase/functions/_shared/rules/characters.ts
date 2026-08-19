@@ -5,6 +5,8 @@
 // characters should be extracted, filtered, and displayed.
 // ============================================
 
+import { getMultilingualCharacterPatterns, type LanguageCode } from './language-rules.ts';
+
 export const CHARACTER_RULES = {
   /**
    * Core rule: Only characters with proper names (first name or surname) are extracted.
@@ -17,25 +19,23 @@ export const CHARACTER_RULES = {
    * These should NEVER be extracted as standalone character entities.
    * They may appear as aliases of a named character if context confirms identity.
    * 
+   * Now supports multiple languages (Hebrew, English, Arabic, French, etc.)
+   * Auto-detects language or uses specified language codes.
+   * 
+   * To support new languages, update language-rules.ts
+   * 
    * REGEX BREAKDOWN:
-   * - Pattern 1: Family roles ± possessive (אבא, אמא, סבא, etc.) with optional "של X"
-   * - Pattern 2: Generic descriptors (המנחה, הזקן, הנער, etc.) — exactly these words
-   * - Pattern 3: "Role של ..." — relationship descriptors
+   * - Pattern 1: Family roles ± possessive with optional relationship reference
+   * - Pattern 2: Generic descriptors (e.g., "the man", "המנחה") — exactly these words
+   * - Pattern 3: "Role של ..." or "Role of ..." — relationship descriptors
    */
-  blockPatterns: [
-    // Family role references (with or without possessive "של")
-    // Matches: אבא, אמא, אמו, אביה, אביו, אימא, אימו, אימה, אח, אחי, אחות, סבא, סבו, סבתא, סבתו, בן, בת, דוד, דודו, דודה, דודתו
-    // With optional " של NAME"
-    /^(אבא|אמא|אמו|אביה?|אביו|אימא|אימו|אימה|אחי?|אחיו|אחות|אחותו|סבא?|סבו|סבתא?|סבתו|בן|בת|דוד|דודו|דודה|דודתו)(\s+של\s+.+)?$/i,
-    
-    // Generic descriptive references — exact match with "ה" prefix
-    // Covers: המנחה, המורה, המדריך, הזקן, הנער, הבחור, האיש, החייל, הקוסם, הילד, המלך, הנסיך, וכו'
-    /^(המנחה|המורה|המדריך|הזקן|הזקנה|הנער|הנערה|הבחור|הבחורה|האיש|האישה|החייל|הקוסם|הקוסמת|הילד|הילדה|המלך|המלכה|הנסיך|הנסיכה|השומר|העבד|הסוחר|הכומר|הרופא|הגנב|הלוחם|השוטר|הקדוש|הנביא|הכהן|הפקיד)$/i,
-    
-    // Relationship references with "של" — explicitly role ± target
-    // Matches: "אבא של X", "אמו של Y", etc.
-    /^(אבא|אמא|אמו|אביו|אביה|אימו|אימה|אח|אחי|אחות|סבא|סבו|סבתא|סבתו|בן|בת|דוד|דודו|דודה|דודתו)\s+של\s+/i,
-  ] as RegExp[],
+  blockPatterns: getMultilingualCharacterPatterns(['he', 'en']) as RegExp[],
+  
+  /**
+   * Language codes supported for character blocking.
+   * To add a new language, update this array and add patterns to language-rules.ts
+   */
+  supportedLanguages: ['he', 'en', 'ar', 'fr', 'de', 'es', 'it', 'pt', 'ru', 'ja', 'zh'] as const,
 
   /**
    * Name consolidation rules:

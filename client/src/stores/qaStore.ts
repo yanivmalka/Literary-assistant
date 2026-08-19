@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import i18n from '@/i18n'
 
 export interface QASource {
   chunkId: string
@@ -62,7 +63,7 @@ export const useQAStore = create<QAState>((set, get) => ({
         const noDocsMsg: QAMessage = {
           id: crypto.randomUUID(),
           type: 'answer',
-          text: 'No documents uploaded yet. Upload a document to start asking questions.',
+          text: i18n.t('ui.qa.noDocuments'),
           noSufficientContext: true,
           timestamp: new Date(),
         }
@@ -83,7 +84,7 @@ export const useQAStore = create<QAState>((set, get) => ({
         const notReadyMsg: QAMessage = {
           id: crypto.randomUUID(),
           type: 'answer',
-          text: 'Documents are still being processed. Please wait until processing is complete.',
+          text: i18n.t('ui.qa.processing'),
           noSufficientContext: true,
           timestamp: new Date(),
         }
@@ -118,7 +119,7 @@ export const useQAStore = create<QAState>((set, get) => ({
         const noResultsMsg: QAMessage = {
           id: crypto.randomUUID(),
           type: 'answer',
-          text: 'No relevant passages found for this question. Try different keywords.',
+          text: i18n.t('ui.qa.noResults'),
           sources: [],
           noSufficientContext: true,
           timestamp: new Date(),
@@ -131,7 +132,7 @@ export const useQAStore = create<QAState>((set, get) => ({
       const answerMsg: QAMessage = {
         id: crypto.randomUUID(),
         type: 'answer',
-        text: 'Here are the relevant passages found in your documents. (Full AI-generated answers require the Express server to be running.)',
+        text: i18n.t('ui.qa.staticModeAnswer'),
         sources,
         noSufficientContext: false,
         timestamp: new Date(),
@@ -142,7 +143,7 @@ export const useQAStore = create<QAState>((set, get) => ({
       const errorMsg: QAMessage = {
         id: crypto.randomUUID(),
         type: 'answer',
-        text: 'An error occurred while searching. Please try again.',
+        text: i18n.t('ui.qa.searchError'),
         timestamp: new Date(),
       }
       set({ messages: [...get().messages, errorMsg], loading: false })

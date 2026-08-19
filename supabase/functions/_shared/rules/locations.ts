@@ -3,7 +3,10 @@
 // ============================================
 // Defines what constitutes a valid location entity.
 // Only locations with distinct identity and narrative importance are extracted.
+// Now supports multiple languages (Hebrew, English, Arabic, French, etc.)
 // ============================================
+
+import { getMultilingualLocationBlockWords, type LanguageCode } from './language-rules.ts';
 
 export const LOCATION_RULES = {
   /**
@@ -18,29 +21,23 @@ export const LOCATION_RULES = {
    * These are only valid if paired with a unique identifier
    * (e.g., "חדר" = blocked, "חדרו של ליאו" = might be valid if narratively important).
    * 
-   * TO ADD A BLOCKWORD: Simply add it to this set. No other changes needed.
+   * Now supports multiple languages (Hebrew, English, etc.)
+   * Auto-combines blocking words from all supported languages.
+   * 
+   * TO ADD A BLOCKWORD: Update language-rules.ts, not this file.
    * 
    * Includes:
-   * - Indoor spaces: חדר, מטבח, דירה, סלון, חצר, מרתף, גג, עליית גג, שירותים, מסדרון, מרפסת, פרוזדור, מחסן
-   * - Outdoor generic: אוהל, גינה, רחוב, שדה, שביל, כביש, דרך
-   * - Nature generic (without name): יער, נהר, הר, גבעה, אגם, ים, חוף, מערה, גשר, בקעה, עמק, מדבר
-   * - Structures generic: בית, בניין, מגדל, חומה, שער, גדר
-   * - Urban generic: עיר, כפר, שוק, רחבה, ככר
+   * - Hebrew: Indoor spaces (חדר, מטבח, דירה), Outdoor generic (אוהל, גינה), 
+   *   Nature generic (יער, נהר, הר), Structures (בית, בניין), Urban (עיר, כפר)
+   * - English: room, bedroom, kitchen, forest, city, house, street, etc.
    */
-  blockWords: new Set([
-    // Indoor spaces
-    "חדר", "מטבח", "דירה", "סלון", "חצר", "מרתף", "גג", "עליית גג",
-    "שירותים", "מסדרון", "מרפסת", "פרוזדור", "מחסן",
-    // Outdoor generic
-    "אוהל", "גינה", "רחוב", "שדה", "שביל", "כביש", "דרך",
-    // Nature generic (without a proper name)
-    "יער", "נהר", "הר", "גבעה", "אגם", "ים", "חוף", "מערה",
-    "גשר", "בקעה", "עמק", "מדבר",
-    // Structures generic
-    "בית", "בניין", "מגדל", "חומה", "שער", "גדר",
-    // Urban generic
-    "עיר", "כפר", "שוק", "רחבה", "ככר",
-  ]),
+  blockWords: getMultilingualLocationBlockWords(['he', 'en']) as Set<string>,
+  
+  /**
+   * Language codes supported for location blocking.
+   * To add a new language, update this array and add block words to language-rules.ts
+   */
+  supportedLanguages: ['he', 'en', 'ar', 'fr', 'de', 'es', 'it', 'pt', 'ru', 'ja', 'zh'] as const,
 
   /**
    * Location types that the system recognizes.

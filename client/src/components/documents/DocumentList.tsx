@@ -99,14 +99,14 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                       : 'bg-green-50 text-green-700 hover:bg-green-100'
                   }`}
-                  title="Extract Knowledge (Gemini)"
+                  title={t('ui.documents.extractKnowledgeTitle')}
                 >
                   {extractionInProgress && extractionDocumentId === doc.id ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <Brain className="h-3.5 w-3.5" />
                   )}
-                  Extract
+                  {t('ui.documents.extractKnowledge')}
                 </button>
               )}
               <button

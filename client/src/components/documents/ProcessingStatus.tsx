@@ -135,7 +135,9 @@ export default function ProcessingStatus({ status, errorMessage, errorStage, pro
       {isError && (
         <div className="mt-3 p-3 bg-destructive/10 rounded-md">
           <p className="text-sm text-destructive">
-            {errorMessage || t('documents.status.genericError')}
+            {t(errorMessage || 'documents.status.genericError', {
+              defaultValue: t('documents.status.genericError'),
+            })}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             {t('documents.status.errorAction')}

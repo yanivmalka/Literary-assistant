@@ -116,7 +116,9 @@ export default function ExtractionProgress() {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <p className="text-xs text-red-600 ps-7">{extractionError}</p>
+        <p className="text-xs text-red-600 ps-7">
+          {t(extractionError, { defaultValue: t('ui.documents.extractionError') })}
+        </p>
       </div>
     )
   }
