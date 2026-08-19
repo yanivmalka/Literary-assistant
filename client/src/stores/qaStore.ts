@@ -99,7 +99,7 @@ export const useQAStore = create<QAState>((set, get) => ({
         .from('document_chunks')
         .select('id, content, chapter_number, chapter_title, page, position, version_id')
         .in('version_id', versionIds)
-        .textSearch('content', question.split(' ').filter(w => w.length > 2).join(' & '), {
+        .textSearch('content', question.trim().split(/\s+/).map(term => term.replace(/[.,!?;:()[\]{}]/g, '')).filter(term => term.length > 1).join(' & '), {
           type: 'plain',
           config: 'simple',
         })

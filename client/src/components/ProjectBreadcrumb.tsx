@@ -41,14 +41,14 @@ export default function ProjectBreadcrumb({ currentPage, showTabs = true }: Proj
           <FolderOpen className="h-3.5 w-3.5" />
           {t('projects.title')}
         </Link>
-        <ChevronRight className="h-3.5 w-3.5" />
+        <ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
         <Link
           to={`/projects/${projectId}`}
           className="hover:text-foreground transition-colors max-w-[200px] truncate"
         >
           {projectName}
         </Link>
-        <ChevronRight className="h-3.5 w-3.5" />
+        <ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
         <span className="text-foreground font-medium">
           {t(NAV_ITEMS.find(item => item.key === currentPage)?.label || '')}
         </span>

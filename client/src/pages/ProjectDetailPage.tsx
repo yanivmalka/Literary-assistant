@@ -45,7 +45,7 @@ export default function ProjectDetailPage() {
           onClick={() => navigate('/projects')}
           className="p-2 rounded-md hover:bg-accent transition-colors"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
         </button>
         <div>
           <h2 className="text-2xl font-bold">{currentProject.name}</h2>
@@ -117,7 +117,7 @@ export default function ProjectDetailPage() {
         {projectMaps.length === 0 ? (
           <div className="border-2 border-dashed rounded-lg p-8 text-center">
             <Map className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="text-muted-foreground mb-4">No maps yet</p>
+            <p className="text-muted-foreground mb-4">{t('ui.maps.empty')}</p>
             <Link
               to={`/projects/${projectId}/maps/new`}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"

@@ -238,7 +238,7 @@ export default function EntityModal({
                 {expandedGroups.has(group.key) ? (
                   <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 rtl:rotate-180" />
                 )}
                 <span className="font-medium text-sm">{t(group.labelKey)}</span>
                 <span className="text-xs text-muted-foreground ms-auto">

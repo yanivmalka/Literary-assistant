@@ -31,8 +31,6 @@ function getField(entity: Entity, field: string): string | null {
   return null
 }
 
-const UNKNOWN_LABEL_KEY = 'ui.common.unknown'
-
 export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails, onClick }: EntityCardProps) {
   const { t } = useTranslation()
   const typeColor = TYPE_COLORS[entity.entity_type] || 'bg-gray-100 text-gray-800'
@@ -66,10 +64,10 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
           {/* Character quick attributes */}
           {isCharacter && (
             <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-              <CharacterAttr label={t('entityFields.age')} value={getField(entity, 'age')} />
-              <CharacterAttr label={t('entityFields.height')} value={getField(entity, 'height')} />
-              <CharacterAttr label={t('entityFields.eye_color')} value={getField(entity, 'eye_color')} />
-              <CharacterAttr label={t('entityFields.hair_color')} value={getField(entity, 'hair_color')} />
+              <CharacterAttr label={t('entityFields.age')} value={getField(entity, 'age')} unknownLabel={t('ui.common.unknown')} />
+              <CharacterAttr label={t('entityFields.height')} value={getField(entity, 'height')} unknownLabel={t('ui.common.unknown')} />
+              <CharacterAttr label={t('entityFields.eye_color')} value={getField(entity, 'eye_color')} unknownLabel={t('ui.common.unknown')} />
+              <CharacterAttr label={t('entityFields.hair_color')} value={getField(entity, 'hair_color')} unknownLabel={t('ui.common.unknown')} />
             </div>
           )}
 
@@ -132,8 +130,8 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
 }
 
 /** A single attribute line shown on character cards */
-function CharacterAttr({ label, value }: { label: string; value: string | null }) {
-  const display = value || t(UNKNOWN_LABEL_KEY)
+function CharacterAttr({ label, value, unknownLabel }: { label: string; value: string | null; unknownLabel: string }) {
+  const display = value || unknownLabel
   const isUnknown = !value
 
   return (

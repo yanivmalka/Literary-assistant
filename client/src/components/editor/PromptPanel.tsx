@@ -7,7 +7,7 @@ import { MARKER_DEFINITIONS } from '@/lib/types'
 import type { CanvasMarker, CanvasRegion } from '@/lib/types'
 
 export default function PromptPanel() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { currentMap, markers, regions } = useMapStore()
   const [prompt, setPrompt] = useState('')
   const [copied, setCopied] = useState(false)
@@ -100,7 +100,7 @@ export default function PromptPanel() {
               onClick={() => { setPrompt(item.prompt_text); setShowHistory(false) }}
               className="w-full text-start px-2 py-1 text-xs rounded hover:bg-accent truncate"
             >
-              {new Date(item.created_at).toLocaleDateString()} - {item.prompt_text.slice(0, 40)}...
+              {new Date(item.created_at).toLocaleDateString(i18n.language === 'he' ? 'he-IL' : 'en-US')} - {item.prompt_text.slice(0, 40)}...
             </button>
           ))}
         </div>

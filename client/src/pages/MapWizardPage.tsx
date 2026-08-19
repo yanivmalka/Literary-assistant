@@ -28,7 +28,7 @@ export default function MapWizardPage() {
       .insert({
         project_id: projectId,
         user_id: user.id,
-        name: mapName.trim() || 'Untitled Map',
+        name: mapName.trim() || t('ui.maps.untitled'),
         material,
         map_type: mapType,
         description: description.trim() || null,
@@ -146,23 +146,23 @@ export default function MapWizardPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Map Name</label>
+              <label className="block text-sm font-medium mb-1">{t('ui.maps.mapName')}</label>
               <input
                 type="text"
                 value={mapName}
                 onChange={(e) => setMapName(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
-                placeholder="e.g. The Realm of Eldoria"
+                placeholder={t('ui.maps.mapNamePlaceholder')}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Description</label>
+              <label className="block text-sm font-medium mb-1">{t('ui.maps.description')}</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                 rows={6}
-                placeholder="Describe the general layout: continents, major geographical features, position of key locations..."
+                placeholder={t('ui.maps.descriptionPlaceholder')}
               />
             </div>
           </div>

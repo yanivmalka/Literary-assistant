@@ -30,7 +30,7 @@ export default function SourceReference({ source, index }: SourceReferenceProps)
           <BookOpen className="h-3 w-3" />
           {label}
           {source.documentName && (
-            <span className="text-muted-foreground/60">• {source.documentName}</span>
+            <bdi dir="auto" className="text-muted-foreground/60"> • {source.documentName}</bdi>
           )}
         </span>
         {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}

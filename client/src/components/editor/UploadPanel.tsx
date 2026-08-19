@@ -120,7 +120,7 @@ export default function UploadPanel() {
       >
         {preview ? (
           <div className="relative">
-            <img src={preview} alt="Preview" className="w-full rounded" />
+            <img src={preview} alt={t('ui.editor.previewAlt')} className="w-full rounded" />
             <button
               onClick={(e) => { e.stopPropagation(); setPreview(null); setFile(null) }}
               className="absolute top-1 end-1 p-1 bg-black/50 rounded-full text-white"
@@ -161,7 +161,7 @@ export default function UploadPanel() {
       {/* Current uploaded image */}
       {uploadedUrl && (
         <div className="border rounded p-2 mb-3">
-          <img src={uploadedUrl} alt="Final map" className="w-full rounded" />
+          <img src={uploadedUrl} alt={t('ui.editor.finalMapAlt')} className="w-full rounded" />
         </div>
       )}
 

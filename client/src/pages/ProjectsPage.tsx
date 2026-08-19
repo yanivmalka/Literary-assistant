@@ -5,7 +5,7 @@ import { Plus, FolderOpen, MoreVertical, Trash2 } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 
 export default function ProjectsPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { projects, loading, fetchProjects, createProject, moveToTrash } = useProjectStore()
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -72,7 +72,7 @@ export default function ProjectsPage() {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground mt-3">
-                  {new Date(project.updated_at).toLocaleDateString()}
+                  {new Date(project.updated_at).toLocaleDateString(i18n.language === 'he' ? 'he-IL' : 'en-US')}
                 </p>
               </div>
 
@@ -118,21 +118,21 @@ export default function ProjectsPage() {
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  placeholder="My Fantasy World"
+                  placeholder={t('ui.projects.namePlaceholder')}
                   autoFocus
                   required
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Description
+                  {t('projects.description')}
                 </label>
                 <textarea
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                   rows={3}
-                  placeholder="Optional description..."
+                  placeholder={t('ui.projects.descriptionPlaceholder')}
                 />
               </div>
               <div className="flex justify-end gap-3">

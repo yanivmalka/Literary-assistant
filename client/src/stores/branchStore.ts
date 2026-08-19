@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import i18n from '@/i18n'
 
 // ============================================
 // Types
@@ -167,7 +168,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
       }
 
       // 1. Create the branch record
-      const branchName = name || `Branch ${new Date().toLocaleDateString('he-IL')}`
+      const branchName = name || `${i18n.t('ui.branch.branch')} ${new Date().toLocaleDateString(i18n.language === 'he' ? 'he-IL' : 'en-US')}`
       const { data: branch, error: branchError } = await supabase
         .from('knowledge_branches')
         .insert({

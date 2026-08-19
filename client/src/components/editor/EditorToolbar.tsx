@@ -59,10 +59,10 @@ export default function EditorToolbar() {
       <div className="border-b bg-card px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="font-medium text-sm">
-            {currentMap?.name || 'Map Editor'}
+            {currentMap?.name || t('ui.editor.title')}
           </span>
           {isDirty && (
-            <span className="text-xs text-muted-foreground">(unsaved)</span>
+            <span className="text-xs text-muted-foreground">({t('ui.editor.unsaved')})</span>
           )}
         </div>
 
@@ -73,7 +73,7 @@ export default function EditorToolbar() {
             className="p-1.5 rounded hover:bg-accent disabled:opacity-30 transition-colors"
             title={t('editor.toolbar.undo')}
           >
-            <Undo2 className="h-4 w-4" />
+            <Undo2 className="h-4 w-4 rtl:rotate-180" />
           </button>
           <button
             onClick={redo}
@@ -81,7 +81,7 @@ export default function EditorToolbar() {
             className="p-1.5 rounded hover:bg-accent disabled:opacity-30 transition-colors"
             title={t('editor.toolbar.redo')}
           >
-            <Redo2 className="h-4 w-4" />
+            <Redo2 className="h-4 w-4 rtl:rotate-180" />
           </button>
 
           <div className="w-px h-5 bg-border mx-2" />

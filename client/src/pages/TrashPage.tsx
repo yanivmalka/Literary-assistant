@@ -31,7 +31,7 @@ export default function TrashPage() {
       ) : trashedProjects.length === 0 ? (
         <div className="text-center py-12">
           <Trash2 className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground">Trash is empty</p>
+          <p className="text-muted-foreground">{t('ui.projects.trashEmpty')}</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -56,7 +56,7 @@ export default function TrashPage() {
                 </button>
                 <button
                   onClick={() => {
-                    if (confirm('Are you sure? This cannot be undone.')) {
+                    if (confirm(t('ui.projects.confirmPermanentDelete'))) {
                       deletePermanently(project.id)
                     }
                   }}

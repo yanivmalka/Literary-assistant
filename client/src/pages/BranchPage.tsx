@@ -172,7 +172,7 @@ export default function BranchPage() {
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">{renderEntityTypeIcon(entity.entity_type)}</span>
                 <h4 className="font-medium">{entity.canonical_name}</h4>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">Main</span>
+                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">{t('ui.branch.main')}</span>
               </div>
               {entity.description && (
                 <p className="text-sm text-muted-foreground mb-2">{entity.description}</p>
@@ -263,7 +263,7 @@ export default function BranchPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{renderEntityTypeIcon(entity.entity_type)}</span>
                       <h4 className="font-medium">{entity.canonical_name}</h4>
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Branch</span>
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{t('ui.branch.branch')}</span>
                       {entity.is_modified && (
                         <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">{t('branch.modified')}</span>
                       )}
@@ -522,7 +522,7 @@ function ComparisonCard({
           onClick={() => onTransferAll(comparison.sourceEntityId)}
           className="flex items-center gap-1 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
         >
-          <ArrowRight className="h-3 w-3" />
+          <ArrowRight className="h-3 w-3 rtl:rotate-180" />
           {t('branch.transferAll')}
         </button>
       </div>
@@ -531,8 +531,8 @@ function ComparisonCard({
       <div className="divide-y">
         <div className="grid grid-cols-[1fr_2fr_2fr_auto] gap-2 px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground">
           <span>{t('branch.field')}</span>
-          <span>Main</span>
-          <span>Branch</span>
+          <span>{t('ui.branch.comparisonMain')}</span>
+          <span>{t('ui.branch.comparisonBranch')}</span>
           <span></span>
         </div>
         {changedDiffs.map(diff => (
@@ -549,7 +549,7 @@ function ComparisonCard({
               className="flex items-center gap-1 px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100 whitespace-nowrap"
               title={t('branch.transferToMain')}
             >
-              <ArrowRight className="h-3 w-3" />
+              <ArrowRight className="h-3 w-3 rtl:rotate-180" />
               {t('branch.transfer')}
             </button>
           </div>

@@ -6,7 +6,7 @@ import he from './he.json'
 const storedLanguage = localStorage.getItem('language')
 const savedLanguage = storedLanguage === 'he' ? 'he' : 'en'
 
- i18n.use(initReactI18next).init({
+i18n.use(initReactI18next).init({
   resources: {
     en: { translation: en },
     he: { translation: he },
