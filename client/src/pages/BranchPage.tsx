@@ -82,7 +82,7 @@ export default function BranchPage() {
   const handleStartEdit = (entity: BranchEntity) => {
     setEditingEntity(entity.id)
     setEditForm({
-      canonical_name: entity.canonical_name,
+      canonical_name: entity.canonical_name || '',
       description: entity.description || '',
       attributes: { ...(entity.attributes || {}) },
     })
@@ -261,8 +261,8 @@ export default function BranchPage() {
                 <>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{renderEntityTypeIcon(entity.entity_type)}</span>
-                      <h4 className="font-medium">{entity.canonical_name}</h4>
+                      <span className="text-lg">{renderEntityTypeIcon(entity.entity_type || '')}</span>
+                      <h4 className="font-medium">{entity.canonical_name || ''}</h4>
                       <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{t('ui.branch.branch')}</span>
                       {entity.is_modified && (
                         <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">{t('branch.modified')}</span>
