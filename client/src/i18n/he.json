@@ -209,6 +209,22 @@
       "stuckDescription": "עיבוד המסמך לקח יותר מדי זמן והופסק. נסה להעלות את המסמך שוב או פנה לתמיכה אם הבעיה נמשכת.",
       "genericError": "אירעה שגיאה בזמן העיבוד.",
       "errorAction": "מחק את המסמך הזה והעלה אותו שוב. אם הבעיה נמשכת, נסה קובץ קטן יותר."
+    },
+    "extraction": {
+      "inProgress": "מחלץ ישויות...",
+      "progress": "עובד על {{processed}} מתוך {{total}} קטעים",
+      "entitiesFound": "{{count}} ישויות נמצאו",
+      "eventsFound": "{{count}} אירועים נמצאו",
+      "batchInfo": "אצווה {{current}}",
+      "completed": "חילוץ הישויות הסתיים בהצלחה!",
+      "completedSummary": "נמצאו {{entities}} ישויות ו-{{events}} אירועים",
+      "cancelled": "חילוץ הישויות בוטל",
+      "cancelledDescription": "הישויות שכבר חולצו נשמרו. ניתן להפעיל מחדש בכל עת.",
+      "cancelButton": "בטל חילוץ",
+      "cancelWarning": "האם לבטל את חילוץ הישויות? הישויות שכבר חולצו יישמרו, אך החילוץ לא יושלם.",
+      "dismiss": "סגור",
+      "error": "שגיאה בחילוץ ישויות",
+      "estimatedTime": "זמן משוער: {{minutes}} דקות"
     }
   },
   "entities": {

@@ -209,6 +209,22 @@
       "stuckDescription": "The document processing took too long and was interrupted. Try uploading the document again or contact support if the issue persists.",
       "genericError": "An error occurred during processing.",
       "errorAction": "Delete this document and upload it again. If the problem persists, try a smaller file."
+    },
+    "extraction": {
+      "inProgress": "Extracting entities...",
+      "progress": "Processing {{processed}} of {{total}} chunks",
+      "entitiesFound": "{{count}} entities found",
+      "eventsFound": "{{count}} events found",
+      "batchInfo": "Batch {{current}}",
+      "completed": "Entity extraction completed successfully!",
+      "completedSummary": "Found {{entities}} entities and {{events}} events",
+      "cancelled": "Entity extraction cancelled",
+      "cancelledDescription": "Entities already extracted have been saved. You can restart at any time.",
+      "cancelButton": "Cancel extraction",
+      "cancelWarning": "Cancel entity extraction? Entities already extracted will be saved, but the extraction will not be completed.",
+      "dismiss": "Dismiss",
+      "error": "Entity extraction error",
+      "estimatedTime": "Estimated time: {{minutes}} minutes"
     }
   },
   "entities": {

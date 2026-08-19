@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next'
-import { FileText, Trash2, Brain } from 'lucide-react'
+import { FileText, Trash2, Brain, Loader2 } from 'lucide-react'
 import { useDocumentStore, type Document } from '@/stores/documentStore'
 import ProcessingStatus from './ProcessingStatus'
+import ExtractionProgress from './ExtractionProgress'
 
 interface DocumentListProps {
   projectId: string
@@ -9,7 +10,13 @@ interface DocumentListProps {
 
 export default function DocumentList({ projectId }: DocumentListProps) {
   const { t } = useTranslation()
-  const { documents, deleteDocument, triggerEntityExtraction } = useDocumentStore()
+  const {
+    documents,
+    deleteDocument,
+    triggerEntityExtraction,
+    extractionInProgress,
+    extractionDocumentId,
+  } = useDocumentStore()
 
   if (documents.length === 0) {
     return null
@@ -37,9 +44,9 @@ export default function DocumentList({ projectId }: DocumentListProps) {
   }
 
   const handleExtractKnowledge = async (doc: Document) => {
-    if (!doc.latest_version) return
+    if (!doc.latest_version || extractionInProgress) return
     console.log('[Knowledge] Manual extraction triggered for', doc.name)
-    await triggerEntityExtraction(doc.latest_version.id, projectId)
+    await triggerEntityExtraction(doc.latest_version.id, projectId, doc.id)
   }
 
   return (
@@ -64,10 +71,19 @@ export default function DocumentList({ projectId }: DocumentListProps) {
               {doc.latest_version?.status === 'ready' && (
                 <button
                   onClick={() => handleExtractKnowledge(doc)}
-                  className="flex items-center gap-1 px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-100 rounded transition-colors"
+                  disabled={extractionInProgress}
+                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                    extractionInProgress
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-green-50 text-green-700 hover:bg-green-100'
+                  }`}
                   title="Extract Knowledge (Gemini)"
                 >
-                  <Brain className="h-3.5 w-3.5" />
+                  {extractionInProgress && extractionDocumentId === doc.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Brain className="h-3.5 w-3.5" />
+                  )}
                   Extract
                 </button>
               )}
@@ -93,6 +109,13 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                   ? () => handleRetry(doc)
                   : undefined}
               />
+            </div>
+          )}
+
+          {/* Entity extraction progress */}
+          {extractionDocumentId === doc.id && (
+            <div className="mt-3 ps-8">
+              <ExtractionProgress />
             </div>
           )}
         </div>

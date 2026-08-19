@@ -24,6 +24,14 @@ export interface Document {
   latest_version: DocumentVersion | null
 }
 
+export interface ExtractionProgress {
+  currentBatch: number
+  totalChunks: number
+  processedChunks: number
+  entitiesSaved: number
+  eventsSaved: number
+}
+
 interface DocumentState {
   documents: Document[]
   loading: boolean
@@ -31,10 +39,21 @@ interface DocumentState {
   uploadProgress: number
   pollingInterval: ReturnType<typeof setInterval> | null
 
+  // Entity extraction state
+  extractionInProgress: boolean
+  extractionDone: boolean
+  extractionCancelled: boolean
+  extractionError: string | null
+  extractionProgress: ExtractionProgress | null
+  extractionDocumentId: string | null
+  _extractionCancelFlag: boolean
+
   fetchDocuments: (projectId: string) => Promise<void>
   uploadDocument: (projectId: string, file: File, documentId?: string) => Promise<{ success: boolean; error?: string }>
   deleteDocument: (projectId: string, documentId: string) => Promise<void>
-  triggerEntityExtraction: (versionId: string, projectId: string) => Promise<void>
+  triggerEntityExtraction: (versionId: string, projectId: string, documentId: string) => Promise<void>
+  cancelExtraction: () => void
+  dismissExtractionStatus: () => void
   startPolling: (projectId: string) => void
   stopPolling: () => void
 }
@@ -45,6 +64,15 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   uploading: false,
   uploadProgress: 0,
   pollingInterval: null,
+
+  // Entity extraction state
+  extractionInProgress: false,
+  extractionDone: false,
+  extractionCancelled: false,
+  extractionError: null,
+  extractionProgress: null,
+  extractionDocumentId: null,
+  _extractionCancelFlag: false,
 
   fetchDocuments: async (projectId: string) => {
     set({ loading: true })
@@ -225,32 +253,59 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     }
   },
 
-  triggerEntityExtraction: async (versionId: string, projectId: string) => {
+  triggerEntityExtraction: async (versionId: string, projectId: string, documentId: string) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    // Use Supabase Edge Function (Gemini 3.6 Flash) for entity extraction
+    // Reset state
+    set({
+      extractionInProgress: true,
+      extractionDone: false,
+      extractionCancelled: false,
+      extractionError: null,
+      extractionDocumentId: documentId,
+      extractionProgress: null,
+      _extractionCancelFlag: false,
+    })
+
     const BATCH_SIZE = 2
     let offset = 0
     let done = false
 
     console.log('[Knowledge] Starting extraction for version', versionId)
 
-    // Get document_id from version
-    const { data: version } = await supabase
-      .from('document_versions')
-      .select('document_id')
-      .eq('id', versionId)
-      .single()
+    // Get total chunk count for progress calculation
+    const { count: totalChunks } = await supabase
+      .from('document_chunks')
+      .select('id', { count: 'exact', head: true })
+      .eq('version_id', versionId)
 
-    if (!version) {
-      console.error('[Knowledge] Could not find version', versionId)
-      return
-    }
+    const total = totalChunks || 0
 
-    const documentId = version.document_id
+    set({
+      extractionProgress: {
+        currentBatch: 0,
+        totalChunks: total,
+        processedChunks: 0,
+        entitiesSaved: 0,
+        eventsSaved: 0,
+      },
+    })
+
+    let totalEntities = 0
+    let totalEvents = 0
 
     while (!done) {
+      // Check cancel flag
+      if (get()._extractionCancelFlag) {
+        set({
+          extractionInProgress: false,
+          extractionCancelled: true,
+        })
+        console.log('[Knowledge] Extraction cancelled by user')
+        return
+      }
+
       try {
         const { data, error } = await supabase.functions.invoke('extract-knowledge', {
           body: {
@@ -265,30 +320,78 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
         if (error) {
           console.error('[Knowledge] Batch error:', error.message)
+          set({
+            extractionInProgress: false,
+            extractionError: error.message,
+          })
           break
         }
 
         if (!data || !data.success) {
-          console.error('[Knowledge] Extraction failed:', data?.error || 'Unknown', 'Details:', data?.details?.slice(0, 300) || 'none')
+          const errorMsg = data?.error || 'Unknown error'
+          console.error('[Knowledge] Extraction failed:', errorMsg, 'Details:', data?.details?.slice(0, 300) || 'none')
+          set({
+            extractionInProgress: false,
+            extractionError: errorMsg,
+          })
           break
         }
 
         done = data.done
         offset = data.next_offset
 
+        totalEntities += data.summary?.entities_saved || 0
+        totalEvents += data.summary?.events_saved || 0
+
+        const processedChunks = Math.min(offset, total)
+        set({
+          extractionProgress: {
+            currentBatch: Math.ceil(offset / BATCH_SIZE),
+            totalChunks: total,
+            processedChunks,
+            entitiesSaved: totalEntities,
+            eventsSaved: totalEvents,
+          },
+        })
+
         console.log(`[Knowledge] Batch done: ${data.summary?.entities_saved || 0} entities, ${data.summary?.events_saved || 0} events saved`)
 
-        // Delay between batches to respect Gemini rate limits (7s)
+        // Delay between batches to respect Gemini rate limits (15s)
         if (!done) {
           await new Promise(resolve => setTimeout(resolve, 15000))
         }
       } catch (err) {
         console.error('[Knowledge] Extraction failed:', err)
+        set({
+          extractionInProgress: false,
+          extractionError: err instanceof Error ? err.message : 'Unexpected error',
+        })
         break
       }
     }
 
-    console.log('[Knowledge] Extraction complete')
+    // Only mark done if we completed without cancellation or error
+    if (done) {
+      set({
+        extractionInProgress: false,
+        extractionDone: true,
+      })
+      console.log('[Knowledge] Extraction complete')
+    }
+  },
+
+  cancelExtraction: () => {
+    set({ _extractionCancelFlag: true })
+  },
+
+  dismissExtractionStatus: () => {
+    set({
+      extractionDone: false,
+      extractionCancelled: false,
+      extractionError: null,
+      extractionProgress: null,
+      extractionDocumentId: null,
+    })
   },
 
   startPolling: (projectId: string) => {
