@@ -107,11 +107,14 @@ export interface ConsolidationProposal {
 
 /**
  * Detect if one name is a clear prefix of another.
+ * IMPORTANT: Names should already be normalized (stripNikud) before calling this.
  * Examples:
  *   - "ליאו" → "ליאו פרוסט" = YES
  *   - "ליאו" → "ליאו סייג'" = YES
  *   - "פרוסט" → "ליאו פרוסט" = NO (suffix, not prefix)
  *   - "ליא" → "ליאו" = NO (partial word)
+ * 
+ * Names with nikud like "אָרון" should be passed as "ארון" (pre-normalized).
  */
 export function isPrefixMatch(shortName: string, longName: string): boolean {
   const short = shortName.trim();
