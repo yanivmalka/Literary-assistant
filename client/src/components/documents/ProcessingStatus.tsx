@@ -49,13 +49,9 @@ export default function ProcessingStatus({ status, errorMessage, errorStage, pro
   const isSkipped = status === 'skipped_no_provider'
   const stuck = isStuck(status, processingStartedAt)
 
+  // Ready documents communicate their state through the document name.
   if (status === 'ready') {
-    return (
-      <div className="flex items-center gap-2 text-green-600">
-        <CheckCircle className="h-5 w-5" />
-        <span className="text-sm font-medium">{t('documents.status.ready')}</span>
-      </div>
-    )
+    return null
   }
 
   if (status === 'indexed') {
