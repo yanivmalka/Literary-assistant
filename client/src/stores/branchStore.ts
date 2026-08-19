@@ -17,21 +17,53 @@ export interface Branch {
   updated_at: string
 }
 
+/**
+ * BranchEntity represents a potential override or branch-only entity.
+ * MVP Overlay Model: Does NOT store full entity data.
+ * 
+ * For an Entity override in Branch:
+ * - source_entity_id = Main Entity ID (the entity being overridden)
+ * - entity_id = Main Entity ID (same as source_entity_id)
+ * - overrides = JSONB with only changed fields (delta, not full copy)
+ * - base_values = JSONB snapshot of Main fields when override was created
+ * 
+ * For a Branch-only Entity:
+ * - source_entity_id = NULL
+ * - entity_id = Branch Entity ID (new entity in this branch)
+ * - overrides = full entity data (since no parent to delta from)
+ * - base_values = {} (no parent to compare against)
+ * 
+ * DEPRECATED (legacy Snapshot data): canonical_name, description, attributes, entity_type, entity_types
+ * These are kept for backward compatibility but should not be used in new code.
+ */
 export interface BranchEntity {
   id: string
   branch_id: string
-  source_entity_id: string
   project_id: string
   user_id: string
-  canonical_name: string
-  entity_type: string
-  entity_types: string[]
-  description: string | null
-  attributes: Record<string, unknown>
+  
+  // Overlay model references
+  source_entity_id: string | null  // Main Entity ID if override; NULL if branch-only
+  entity_id: string | null         // Actual Entity ID (Main or Branch)
+  
+  // Overlay/Patch data
+  overrides: Record<string, unknown>  // Only changed fields (patches)
+  base_values: Record<string, unknown> // Main entity field values at override creation time
+  rejected_fields: string[]            // Fields user rejected in suggestions
+  
+  // Metadata
   is_modified: boolean
   modified_fields: string[]
   created_at: string
   updated_at: string
+
+  // DEPRECATED: Snapshot fields (legacy, for backward compatibility)
+  // Do not populate in new code; kept to avoid breaking existing queries
+  canonical_name?: string
+  entity_type?: string
+  entity_types?: string[]
+  description?: string | null
+  attributes?: Record<string, unknown>
 }
 
 export interface MainEntity {
@@ -156,8 +188,13 @@ export const useBranchStore = create<BranchState>((set, get) => ({
   },
 
   // ==============================
-  // Create a new branch (copies Main entities into branch)
+  // Create a new branch (Overlay model)
   // ==============================
+  // MVP Change: Branch creation NO LONGER copies all Main entities.
+  // New branches are created empty. Overlays are created only when:
+  // - An existing entity is modified in the branch, or
+  // - A new entity is created in the branch, or
+  // - An operation explicitly creates an overlay.
   createBranch: async (projectId: string, name?: string) => {
     set({ loading: true, error: null })
     try {
@@ -167,7 +204,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
         return null
       }
 
-      // 1. Create the branch record
+      // Create the branch record (metadata only, no entity copies)
       const branchName = name || `${i18n.t('ui.branch.branch')} ${new Date().toLocaleDateString(i18n.language === 'he' ? 'he-IL' : 'en-US')}`
       const { data: branch, error: branchError } = await supabase
         .from('knowledge_branches')
@@ -187,49 +224,11 @@ export const useBranchStore = create<BranchState>((set, get) => ({
         return null
       }
 
-      // 2. Fetch all Main entities for this project
-      const { data: mainEntities, error: mainError } = await supabase
-        .from('knowledge_entities')
-        .select('id, canonical_name, entity_type, entity_types, description, attributes')
-        .eq('project_id', projectId)
-        .eq('user_id', user.id)
-        .eq('layer', 'main')
+      // That's it! No entity copying. Branch is created empty.
+      // Overlays will be created only when needed (on modification or extraction).
 
-      if (mainError) {
-        console.error('Failed to fetch main entities for branch:', mainError)
-        set({ loading: false, error: mainError.message })
-        return branch as Branch
-      }
-
-      // 3. Copy Main entities into branch
-      if (mainEntities && mainEntities.length > 0) {
-        const branchEntities = mainEntities.map(entity => ({
-          branch_id: branch.id,
-          source_entity_id: entity.id,
-          project_id: projectId,
-          user_id: user.id,
-          canonical_name: entity.canonical_name,
-          entity_type: entity.entity_type,
-          entity_types: entity.entity_types || [],
-          description: entity.description || null,
-          attributes: entity.attributes || {},
-          is_modified: false,
-          modified_fields: [],
-        }))
-
-        const { error: copyError } = await supabase
-          .from('knowledge_branch_entities')
-          .insert(branchEntities)
-
-        if (copyError) {
-          console.error('Failed to copy entities to branch:', copyError)
-          set({ error: `Branch created but failed to copy entities: ${copyError.message}` })
-        }
-      }
-
-      // 4. Refresh state
+      // Refresh state
       await get().fetchBranches(projectId)
-      await get().fetchBranchEntities(branch.id)
 
       set({ loading: false })
       return branch as Branch
@@ -241,15 +240,18 @@ export const useBranchStore = create<BranchState>((set, get) => ({
   },
 
   // ==============================
-  // Fetch branch entities
+  // Fetch branch entities (Overlay model)
   // ==============================
+  // Fetches only entities that have overlays in this branch.
+  // Does NOT fetch all Main entities (unlike old Snapshot model).
+  // Returns overlays with source_entity_id, entity_id, overrides, base_values.
   fetchBranchEntities: async (branchId: string) => {
     try {
       const { data, error } = await supabase
         .from('knowledge_branch_entities')
         .select('*')
         .eq('branch_id', branchId)
-        .order('canonical_name')
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Failed to fetch branch entities:', error)
@@ -291,18 +293,21 @@ export const useBranchStore = create<BranchState>((set, get) => ({
   },
 
   // ==============================
-  // Update a branch entity (edit in branch)
+  // Update a branch entity overlay (Overlay model)
   // ==============================
+  // DEPRECATED: This method is kept for backward compatibility with Snapshot model.
+  // For MVP Overlay model, use createOrUpdateOverlay() in Task 3.
+  // This method updates old Snapshot-style data if it exists.
   updateBranchEntity: async (branchEntityId: string, updates) => {
     try {
-      // Get current branch entity to determine which fields changed
+      // Get current branch entity overlay
       const current = get().branchEntities.find(e => e.id === branchEntityId)
       if (!current) return
 
       // Get the corresponding main entity to compare
       const mainEntity = get().mainEntities.find(e => e.id === current.source_entity_id)
 
-      // Determine modified fields
+      // Determine modified fields (legacy logic)
       const modifiedFields = new Set(current.modified_fields || [])
 
       if (updates.canonical_name !== undefined && mainEntity) {
@@ -368,6 +373,9 @@ export const useBranchStore = create<BranchState>((set, get) => ({
   // ==============================
   // Compare Main vs Branch (field-level diff)
   // ==============================
+  // DEPRECATED: This method works with old Snapshot model.
+  // For MVP Overlay model, comparison will be implemented in Task 3.
+  // Kept for backward compatibility.
   compareEntities: async (branchId: string, projectId: string) => {
     set({ loading: true })
     try {
@@ -381,6 +389,9 @@ export const useBranchStore = create<BranchState>((set, get) => ({
       const comparisons: EntityComparison[] = []
 
       for (const branchEntity of branchEntities) {
+        // Skip if no source_entity_id (branch-only entity with no comparison needed)
+        if (!branchEntity.source_entity_id) continue
+
         const mainEntity = mainEntities.find(m => m.id === branchEntity.source_entity_id)
         if (!mainEntity) continue
 
@@ -390,16 +401,16 @@ export const useBranchStore = create<BranchState>((set, get) => ({
         diffs.push({
           field: 'canonical_name',
           mainValue: mainEntity.canonical_name,
-          branchValue: branchEntity.canonical_name,
-          changed: mainEntity.canonical_name !== branchEntity.canonical_name,
+          branchValue: branchEntity.canonical_name || mainEntity.canonical_name,
+          changed: mainEntity.canonical_name !== (branchEntity.canonical_name || mainEntity.canonical_name),
         })
 
         // Compare description
         diffs.push({
           field: 'description',
           mainValue: mainEntity.description,
-          branchValue: branchEntity.description,
-          changed: (mainEntity.description || '') !== (branchEntity.description || ''),
+          branchValue: branchEntity.description || mainEntity.description,
+          changed: (mainEntity.description || '') !== (branchEntity.description || mainEntity.description || ''),
         })
 
         // Compare attributes (field by field)
@@ -419,8 +430,8 @@ export const useBranchStore = create<BranchState>((set, get) => ({
         const hasChanges = diffs.some(d => d.changed)
         comparisons.push({
           sourceEntityId: branchEntity.source_entity_id,
-          entityName: branchEntity.canonical_name,
-          entityType: branchEntity.entity_type,
+          entityName: branchEntity.canonical_name || mainEntity.canonical_name,
+          entityType: branchEntity.entity_type || mainEntity.entity_type,
           diffs,
           hasChanges,
         })
