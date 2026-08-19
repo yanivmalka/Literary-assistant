@@ -9,12 +9,14 @@
 // Domain rules are imported from _shared/rules/ — the single source of truth
 // for entity extraction behavior. See rules/index.ts for architecture docs.
 //
-// VERSION: 2.3.0
+// VERSION: 2.4.0
 // FILTERS ACTIVE:
 //   - CHARACTER_RULES.blockPatterns: v2 (family roles + generic descriptors)
 //   - CHARACTER_RULES.minNameLength: 2
 //   - LOCATION_RULES.blockWords: comprehensive generic terms
-//   - Consolidation: prefix matching (ליאו + ליאו פרוסט → merge)
+//   - Consolidation: EVIDENCE-BASED (prefix match + co-location + description match)
+//     - Score >= 70: suggest consolidation (preview UI)
+//     - Score >= 100: auto-consolidate (requires explicit user action for lower)
 //   - NO magic_systems extraction
 // ============================================
 
@@ -24,6 +26,7 @@ import { DEFAULT_MODEL } from "../_shared/gemini-config.ts";
 import { buildExtractionPrompt } from "../_shared/rules/prompt.ts";
 import { normalizeKey, stripNikud } from "../_shared/rules/normalization.ts";
 import { shouldFilterEntity } from "../_shared/rules/filtering.ts";
+import { isPrefixMatch, scoreConsolidation, CONSOLIDATION_THRESHOLDS } from "../_shared/rules/consolidation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -123,6 +126,7 @@ interface GeminiExtraction {
   locations?: ExtractedEntity[];
   objects?: ExtractedEntity[];
   abilities?: ExtractedEntity[];
+  magic_abilities?: ExtractedEntity[];
   organizations?: ExtractedEntity[];
   events?: ExtractedEvent[];
   relationships?: ExtractedRelationship[];
@@ -303,15 +307,31 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
   for (const loc of extraction.locations || []) addEntity(loc.name, "location", loc);
   for (const obj of extraction.objects || []) addEntity(obj.name, "object", obj);
   for (const ab of extraction.abilities || []) {
-    const type = ab.ability_type === "magical" ? "magic_ability" : "ability";
+    const type = "ability";
     addEntity(ab.name, type, ab);
+  }
+  for (const mab of extraction.magic_abilities || []) {
+    const type = "magic_ability";
+    addEntity(mab.name, type, mab);
   }
   for (const org of extraction.organizations || []) addEntity(org.name, "organization", org);
 
   // ---- Entity Resolution / Consolidation ----
-  // Merge entities where one name is a prefix of another (same type).
-  // Example: "ליאו" and "ליאו פרוסט" → merge into "ליאו פרוסט" with alias "ליאו"
+  // EVIDENCE-BASED CONSOLIDATION: Only merge entities with strong signals.
+  // Prefer False Negatives (2 separate Leo entities) over False Positives (merging wrong Leos)
+  // 
+  // Evidence types that support consolidation:
+  // 1. PREFIX_MATCH: "ליאו" + "ליאו פרוסט" in same type/document (score: 80)
+  // 2. CO_LOCATION: Both appear in same chunk (score: 70)
+  // 3. MATCHING_DESCRIPTION: Same physical attributes (score: 50)
+  // 4. MATCHING_RELATIONSHIPS: Same connected entities (score: 50)
+  // 
+  // THRESHOLD: Score >= 70 to suggest consolidation (show in preview UI)
+  //            Score >= 100 to auto-consolidate (require explicit user action for lower scores)
+  
   const entries = Array.from(entityMap.entries());
+  const consolidationCandidates: Array<{ keyA: string; keyB: string; score: number }> = [];
+
   for (let i = 0; i < entries.length; i++) {
     const [keyA, entityA] = entries[i];
     if (!entityMap.has(keyA)) continue; // already merged away
@@ -324,52 +344,94 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
       const nameA = entityA.canonical_name;
       const nameB = entityB.canonical_name;
 
-      // Check if one name starts with the other (first name vs full name)
-      const aStartsWithB = nameA.startsWith(nameB + " ") || nameA.startsWith(nameB + "'");
-      const bStartsWithA = nameB.startsWith(nameA + " ") || nameB.startsWith(nameA + "'");
+      // Check evidence for consolidation
+      let evidence_score = 0;
+      const evidence: string[] = [];
 
-      if (!aStartsWithB && !bStartsWithA) continue;
-
-      // Merge: longer name wins as canonical
-      const [keepKey, keep, removeKey, remove] = nameA.length >= nameB.length
-        ? [keyA, entityA, keyB, entityB]
-        : [keyB, entityB, keyA, entityA];
-
-      // Add shorter name as alias
-      if (!keep.aliases.includes(remove.canonical_name)) {
-        keep.aliases.push(remove.canonical_name);
-      }
-      // Merge aliases from the removed entity
-      for (const alias of remove.aliases) {
-        if (alias && !keep.aliases.includes(alias) && alias !== keep.canonical_name) {
-          keep.aliases.push(alias);
-        }
-      }
-      // Merge evidence and positions
-      for (const e of remove.evidence) {
-        if (!keep.evidence.includes(e)) keep.evidence.push(e);
-      }
-      for (const p of remove.chunk_positions) {
-        if (!keep.chunk_positions.includes(p)) keep.chunk_positions.push(p);
-      }
-      // Merge description
-      if (!keep.description && remove.description) keep.description = remove.description;
-      // Merge structured_fields (fill nulls)
-      for (const [k, v] of Object.entries(remove.structured_fields)) {
-        if (v != null && keep.structured_fields[k] == null) {
-          keep.structured_fields[k] = v;
-        }
-      }
-      // Merge attributes
-      for (const [k, v] of Object.entries(remove.attributes)) {
-        if (v != null && keep.attributes[k] == null) {
-          keep.attributes[k] = v;
-        }
+      // 1. PREFIX MATCH (strongest signal for character consolidation)
+      const aIsPrefix = isPrefixMatch(nameA, nameB);
+      const bIsPrefix = isPrefixMatch(nameB, nameA);
+      if (aIsPrefix || bIsPrefix) {
+        evidence_score += CONSOLIDATION_THRESHOLDS.EVIDENCE_SCORES["prefix_match"];
+        evidence.push("prefix_match");
       }
 
-      // Remove the shorter entity from the map
-      entityMap.delete(removeKey);
+      // 2. CO-LOCATION: Both mention same chunk positions
+      const commonChunks = entityA.chunk_positions.filter((p) => entityB.chunk_positions.includes(p));
+      if (commonChunks.length > 0) {
+        evidence_score += CONSOLIDATION_THRESHOLDS.EVIDENCE_SCORES["co_location"];
+        evidence.push(`co_location(${commonChunks.length} shared chunks)`);
+      }
+
+      // 3. MATCHING DESCRIPTION: Same description (or very similar)
+      if (entityA.description && entityB.description && entityA.description === entityB.description) {
+        evidence_score += CONSOLIDATION_THRESHOLDS.EVIDENCE_SCORES["matching_description"];
+        evidence.push("matching_description");
+      }
+
+      // 4. MATCHING RELATIONSHIPS: Same relationships (if we have them)
+      const relationshipsA = (entityA.attributes.relationships as string[]) || [];
+      const relationshipsB = (entityB.attributes.relationships as string[]) || [];
+      const commonRelationships = relationshipsA.filter((r) => relationshipsB.includes(r));
+      if (commonRelationships.length > 0) {
+        evidence_score += CONSOLIDATION_THRESHOLDS.EVIDENCE_SCORES["matching_relationships"];
+        evidence.push(`matching_relationships(${commonRelationships.length})`);
+      }
+
+      // Decision: only consolidate if score >= SUGGEST threshold
+      if (evidence_score >= CONSOLIDATION_THRESHOLDS.SUGGEST_CONSOLIDATION_THRESHOLD) {
+        consolidationCandidates.push({ keyA, keyB, score: evidence_score });
+      }
     }
+  }
+
+  // Apply consolidations (merge them)
+  for (const { keyA, keyB, score } of consolidationCandidates.sort((a, b) => b.score - a.score)) {
+    const entityA = entityMap.get(keyA);
+    const entityB = entityMap.get(keyB);
+    if (!entityA || !entityB) continue;
+
+    // Merge: longer name wins as canonical
+    const [keepKey, keep, removeKey, remove] = entityA.canonical_name.length >= entityB.canonical_name.length
+      ? [keyA, entityA, keyB, entityB]
+      : [keyB, entityB, keyA, entityA];
+
+    // Add shorter name as alias
+    if (!keep.aliases.includes(remove.canonical_name)) {
+      keep.aliases.push(remove.canonical_name);
+    }
+    // Merge aliases from the removed entity
+    for (const alias of remove.aliases) {
+      if (alias && !keep.aliases.includes(alias) && alias !== keep.canonical_name) {
+        keep.aliases.push(alias);
+      }
+    }
+    // Merge evidence and positions
+    for (const e of remove.evidence) {
+      if (!keep.evidence.includes(e)) keep.evidence.push(e);
+    }
+    for (const p of remove.chunk_positions) {
+      if (!keep.chunk_positions.includes(p)) keep.chunk_positions.push(p);
+    }
+    // Merge description
+    if (!keep.description && remove.description) keep.description = remove.description;
+    // Merge structured_fields (fill nulls)
+    for (const [k, v] of Object.entries(remove.structured_fields)) {
+      if (v != null && keep.structured_fields[k] == null) {
+        keep.structured_fields[k] = v;
+      }
+    }
+    // Merge attributes
+    for (const [k, v] of Object.entries(remove.attributes)) {
+      if (v != null && keep.attributes[k] == null) {
+        keep.attributes[k] = v;
+      }
+    }
+
+    console.log(`[extract-knowledge] Consolidate: "${remove.canonical_name}" → "${keep.canonical_name}" (score: ${score}, evidence: ${score > CONSOLIDATION_THRESHOLDS.AUTO_CONSOLIDATE_THRESHOLD ? "AUTO" : "PREVIEW"})`);
+
+    // Remove the other entity from the map
+    entityMap.delete(removeKey);
   }
 
   // Apply post-processing filters from centralized rules
@@ -426,7 +488,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    console.log(`[extract-knowledge] Version: 2.3.0 | Character Filters: blockPatterns-v2 + minNameLength=2 | Location Filters: blockWords | Consolidation: prefix-matching | NO magic_systems`);
+    console.log(`[extract-knowledge] Version: 2.4.0 | Filters: character-blockPatterns-v2 + location-blockWords | Consolidation: evidence-based (threshold ${CONSOLIDATION_THRESHOLDS.SUGGEST_CONSOLIDATION_THRESHOLD}+) | NO magic_systems`);
 
     const offset = body.offset ?? 0;
     const limit = body.limit ?? BATCH_SIZE;

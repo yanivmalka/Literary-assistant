@@ -16,14 +16,25 @@ export const CHARACTER_RULES = {
    * Patterns that indicate a role-based reference, not a proper name.
    * These should NEVER be extracted as standalone character entities.
    * They may appear as aliases of a named character if context confirms identity.
+   * 
+   * REGEX BREAKDOWN:
+   * - Pattern 1: Family roles ± possessive (אבא, אמא, סבא, etc.) with optional "של X"
+   * - Pattern 2: Generic descriptors (המנחה, הזקן, הנער, etc.) — exactly these words
+   * - Pattern 3: "Role של ..." — relationship descriptors
    */
   blockPatterns: [
-    // Family role references — all forms (with or without "של X")
-    /^(אבא|אמא|אמו|אביה?|אביו|אימא|אימו|אימה?|אחי?|אחיו|אחות|אחותו|סבא?|סבו|סבתא?|סבתו|דוד|דודו|דודה|דודתו|בן|בנו|בת|בתו|ילד|ילדה)(\s+של\s+.+)?$/,
-    // Generic descriptive references
-    /^(המנחה|המורה|המדריך|הזקן|הזקנה|הנער|הנערה|הבחור|הבחורה|האיש|האישה|החייל|הקוסם|הקוסמת|הילד|הילדה|המלך|המלכה|הנסיך|הנסיכה|השומר|העבד|הסוחר|הכומר|הרופא|הגנב|הלוחם|השוטר)$/,
-    // Relationship references with "של" — all forms
-    /^(אבא|אמא|אמו|אביו|אביה|אימו|אימה|אח|אחי|אחיו|אחות|אחותו|סבא|סבו|סבתא|סבתו|בן|בנו|בת|בתו|דוד|דודו|דודה|דודתו)\s+של\s+/,
+    // Family role references (with or without possessive "של")
+    // Matches: אבא, אמא, אמו, אביה, אביו, אימא, אימו, אימה, אח, אחי, אחות, סבא, סבו, סבתא, סבתו, בן, בת, דוד, דודו, דודה, דודתו
+    // With optional " של NAME"
+    /^(אבא|אמא|אמו|אביה?|אביו|אימא|אימו|אימה|אחי?|אחיו|אחות|אחותו|סבא?|סבו|סבתא?|סבתו|בן|בת|דוד|דודו|דודה|דודתו)(\s+של\s+.+)?$/i,
+    
+    // Generic descriptive references — exact match with "ה" prefix
+    // Covers: המנחה, המורה, המדריך, הזקן, הנער, הבחור, האיש, החייל, הקוסם, הילד, המלך, הנסיך, וכו'
+    /^(המנחה|המורה|המדריך|הזקן|הזקנה|הנער|הנערה|הבחור|הבחורה|האיש|האישה|החייל|הקוסם|הקוסמת|הילד|הילדה|המלך|המלכה|הנסיך|הנסיכה|השומר|העבד|הסוחר|הכומר|הרופא|הגנב|הלוחם|השוטר|הקדוש|הנביא|הכהן|הפקיד)$/i,
+    
+    // Relationship references with "של" — explicitly role ± target
+    // Matches: "אבא של X", "אמו של Y", etc.
+    /^(אבא|אמא|אמו|אביו|אביה|אימו|אימה|אח|אחי|אחות|סבא|סבו|סבתא|סבתו|בן|בת|דוד|דודו|דודה|דודתו)\s+של\s+/i,
   ] as RegExp[],
 
   /**
@@ -61,3 +72,4 @@ export const CHARACTER_RULES = {
    */
   minNameLength: 2,
 } as const;
+

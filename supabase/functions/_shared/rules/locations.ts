@@ -19,6 +19,13 @@ export const LOCATION_RULES = {
    * (e.g., "חדר" = blocked, "חדרו של ליאו" = might be valid if narratively important).
    * 
    * TO ADD A BLOCKWORD: Simply add it to this set. No other changes needed.
+   * 
+   * Includes:
+   * - Indoor spaces: חדר, מטבח, דירה, סלון, חצר, מרתף, גג, עליית גג, שירותים, מסדרון, מרפסת, פרוזדור, מחסן
+   * - Outdoor generic: אוהל, גינה, רחוב, שדה, שביל, כביש, דרך
+   * - Nature generic (without name): יער, נהר, הר, גבעה, אגם, ים, חוף, מערה, גשר, בקעה, עמק, מדבר
+   * - Structures generic: בית, בניין, מגדל, חומה, שער, גדר
+   * - Urban generic: עיר, כפר, שוק, רחבה, ככר
    */
   blockWords: new Set([
     // Indoor spaces
@@ -64,3 +71,4 @@ export const LOCATION_RULES = {
     'narrative_impact', 'narrative_importance', 'related_events', 'related_characters',
   ] as const,
 } as const;
+

@@ -26,6 +26,7 @@ Return JSON with these arrays (omit empty arrays):
 - locations: [{name, aliases[], location_type, parent_location, description, continent, country, region, city, narrative_importance, related_characters, evidence[], chunk_positions[]}]
 - objects: [{name, aliases[], object_type, description, appearance, materials, special_properties, origin, current_location, owners, narrative_importance, evidence[], chunk_positions[]}]
 - abilities: [{name, aliases[], ability_type, description, mechanism, activation_conditions, limitations, cost, power_level, users, evidence[], chunk_positions[]}]
+- magic_abilities: [{name, aliases[], ability_type, description, mechanism, activation_conditions, limitations, cost, power_level, users, evidence[], chunk_positions[]}]
 - events: [{description, name, participants[], location, what_happened, evidence[], chunk_positions[]}]
 - relationships: [{character_a, character_b, relationship_type, evidence[], chunk_positions[]}]
 
@@ -37,23 +38,29 @@ Return JSON with these arrays (omit empty arrays):
 - An alias is NOT a new entity. If the same entity has multiple names/references, use ONE entity with aliases[].
 
 === CHARACTERS ===
-ONLY extract characters that have a PROPER NAME (first name, surname, or both).
 
-DO NOT extract:
-- Role-based references: אבא, אמא, סבא, סבתא, אח, אחות, דוד, דודה
-- Generic descriptions: הנער, האיש, האישה, הזקן, הקוסם, החייל, המורה, המנחה
-- Relationship references: "אביה של רייבן", "אמא של הולי"
+**CRITICAL RULE: ONLY extract characters that have a PROPER NAME (first name, surname, or both).**
 
-DO extract:
+NEVER EXTRACT (these WILL be FILTERED OUT):
+- Role-based references: אבא, אמא, אמו, אביו, אביה, אימא, אימו, אחי, אחיו, אחות, אחותו, סבא, סבו, סבתא, סבתו, בן, בת, דוד, דודו, דודה, דודתו
+- Relationship descriptors: "אמא של הולי", "אביו של הרך", "אחיו של ליאו" (unless the related person is a character entity)
+- Generic descriptions (NEVER extract as standalone characters): הנער, הנערה, הבחור, הבחורה, האיש, האישה, הזקן, הזקנה, הקוסם, הקוסמת, החייל, המורה, המדריך, המנחה, המלך, המלכה, הנסיך, הנסיכה, השומר, העבד, הסוחר, הכומר, הרופא, הגנב, הלוחם, הילד, הילדה, השוטר
+- ABBREVIATIONS OR INITIALS: ל.ש., א.ב., etc.
+
+DO EXTRACT (characters with proper names):
 - "ליאו" — proper first name
-- "ליאו פרוסט" — full name
+- "ליאו פרוסט" — full name (first + surname)
+- "אליהו הנביא" — where "אליהו" is the proper name (first name takes priority)
+- Any clearly named character, even if they also have a description
 
 NAME CONSOLIDATION:
 - If a character appears as "קיל" and also as "קיילאמר", these are the SAME character.
   → canonical name = "קיילאמר" (the longer/fuller name), aliases = ["קיל"]
 - If a character appears as "ליאו" and "ליאו סייג'", these are the SAME character.
   → canonical name = "ליאו סייג'" (full name), aliases = ["ליאו"]
-- Hebrew nikud differences = same character. "אָרון" = "ארון" → use "ארון" (without nikud).
+- Hebrew nikud differences = same character. "אָרון" = "ארון" → use "ארון" (without nikud)
+- **ONLY consolidate if same first name + additional surname, OR within same document/context showing both names for the same entity**
+- Never consolidate on family relationship alone (e.g., "ליאו" + "אביו של ליאו" → DO NOT consolidate "אביו" as a character unless it has its own name)
 
 PHYSICAL ATTRIBUTES — pay special attention to: age, height, eye_color, hair_color.
 - Extract even when mentioned indirectly:
@@ -62,22 +69,28 @@ PHYSICAL ATTRIBUTES — pay special attention to: age, height, eye_color, hair_c
 - If vague ("גבוה למדי") and cannot be converted to a concrete value → null.
 
 === LOCATIONS ===
-ONLY extract locations with a DISTINCT IDENTITY and NARRATIVE IMPORTANCE.
 
-DO NOT extract:
-- Generic nouns: חדר, מטבח, דירה, אוהל, גינה, בית, סלון, רחוב, יער (ללא שם), עיר (ללא זיהוי)
+**ONLY extract locations with a DISTINCT IDENTITY and NARRATIVE IMPORTANCE.**
 
-DO extract:
+NEVER EXTRACT (these WILL be FILTERED OUT):
+- Generic indoor spaces: חדר, מטבח, דירה, סלון, חצר, מרתף, גג, עליית גג, שירותים, מסדרון, מרפסת, פרוזדור, מחסן
+- Generic outdoor spaces: שדה, רחוב, שביל, כביש, דרך, גינה, חצר
+- Generic nature (without specific name): יער, נהר, הר, גבעה, אגם, ים, חוף, מערה, גשר, בקעה, עמק, מדבר
+- Generic buildings/structures: בית, בניין, מגדל, חומה, שער, גדר
+- Generic urban: עיר, כפר, שוק, רחבה, ככר
+
+DO EXTRACT (places with distinct identity):
 - Named places: "יער אירויין", "המבצר", "טרונהיים", "המישור הארצי", "האקדמיה"
-- Places with distinct narrative identity
+- Places with specific narrative importance
+- Unique location identifiers within the story
 
 CONSOLIDATION:
 - If "העיר" refers to "טרונהיים" → canonical = "טרונהיים", aliases = ["העיר"]
-- If "יער" and "יער אירויין" refer to the same place → canonical = "יער אירויין", aliases = ["היער"]
-- "המישור הארצי" and "מישור הארצי" = same place → use the most common full form
-- Use names WITHOUT nikud.
+- If "יער" and "יער אירויין" = same → canonical = "יער אירויין", aliases = ["היער"]
+- "המישור הארצי" and "מישור הארצי" = same → use "המישור הארצי" or "מישור הארצי" as canonical (most frequent in text)
 
 === OBJECTS ===
+
 ONLY extract objects with DISTINCT IDENTITY, NARRATIVE IMPORTANCE, or UNIQUE PROPERTIES.
 
 DO NOT extract:
@@ -89,21 +102,33 @@ DO extract:
 - Objects with special/magical properties or plot significance
 
 === ABILITIES ===
+
 ONLY extract DISTINCT, SPECIAL abilities — not ordinary actions.
 
-ability_type field MUST be one of:
-- "physical" — exceptional physical/combat abilities, special techniques (NOT ordinary actions)
-- "magical" — magical powers, spells, supernatural abilities
+Extract into TWO separate arrays based on ability type:
+
+**abilities[]** — Physical/combat abilities (NOT ordinary actions):
+- Exceptional physical feats
+- Combat techniques with names
+- Special martial skills
+- Athletic abilities beyond normal
+- Example: "קתיע קרב", "יכולת אתלטית יוצאת דופן"
+
+**magic_abilities[]** — Magical/supernatural abilities:
+- Magic powers and spells
+- Supernatural abilities
+- Mystical techniques
+- Example: "רונת אש" (fire magic), "יכולת ראייה דרך קירות" (vision through walls)
 
 DO NOT extract:
 - Ordinary actions: running, walking, talking, eating
-- General magic system concepts: if a term refers to a general system (not a specific usable ability), do NOT extract
+- General magic system concepts: if term refers to a general system (not a specific usable ability), do NOT extract as entity
 - Vague references to "power" without specifics
 
 DO extract:
-- Specific named abilities: "רונת אש", "יכולת ראייה דרך קירות"
-- Distinct combat techniques with names
-- Specific magical powers that characters actively USE
+- Specific named abilities in both categories
+- Abilities that characters actively USE
+- Distinct techniques with identifiable names
 
 === CONTEXT AWARENESS ===
 - If a word can be either a character name or a concept (e.g., "רונה" could be a person or a type of magic), decide based on context.
@@ -112,3 +137,4 @@ DO extract:
 TEXT:
 ${chunksText}`;
 }
+
