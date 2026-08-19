@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Plus, Map, ArrowLeft, Users, TreePine, Sparkles, FileText, MessageSquare, AlertTriangle } from 'lucide-react'
+import { Plus, Map, ArrowLeft, Users, TreePine, Sparkles, FileText, MessageSquare, AlertTriangle, GitBranch } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useEntityStore } from '@/stores/entityStore'
@@ -64,13 +64,7 @@ export default function ProjectDetailPage() {
           <FileText className="h-4 w-4" />
           {t('documents.title')}
         </Link>
-        <Link
-          to={`/projects/${projectId}/entities`}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${hasReadyDocument ? 'hover:bg-muted' : 'opacity-50 pointer-events-none'}`}
-        >
-          <Users className="h-4 w-4" />
-          {t('entities.title')}
-        </Link>
+
         <Link
           to={`/projects/${projectId}/qa`}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${hasReadyDocument ? 'hover:bg-muted' : 'opacity-50 pointer-events-none'}`}
@@ -85,6 +79,13 @@ export default function ProjectDetailPage() {
           <AlertTriangle className="h-4 w-4" />
           {t('contradictions.title')}
         </Link>
+        <Link
+          to={`/projects/${projectId}/branches`}
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${hasReadyDocument ? 'hover:bg-muted' : 'opacity-50 pointer-events-none'}`}
+        >
+          <GitBranch className="h-4 w-4" />
+          {t('branch.title')}
+        </Link>
       </nav>
 
       {/* Knowledge Overview */}
@@ -93,7 +94,6 @@ export default function ProjectDetailPage() {
         <KnowledgeOverview
           projectId={projectId!}
           documents={documents}
-          entities={entities}
           contradictions={contradictions}
         />
       </section>

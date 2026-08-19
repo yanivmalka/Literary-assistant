@@ -296,5 +296,37 @@
     "searchNotReady": "Upload a document",
     "uploadCta": "Upload your manuscript to build your knowledge base",
     "uploadButton": "Upload Document"
+  },
+  "branch": {
+    "title": "Main / Branch",
+    "subtitle": "Manage canonical entity data (Main) and working copies (Branch)",
+    "mainEntities": "Main Entities",
+    "entities": "entities",
+    "noMainEntities": "No entities in Main yet. Run entity extraction first.",
+    "noBranchEntities": "No entities in this branch.",
+    "branch": "Branch",
+    "active": "Active",
+    "modified": "Modified",
+    "noBranch": "No active branch. Create one to start editing.",
+    "createBranch": "Create Branch",
+    "newBranch": "New Branch",
+    "branchNamePlaceholder": "Branch name (optional)",
+    "create": "Create",
+    "viewMain": "Main",
+    "viewBranch": "Branch",
+    "viewCompare": "Compare",
+    "comparison": "Main vs Branch Comparison",
+    "refresh": "Refresh",
+    "noComparisons": "No comparisons available. Create a branch and make edits first.",
+    "noChanges": "No differences found. Branch matches Main.",
+    "changedFields": "changes",
+    "field": "Field",
+    "transfer": "Transfer",
+    "transferAll": "Transfer All",
+    "transferToMain": "Transfer to Main",
+    "fields": {
+      "name": "Name",
+      "description": "Description"
+    }
   }
 }

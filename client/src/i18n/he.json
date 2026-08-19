@@ -296,5 +296,37 @@
     "searchNotReady": "העלה מסמך",
     "uploadCta": "העלה את כתב היד שלך כדי לבנות את בסיס הידע",
     "uploadButton": "העלה מסמך"
+  },
+  "branch": {
+    "title": "ראשי / ענף",
+    "subtitle": "ניהול מידע קנוני (ראשי) ועותקי עבודה (ענף)",
+    "mainEntities": "ישויות ראשיות",
+    "entities": "ישויות",
+    "noMainEntities": "אין ישויות ב-Main עדיין. הפעל חילוץ ישויות תחילה.",
+    "noBranchEntities": "אין ישויות בענף זה.",
+    "branch": "ענף",
+    "active": "פעיל",
+    "modified": "שונה",
+    "noBranch": "אין ענף פעיל. צור אחד כדי להתחיל לערוך.",
+    "createBranch": "צור ענף",
+    "newBranch": "ענף חדש",
+    "branchNamePlaceholder": "שם הענף (אופציונלי)",
+    "create": "צור",
+    "viewMain": "ראשי",
+    "viewBranch": "ענף",
+    "viewCompare": "השוואה",
+    "comparison": "השוואת ראשי מול ענף",
+    "refresh": "רענן",
+    "noComparisons": "אין השוואות זמינות. צור ענף ובצע עריכות.",
+    "noChanges": "לא נמצאו הבדלים. הענף זהה ל-Main.",
+    "changedFields": "שינויים",
+    "field": "שדה",
+    "transfer": "העבר",
+    "transferAll": "העבר הכל",
+    "transferToMain": "העבר ל-Main",
+    "fields": {
+      "name": "שם",
+      "description": "תיאור"
+    }
   }
 }

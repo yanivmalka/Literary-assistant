@@ -30,6 +30,7 @@ interface ExtractRequest {
   user_id: string;
   offset?: number;
   limit?: number;
+  target_branch_id?: string; // If provided, extracted entities go to branch instead of Main
 }
 
 interface ExtractedEntity {
@@ -310,7 +311,7 @@ Deno.serve(async (req) => {
 
 
     // ==============================
-    // Step 3: Parse JSON — skip batch on failure (do not stop extraction)
+    // Step 3: Parse JSON ï¿½ skip batch on failure (do not stop extraction)
     // ==============================
     let extraction: GeminiExtraction;
     try {
@@ -331,7 +332,7 @@ Deno.serve(async (req) => {
           throw new Error("no JSON object found");
         }
       } catch {
-        // Skip this batch — return success so the loop continues
+        // Skip this batch ï¿½ return success so the loop continues
         console.warn(`[extract-knowledge] Skipping batch offset=${offset}: unparseable JSON (len=${responseText.length})`);
         const done = chunks.length < limit;
         return new Response(
@@ -378,6 +379,7 @@ Deno.serve(async (req) => {
     let entitiesSaved = 0;
     let mentionsSaved = 0;
     let aliasesSaved = 0;
+    let branchEntitiesSaved = 0;
 
     for (const entity of normalizedEntities) {
       const { data: upserted, error: upsertError } = await supabase
@@ -411,6 +413,33 @@ Deno.serve(async (req) => {
       const entityId = upserted.id;
       entityIdMap.set(entity.canonical_name.toLowerCase(), entityId);
       entitiesSaved++;
+
+      // If target_branch_id is provided, also copy entity into branch for user review
+      if (body.target_branch_id) {
+        const { error: branchError } = await supabase
+          .from("knowledge_branch_entities")
+          .upsert(
+            {
+              branch_id: body.target_branch_id,
+              source_entity_id: entityId,
+              project_id: body.project_id,
+              user_id: body.user_id,
+              canonical_name: entity.canonical_name,
+              entity_type: entity.entity_type,
+              entity_types: entity.entity_types || [],
+              description: entity.description || null,
+              attributes: entity.attributes || {},
+              is_modified: false,
+              modified_fields: [],
+            },
+            { onConflict: "branch_id,source_entity_id" }
+          );
+        if (branchError) {
+          console.error(`Failed to copy entity '${entity.canonical_name}' to branch:`, branchError.message);
+        } else {
+          branchEntitiesSaved++;
+        }
+      }
 
       // Mentions
       for (const pos of entity.chunk_positions) {
@@ -549,6 +578,7 @@ Deno.serve(async (req) => {
           events_saved: eventsSaved,
           event_mentions_saved: eventMentionsSaved,
           event_participants_saved: eventParticipantsSaved,
+          branch_entities_saved: branchEntitiesSaved,
           raw_extraction_id: rawExtractionId,
           normalized_entity_count: normalizedEntities.length,
         },
