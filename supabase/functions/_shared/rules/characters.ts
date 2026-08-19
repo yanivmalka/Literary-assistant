@@ -18,12 +18,12 @@ export const CHARACTER_RULES = {
    * They may appear as aliases of a named character if context confirms identity.
    */
   blockPatterns: [
-    // Family role references (with or without "של X")
-    /^(אבא|אמא|אביה?|אביו|אימא|אימה?|אחי?|אחות|סבא?|סבתא?|דוד|דודה|בן|בת|ילד|ילדה)(\s+של\s+.+)?$/,
+    // Family role references — all forms (with or without "של X")
+    /^(אבא|אמא|אמו|אביה?|אביו|אימא|אימו|אימה?|אחי?|אחיו|אחות|אחותו|סבא?|סבו|סבתא?|סבתו|דוד|דודו|דודה|דודתו|בן|בנו|בת|בתו|ילד|ילדה)(\s+של\s+.+)?$/,
     // Generic descriptive references
     /^(המנחה|המורה|המדריך|הזקן|הזקנה|הנער|הנערה|הבחור|הבחורה|האיש|האישה|החייל|הקוסם|הקוסמת|הילד|הילדה|המלך|המלכה|הנסיך|הנסיכה|השומר|העבד|הסוחר|הכומר|הרופא|הגנב|הלוחם|השוטר)$/,
-    // Relationship references with "של"
-    /^(אבא|אמא|אח|אחות|סבא|סבתא|בן|בת|דוד|דודה)\s+של\s+/,
+    // Relationship references with "של" — all forms
+    /^(אבא|אמא|אמו|אביו|אביה|אימו|אימה|אח|אחי|אחיו|אחות|אחותו|סבא|סבו|סבתא|סבתו|בן|בנו|בת|בתו|דוד|דודו|דודה|דודתו)\s+של\s+/,
   ] as RegExp[],
 
   /**

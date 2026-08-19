@@ -300,6 +300,70 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
   }
   for (const org of extraction.organizations || []) addEntity(org.name, "organization", org);
 
+  // ---- Entity Resolution / Consolidation ----
+  // Merge entities where one name is a prefix of another (same type).
+  // Example: "ליאו" and "ליאו פרוסט" → merge into "ליאו פרוסט" with alias "ליאו"
+  const entries = Array.from(entityMap.entries());
+  for (let i = 0; i < entries.length; i++) {
+    const [keyA, entityA] = entries[i];
+    if (!entityMap.has(keyA)) continue; // already merged away
+
+    for (let j = i + 1; j < entries.length; j++) {
+      const [keyB, entityB] = entries[j];
+      if (!entityMap.has(keyB)) continue; // already merged away
+      if (entityA.entity_type !== entityB.entity_type) continue; // different types
+
+      const nameA = entityA.canonical_name;
+      const nameB = entityB.canonical_name;
+
+      // Check if one name starts with the other (first name vs full name)
+      const aStartsWithB = nameA.startsWith(nameB + " ") || nameA.startsWith(nameB + "'");
+      const bStartsWithA = nameB.startsWith(nameA + " ") || nameB.startsWith(nameA + "'");
+
+      if (!aStartsWithB && !bStartsWithA) continue;
+
+      // Merge: longer name wins as canonical
+      const [keepKey, keep, removeKey, remove] = nameA.length >= nameB.length
+        ? [keyA, entityA, keyB, entityB]
+        : [keyB, entityB, keyA, entityA];
+
+      // Add shorter name as alias
+      if (!keep.aliases.includes(remove.canonical_name)) {
+        keep.aliases.push(remove.canonical_name);
+      }
+      // Merge aliases from the removed entity
+      for (const alias of remove.aliases) {
+        if (alias && !keep.aliases.includes(alias) && alias !== keep.canonical_name) {
+          keep.aliases.push(alias);
+        }
+      }
+      // Merge evidence and positions
+      for (const e of remove.evidence) {
+        if (!keep.evidence.includes(e)) keep.evidence.push(e);
+      }
+      for (const p of remove.chunk_positions) {
+        if (!keep.chunk_positions.includes(p)) keep.chunk_positions.push(p);
+      }
+      // Merge description
+      if (!keep.description && remove.description) keep.description = remove.description;
+      // Merge structured_fields (fill nulls)
+      for (const [k, v] of Object.entries(remove.structured_fields)) {
+        if (v != null && keep.structured_fields[k] == null) {
+          keep.structured_fields[k] = v;
+        }
+      }
+      // Merge attributes
+      for (const [k, v] of Object.entries(remove.attributes)) {
+        if (v != null && keep.attributes[k] == null) {
+          keep.attributes[k] = v;
+        }
+      }
+
+      // Remove the shorter entity from the map
+      entityMap.delete(removeKey);
+    }
+  }
+
   // Apply post-processing filters from centralized rules
   const results: NormalizedEntity[] = [];
   for (const entity of entityMap.values()) {
@@ -488,14 +552,46 @@ Deno.serve(async (req) => {
     let branchEntitiesSaved = 0;
 
     for (const entity of normalizedEntities) {
-      const { data: existing } = await supabase
+      // Check if entity already exists — exact match or name-prefix match
+      let existing: { id: string; structured_fields: unknown; attributes: unknown; source: string; description: string | null; entity_types: string[]; canonical_name?: string } | null = null;
+
+      // 1. Try exact match (case-insensitive)
+      const { data: exactMatch } = await supabase
         .from("knowledge_entities")
-        .select("id, structured_fields, attributes, source, description, entity_types")
+        .select("id, canonical_name, structured_fields, attributes, source, description, entity_types")
         .eq("project_id", body.project_id)
         .eq("user_id", body.user_id)
         .eq("layer", "main")
         .ilike("canonical_name", entity.canonical_name)
         .maybeSingle();
+
+      if (exactMatch) {
+        existing = exactMatch;
+      } else {
+        // 2. Try prefix match: find existing entity whose name starts with new name or vice versa
+        //    e.g., existing "ליאו" matches new "ליאו פרוסט" → update existing to full name
+        const { data: prefixMatches } = await supabase
+          .from("knowledge_entities")
+          .select("id, canonical_name, structured_fields, attributes, source, description, entity_types")
+          .eq("project_id", body.project_id)
+          .eq("user_id", body.user_id)
+          .eq("layer", "main")
+          .eq("entity_type", entity.entity_type)
+          .or(`canonical_name.ilike.${entity.canonical_name}%,canonical_name.ilike.%${entity.canonical_name}`)
+          .limit(1);
+
+        if (prefixMatches && prefixMatches.length > 0) {
+          // Verify it's actually a name-prefix relationship (not just substring coincidence)
+          const match = prefixMatches[0];
+          const matchName = (match.canonical_name || "").toLowerCase();
+          const newName = entity.canonical_name.toLowerCase();
+          if (matchName.startsWith(newName + " ") || newName.startsWith(matchName + " ") ||
+              matchName.startsWith(newName + "'") || newName.startsWith(matchName + "'") ||
+              matchName === newName) {
+            existing = match;
+          }
+        }
+      }
 
       let entityId: string;
 
@@ -503,6 +599,11 @@ Deno.serve(async (req) => {
         const existingStructured = (existing.structured_fields || {}) as Record<string, unknown>;
         const existingAttrs = (existing.attributes || {}) as Record<string, unknown>;
         const isUserSource = existing.source === "user";
+        const existingName = (existing as { canonical_name?: string }).canonical_name || "";
+
+        // If new name is longer/more complete, upgrade canonical_name and save old as alias
+        const shouldUpgradeName = entity.canonical_name.length > existingName.length && !isUserSource;
+        const newCanonicalName = shouldUpgradeName ? entity.canonical_name : existingName;
 
         const mergedStructured: Record<string, unknown> = { ...existingStructured };
         for (const [key, newVal] of Object.entries(entity.structured_fields)) {
@@ -526,6 +627,7 @@ Deno.serve(async (req) => {
         const { error: updateError } = await supabase
           .from("knowledge_entities")
           .update({
+            ...(shouldUpgradeName ? { canonical_name: newCanonicalName } : {}),
             structured_fields: mergedStructured,
             attributes: mergedAttrs,
             entity_types: mergedTypes,
@@ -540,6 +642,15 @@ Deno.serve(async (req) => {
           console.error(`Failed to update entity '${entity.canonical_name}':`, updateError.message);
           continue;
         }
+
+        // If name was upgraded, save old name as alias
+        if (shouldUpgradeName && existingName && existingName !== newCanonicalName) {
+          await supabase.from("knowledge_entity_aliases").upsert(
+            { entity_id: existing.id, alias: existingName },
+            { onConflict: "entity_id,alias" }
+          );
+        }
+
         entityId = existing.id;
       } else {
         const { data: inserted, error: insertError } = await supabase

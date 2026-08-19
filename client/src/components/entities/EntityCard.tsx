@@ -77,9 +77,10 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
             </p>
           )}
           {entity.aliases.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">
-              {entity.aliases.join(', ')}
-            </p>
+            <div className="text-xs mt-1">
+              <span className="font-medium text-muted-foreground">{t('entityFields.aliases')}:</span>{' '}
+              <span>{entity.aliases.join(', ')}</span>
+            </div>
           )}
         </div>
 
