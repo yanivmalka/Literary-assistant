@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
-import { FileText, Trash2, Brain, Loader2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { FileText, Trash2, Brain, Loader2, AlertCircle } from 'lucide-react'
 import { useDocumentStore, type Document } from '@/stores/documentStore'
 import ProcessingStatus from './ProcessingStatus'
 import ExtractionProgress from './ExtractionProgress'
@@ -27,6 +28,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
     triggerEntityExtraction,
     extractionInProgress,
     extractionDocumentId,
+    extractionError,
   } = useDocumentStore()
 
   if (documents.length === 0) {
@@ -67,6 +69,25 @@ export default function DocumentList({ projectId }: DocumentListProps) {
 
   return (
     <div className="space-y-3">
+      {/* Error alert if no active branch */}
+      {extractionError === 'ui.documents.noBranchForExtraction' && (
+        <div className="border border-amber-200 bg-amber-50 rounded-lg p-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="font-medium text-amber-900 mb-1">{t('documents.noBranchTitle')}</h4>
+            <p className="text-sm text-amber-800 mb-3">
+              {t('documents.noBranchDescription')}
+            </p>
+            <Link
+              to={`/projects/${projectId}/branches`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white text-sm rounded-md hover:bg-amber-700 transition-colors"
+            >
+              {t('documents.goToBranches')}
+            </Link>
+          </div>
+        </div>
+      )}
+
       {documents.map(doc => (
         <div key={doc.id} className="border rounded-lg p-4 bg-card">
           <div className="flex items-start justify-between">

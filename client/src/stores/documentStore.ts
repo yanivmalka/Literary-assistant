@@ -265,7 +265,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       console.error('[Knowledge] Extraction rejected: no active branch', error)
       set({
         extractionInProgress: false,
-        extractionError: 'ui.documents.extractionError',
+        extractionError: 'ui.documents.noBranchForExtraction',
         extractionDocumentId: documentId,
       })
       return

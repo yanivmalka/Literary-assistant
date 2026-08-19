@@ -229,7 +229,10 @@
       "dismiss": "סגור",
       "error": "שגיאה בחילוץ ישויות",
       "estimatedTime": "זמן משוער: {{minutes}} דקות"
-    }
+    },
+    "noBranchTitle": "החילוץ דורש Branch פעיל",
+    "noBranchDescription": "חילוץ הישויות לא יכול לשנות את בסיס הידע הראשי ישירות. עליך ליצור או להפעיל Branch תחילה לשם חילוץ וביקורת של ישויות.",
+    "goToBranches": "עבור ל-Branches"
   },
   "entities": {
     "title": "ישויות",

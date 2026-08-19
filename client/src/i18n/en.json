@@ -229,7 +229,10 @@
       "dismiss": "Dismiss",
       "error": "Entity extraction error",
       "estimatedTime": "Estimated time: {{minutes}} minutes"
-    }
+    },
+    "noBranchTitle": "Extraction Requires an Active Branch",
+    "noBranchDescription": "Entity extraction cannot modify the Main knowledge base directly. You must create or activate a Branch first to extract and review entities.",
+    "goToBranches": "Go to Branches"
   },
   "entities": {
     "title": "Entities",
