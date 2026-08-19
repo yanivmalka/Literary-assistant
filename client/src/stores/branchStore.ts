@@ -1,6 +1,15 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import i18n from '@/i18n'
+import {
+  getEffectiveBranchView,
+  applyFieldOverride,
+  removeFieldOverride,
+  detectConflicts,
+  type EffectiveEntity,
+  type MainEntityRecord,
+  type BranchEntityOverlay,
+} from '@/lib/branchView'
 
 // ============================================
 // Types
@@ -103,6 +112,7 @@ interface BranchState {
   branchEntities: BranchEntity[]
   mainEntities: MainEntity[]
   comparisons: EntityComparison[]
+  effectiveViews: Map<string, EffectiveEntity> // entityId -> EffectiveEntity
   loading: boolean
   error: string | null
 
@@ -112,6 +122,10 @@ interface BranchState {
   createBranch: (projectId: string, name?: string) => Promise<Branch | null>
   fetchBranchEntities: (branchId: string) => Promise<void>
   fetchMainEntities: (projectId: string) => Promise<void>
+  getEffectiveBranchView: (entityId: string, branchId: string) => Promise<EffectiveEntity | null>
+  createOrUpdateOverride: (branchId: string, sourceEntityId: string, fieldPath: string, newValue: unknown) => Promise<void>
+  removeOverride: (branchId: string, sourceEntityId: string, fieldPath: string) => Promise<void>
+  detectConflicts: (entityId: string, branchId: string) => Promise<string[]>
   updateBranchEntity: (branchEntityId: string, updates: Partial<Pick<BranchEntity, 'canonical_name' | 'description' | 'attributes'>>) => Promise<void>
   compareEntities: (branchId: string, projectId: string) => Promise<void>
   transferFieldToMain: (sourceEntityId: string, field: string, branchValue: unknown) => Promise<void>
@@ -126,6 +140,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
   branchEntities: [],
   mainEntities: [],
   comparisons: [],
+  effectiveViews: new Map(),
   loading: false,
   error: null,
 
@@ -532,6 +547,261 @@ export const useBranchStore = create<BranchState>((set, get) => ({
     const changedDiffs = comparison.diffs.filter(d => d.changed)
     for (const diff of changedDiffs) {
       await get().transferFieldToMain(sourceEntityId, diff.field, diff.branchValue)
+    }
+  },
+
+  // ==============================
+  // Get Effective Branch View (Main + Overrides)
+  // ==============================
+  getEffectiveBranchView: async (entityId: string, branchId: string) => {
+    try {
+      // Load main entity
+      const mainData = await supabase
+        .from('knowledge_entities')
+        .select('*')
+        .eq('id', entityId)
+        .eq('layer', 'main')
+        .single()
+
+      if (mainData.error || !mainData.data) {
+        console.error('Failed to fetch main entity:', mainData.error)
+        return null
+      }
+
+      const main = mainData.data as MainEntityRecord
+
+      // Load overlay if exists
+      const overlayData = await supabase
+        .from('knowledge_branch_entities')
+        .select('*')
+        .eq('branch_id', branchId)
+        .eq('source_entity_id', entityId)
+        .maybeSingle()
+
+      const overlay = overlayData.data as BranchEntityOverlay | null
+
+      // Merge into effective view
+      const effective = getEffectiveBranchView(main, overlay, branchId)
+
+      // Cache in state
+      const newMap = new Map(get().effectiveViews)
+      newMap.set(entityId, effective)
+      set({ effectiveViews: newMap })
+
+      return effective
+    } catch (err) {
+      console.error('Failed to get effective branch view:', err)
+      return null
+    }
+  },
+
+  // ==============================
+  // Create or Update Override for a field
+  // ==============================
+  createOrUpdateOverride: async (branchId: string, sourceEntityId: string, fieldPath: string, newValue: unknown) => {
+    try {
+      // Get main entity
+      const mainData = await supabase
+        .from('knowledge_entities')
+        .select('*')
+        .eq('id', sourceEntityId)
+        .eq('layer', 'main')
+        .single()
+
+      if (mainData.error || !mainData.data) {
+        set({ error: 'Main entity not found' })
+        return
+      }
+
+      const main = mainData.data as MainEntityRecord
+
+      // Get or create overlay record
+      let overlayData = await supabase
+        .from('knowledge_branch_entities')
+        .select('*')
+        .eq('branch_id', branchId)
+        .eq('source_entity_id', sourceEntityId)
+        .maybeSingle()
+
+      let overlay = overlayData.data as BranchEntityOverlay | null
+
+      // Calculate new overrides
+      const newOverrides = applyFieldOverride(main, fieldPath, newValue, overlay)
+
+      if (!overlay) {
+        // Create new overlay record
+        const { data: newOverlay, error } = await supabase
+          .from('knowledge_branch_entities')
+          .insert({
+            branch_id: branchId,
+            source_entity_id: sourceEntityId,
+            entity_id: sourceEntityId,
+            project_id: main.project_id,
+            user_id: main.user_id,
+            overrides: newOverrides,
+            base_values: {
+              canonical_name: main.canonical_name,
+              entity_type: main.entity_type,
+              description: main.description,
+              ...Object.fromEntries(
+                Object.entries(main.attributes || {}).map(([k, v]) => [`attributes.${k}`, v])
+              ),
+            },
+            is_modified: Object.keys(newOverrides).length > 0,
+            modified_fields: Object.keys(newOverrides),
+          })
+          .select('*')
+          .single()
+
+        if (error) {
+          set({ error: error.message })
+          return
+        }
+
+        overlay = newOverlay as BranchEntityOverlay
+      } else {
+        // Update existing overlay
+        const { error } = await supabase
+          .from('knowledge_branch_entities')
+          .update({
+            overrides: newOverrides,
+            is_modified: Object.keys(newOverrides).length > 0,
+            modified_fields: Object.keys(newOverrides),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', overlay.id)
+
+        if (error) {
+          set({ error: error.message })
+          return
+        }
+
+        overlay = {
+          ...overlay,
+          overrides: newOverrides,
+          is_modified: Object.keys(newOverrides).length > 0,
+          modified_fields: Object.keys(newOverrides),
+        }
+      }
+
+      // Update branch entities in state
+      set({
+        branchEntities: get().branchEntities.map(e =>
+          e.source_entity_id === sourceEntityId
+            ? {
+                ...e,
+                overrides: overlay.overrides,
+                is_modified: overlay.is_modified,
+                modified_fields: overlay.modified_fields,
+              }
+            : e
+        ),
+      })
+
+      // Invalidate effective view cache
+      const newMap = new Map(get().effectiveViews)
+      newMap.delete(sourceEntityId)
+      set({ effectiveViews: newMap })
+    } catch (err) {
+      console.error('Failed to create or update override:', err)
+    }
+  },
+
+  // ==============================
+  // Remove Override (revert to Main)
+  // ==============================
+  removeOverride: async (branchId: string, sourceEntityId: string, fieldPath: string) => {
+    try {
+      // Get overlay
+      const overlayData = await supabase
+        .from('knowledge_branch_entities')
+        .select('*')
+        .eq('branch_id', branchId)
+        .eq('source_entity_id', sourceEntityId)
+        .maybeSingle()
+
+      if (!overlayData.data) {
+        return
+      }
+
+      const overlay = overlayData.data as BranchEntityOverlay
+
+      // Calculate new overrides
+      const newOverrides = removeFieldOverride(fieldPath, overlay)
+
+      // Update overlay
+      const { error } = await supabase
+        .from('knowledge_branch_entities')
+        .update({
+          overrides: newOverrides,
+          is_modified: Object.keys(newOverrides).length > 0,
+          modified_fields: Object.keys(newOverrides),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', overlay.id)
+
+      if (error) {
+        set({ error: error.message })
+        return
+      }
+
+      // Update state
+      set({
+        branchEntities: get().branchEntities.map(e =>
+          e.id === overlay.id
+            ? {
+                ...e,
+                overrides: newOverrides,
+                is_modified: Object.keys(newOverrides).length > 0,
+                modified_fields: Object.keys(newOverrides),
+              }
+            : e
+        ),
+      })
+
+      // Invalidate cache
+      const newMap = new Map(get().effectiveViews)
+      newMap.delete(sourceEntityId)
+      set({ effectiveViews: newMap })
+    } catch (err) {
+      console.error('Failed to remove override:', err)
+    }
+  },
+
+  // ==============================
+  // Detect Conflicts
+  // ==============================
+  detectConflicts: async (entityId: string, branchId: string) => {
+    try {
+      // Get main entity
+      const mainData = await supabase
+        .from('knowledge_entities')
+        .select('*')
+        .eq('id', entityId)
+        .eq('layer', 'main')
+        .single()
+
+      if (mainData.error || !mainData.data) {
+        return []
+      }
+
+      const main = mainData.data as MainEntityRecord
+
+      // Get overlay
+      const overlayData = await supabase
+        .from('knowledge_branch_entities')
+        .select('*')
+        .eq('branch_id', branchId)
+        .eq('source_entity_id', entityId)
+        .maybeSingle()
+
+      const overlay = overlayData.data as BranchEntityOverlay | null
+
+      // Detect conflicts
+      return detectConflicts(main, overlay)
+    } catch (err) {
+      console.error('Failed to detect conflicts:', err)
+      return []
     }
   },
 
