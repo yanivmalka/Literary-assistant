@@ -17,6 +17,7 @@ interface AuthState {
   signOut: () => Promise<void>
   fetchProfile: () => Promise<void>
   updateProfile: (updates: Partial<Profile>) => Promise<void>
+  confirmEmail: (email: string, token: string) => Promise<{ error: string | null }>
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -54,16 +55,41 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signUp: async (email, password) => {
     set({ loading: true })
-    const { error } = await supabase.auth.signUp({ email, password })
-    set({ loading: false })
-    return { error: error?.message ?? null }
+    try {
+      const { error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          // Disable email confirmation requirement for now - can be enabled in Supabase settings later
+          emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
+        }
+      })
+      set({ loading: false })
+      return { error: error?.message ?? null }
+    } catch (err) {
+      set({ loading: false })
+      const message = err instanceof Error ? err.message : 'Sign up failed'
+      return { error: message }
+    }
   },
 
   signIn: async (email, password) => {
     set({ loading: true })
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    set({ loading: false })
-    return { error: error?.message ?? null }
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      set({ loading: false })
+      
+      // If sign in fails and user exists but not confirmed, provide helpful message
+      if (error?.message?.includes('Email not confirmed')) {
+        return { error: 'Please check your email to confirm your account before logging in.' }
+      }
+      
+      return { error: error?.message ?? null }
+    } catch (err) {
+      set({ loading: false })
+      const message = err instanceof Error ? err.message : 'Sign in failed'
+      return { error: message }
+    }
   },
 
   signInWithGoogle: async () => {
@@ -90,5 +116,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updateProfile: async (_updates) => {
     // profiles table removed - no-op
     console.log("[Auth] updateProfile: profiles table not available")
+  },
+
+  confirmEmail: async (email, token) => {
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'signup',
+      })
+      return { error: error?.message ?? null }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Email confirmation failed'
+      return { error: message }
+    }
   },
 }))
