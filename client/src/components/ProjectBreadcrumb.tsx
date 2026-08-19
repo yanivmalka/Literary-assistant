@@ -6,6 +6,7 @@ import { useProjectStore } from '@/stores/projectStore'
 
 interface ProjectBreadcrumbProps {
   currentPage: 'documents' | 'entities' | 'qa' | 'contradictions' | 'branches'
+  showTabs?: boolean
 }
 
 const NAV_ITEMS = [
@@ -16,7 +17,7 @@ const NAV_ITEMS = [
   { key: 'branches', path: 'branches', icon: GitBranch, label: 'branch.title' },
 ] as const
 
-export default function ProjectBreadcrumb({ currentPage }: ProjectBreadcrumbProps) {
+export default function ProjectBreadcrumb({ currentPage, showTabs = true }: ProjectBreadcrumbProps) {
   const { t } = useTranslation()
   const { projectId } = useParams<{ projectId: string }>()
   const { currentProject, fetchProject } = useProjectStore()
@@ -54,25 +55,27 @@ export default function ProjectBreadcrumb({ currentPage }: ProjectBreadcrumbProp
       </nav>
 
       {/* Sub-navigation tabs */}
-      <div className="flex flex-wrap gap-1 border-b pb-2">
-        {NAV_ITEMS.map(item => {
-          const isActive = item.key === currentPage
-          return (
-            <Link
-              key={item.key}
-              to={`/projects/${projectId}/${item.path}`}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
-                isActive
-                  ? 'bg-primary/10 text-primary font-medium'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              }`}
-            >
-              <item.icon className="h-3.5 w-3.5" />
-              {t(item.label)}
-            </Link>
-          )
-        })}
-      </div>
+      {showTabs && (
+        <div className="flex flex-wrap gap-1 border-b pb-2">
+          {NAV_ITEMS.map(item => {
+            const isActive = item.key === currentPage
+            return (
+              <Link
+                key={item.key}
+                to={`/projects/${projectId}/${item.path}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  isActive
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                <item.icon className="h-3.5 w-3.5" />
+                {t(item.label)}
+              </Link>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
