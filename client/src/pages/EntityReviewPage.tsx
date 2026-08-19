@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams, useSearchParams } from 'react-router-dom'
-import { Users, MapPin, Sword, Sparkles, Globe } from 'lucide-react'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { Users, MapPin, Sword, Sparkles, GitBranch } from 'lucide-react'
 import { useEntityStore } from '@/stores/entityStore'
 import EntityCard from '@/components/entities/EntityCard'
 import MergeSuggestionComponent from '@/components/entities/MergeSuggestion'
 
 const TYPE_FILTERS = [
-  { value: '', label: 'common.all', icon: Globe },
   { value: 'character', label: 'entities.types.character', icon: Users },
   { value: 'location', label: 'entities.types.location', icon: MapPin },
   { value: 'object', label: 'entities.types.object', icon: Sword },
@@ -29,7 +28,7 @@ export default function EntityReviewPage() {
     mergeEntities,
   } = useEntityStore()
 
-  const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || '')
+  const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || 'character')
   const [statusFilter, setStatusFilter] = useState('')
 
   const handleTypeFilter = (value: string) => {
@@ -101,21 +100,28 @@ export default function EntityReviewPage() {
         ))}
       </div>
 
-      {/* Status filter */}
-      <div className="flex gap-2 mb-4">
-        {['pending', 'confirmed', ''].map(status => (
+      {/* Status filter + Branch link */}
+      <div className="flex items-center gap-2 mb-4">
+        {['pending', 'confirmed'].map(status => (
           <button
             key={status}
-            onClick={() => setStatusFilter(status)}
+            onClick={() => setStatusFilter(statusFilter === status ? '' : status)}
             className={`text-xs px-2.5 py-1 rounded transition-colors ${
               statusFilter === status
                 ? 'bg-secondary text-secondary-foreground'
                 : 'text-muted-foreground hover:bg-muted'
             }`}
           >
-            {status ? t(`entities.status.${status}`) : t('common.all') || 'All'}
+            {t(`entities.status.${status}`)}
           </button>
         ))}
+        <Link
+          to={`/projects/${projectId}/branches`}
+          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded text-muted-foreground hover:bg-muted transition-colors ms-auto"
+        >
+          <GitBranch className="h-3 w-3" />
+          {t('branch.title')}
+        </Link>
       </div>
 
       {/* Entity list */}
