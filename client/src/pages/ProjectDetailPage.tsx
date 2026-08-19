@@ -81,7 +81,7 @@ export default function ProjectDetailPage() {
         </Link>
         <Link
           to={`/projects/${projectId}/branches`}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${hasReadyDocument ? 'hover:bg-muted' : 'opacity-50 pointer-events-none'}`}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors hover:bg-muted"
         >
           <GitBranch className="h-4 w-4" />
           {t('branch.title')}
