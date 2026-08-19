@@ -18,6 +18,9 @@ interface AuthState {
   fetchProfile: () => Promise<void>
   updateProfile: (updates: Partial<Profile>) => Promise<void>
   confirmEmail: (email: string, token: string) => Promise<{ error: string | null }>
+  linkIdentity: (provider: 'google' | 'github') => Promise<{ error: string | null }>
+  updateUserPassword: (password: string) => Promise<{ error: string | null }>
+  getUserIdentities: () => Promise<{ identities: any[] | null; error: string | null }>
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -129,6 +132,45 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Email confirmation failed'
       return { error: message }
+    }
+  },
+
+  linkIdentity: async (provider) => {
+    try {
+      const redirectUrl = `${window.location.origin}${import.meta.env.BASE_URL}`
+      const { error } = await supabase.auth.linkIdentity({
+        provider,
+        options: {
+          redirectTo: redirectUrl,
+        },
+      })
+      return { error: error?.message ?? null }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : `Failed to link ${provider}`
+      return { error: message }
+    }
+  },
+
+  updateUserPassword: async (password) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password })
+      return { error: error?.message ?? null }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update password'
+      return { error: message }
+    }
+  },
+
+  getUserIdentities: async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        return { identities: null, error: userError?.message ?? 'User not found' }
+      }
+      return { identities: user.identities ?? [], error: null }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch identities'
+      return { identities: null, error: message }
     }
   },
 }))

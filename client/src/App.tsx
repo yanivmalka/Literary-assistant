@@ -19,6 +19,7 @@ import ContradictionsPage from './pages/ContradictionsPage'
 import BranchPage from './pages/BranchPage'
 import DevTestPage from './pages/DevTestPage'
 import DebugAuthPage from './pages/DebugAuthPage'
+import AccountSettingsPage from './pages/AccountSettingsPage'
 
 function App() {
   const { i18n } = useTranslation()
@@ -39,6 +40,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/debug-auth" element={<DebugAuthPage />} />
+      <Route path="/account-settings" element={<ProtectedRoute><AccountSettingsPage /></ProtectedRoute>} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<HomePage />} />
         <Route path="projects" element={<ProjectsPage />} />
