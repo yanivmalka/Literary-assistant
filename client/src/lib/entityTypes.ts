@@ -1,17 +1,17 @@
 // ============================================
 // Entity Type Definitions
 // Defines structured fields for each of the 5 entity types:
-// Characters, Locations, Objects, Magic, Abilities
+// Characters, Locations, Objects, Abilities (physical), Magic Abilities
 //
 // All fields are nullable (string | null) — no field is required.
-// "לא ידוע" is displayed in the UI for null values.
+// NULL in DB, displayed as "לא ידוע" in UI.
 // ============================================
 
 // ============================================
 // Entity Type Constants
 // ============================================
 
-export const ENTITY_TYPES = ['character', 'location', 'object', 'magic', 'ability'] as const
+export const ENTITY_TYPES = ['character', 'location', 'object', 'ability', 'magic_ability'] as const
 export type EntityType = typeof ENTITY_TYPES[number]
 
 // ============================================
@@ -155,55 +155,15 @@ export const OBJECT_FIELD_GROUPS = [
 ] as const
 
 // ============================================
-// 4. Magic Systems
-// ============================================
-
-export interface MagicFields {
-  // Basic details
-  name: string | null
-  description: string | null
-  source: string | null
-  users: string | null
-
-  // Rules
-  rules: string | null
-  requirements: string | null
-  limitations: string | null
-  cost: string | null
-  unique_properties: string | null
-
-  // Role in world
-  world_impact: string | null
-  narrative_impact: string | null
-  related_characters: string | null
-}
-
-export const MAGIC_FIELD_GROUPS = [
-  {
-    key: 'basic',
-    labelKey: 'entityFields.groups.basic',
-    fields: ['name', 'description', 'source', 'users'] as (keyof MagicFields)[],
-  },
-  {
-    key: 'rules',
-    labelKey: 'entityFields.groups.rules',
-    fields: ['rules', 'requirements', 'limitations', 'cost', 'unique_properties'] as (keyof MagicFields)[],
-  },
-  {
-    key: 'worldRole',
-    labelKey: 'entityFields.groups.worldRole',
-    fields: ['world_impact', 'narrative_impact', 'related_characters'] as (keyof MagicFields)[],
-  },
-] as const
-
-// ============================================
-// 5. Abilities
+// 4. Abilities (shared structure for physical and magical)
+// The distinction is via ability_type field: "physical" | "magical"
+// UI shows them in separate tabs but they share the same data model.
 // ============================================
 
 export interface AbilityFields {
   // Basic details
   name: string | null
-  ability_type: string | null
+  ability_type: string | null  // "physical" | "magical"
   description: string | null
 
   // Mechanics
@@ -253,7 +213,6 @@ export type EntityStructuredFields =
   | CharacterFields
   | LocationFields
   | ObjectFields
-  | MagicFields
   | AbilityFields
 
 // ============================================
@@ -278,9 +237,8 @@ export function getFieldGroupsForType(entityType: EntityType): FieldGroup<string
       return LOCATION_FIELD_GROUPS as unknown as FieldGroup<string>[]
     case 'object':
       return OBJECT_FIELD_GROUPS as unknown as FieldGroup<string>[]
-    case 'magic':
-      return MAGIC_FIELD_GROUPS as unknown as FieldGroup<string>[]
     case 'ability':
+    case 'magic_ability':
       return ABILITY_FIELD_GROUPS as unknown as FieldGroup<string>[]
     default:
       return []
@@ -322,11 +280,7 @@ export const TEXTAREA_FIELDS = new Set([
   'face_structure',
   'other_visual_features',
   'common_clothing',
-  'rules',
-  'requirements',
   'limitations',
-  'unique_properties',
-  'world_impact',
   'mechanism',
   'activation_conditions',
   'special_properties',
@@ -342,6 +296,6 @@ export const ENTITY_TYPE_META: Record<EntityType, { labelKey: string; icon: stri
   character: { labelKey: 'entities.types.character', icon: '👤', color: 'blue' },
   location: { labelKey: 'entities.types.location', icon: '📍', color: 'green' },
   object: { labelKey: 'entities.types.object', icon: '🗡️', color: 'amber' },
-  magic: { labelKey: 'entities.types.magic_system', icon: '🔮', color: 'purple' },
-  ability: { labelKey: 'entities.types.ability', icon: '✨', color: 'pink' },
+  ability: { labelKey: 'entities.types.ability', icon: '⚔️', color: 'orange' },
+  magic_ability: { labelKey: 'entities.types.magic_ability', icon: '✨', color: 'purple' },
 }

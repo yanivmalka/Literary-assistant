@@ -5,11 +5,17 @@
 // Normalizes and saves to knowledge layer tables.
 // Idempotent via UNIQUE constraints (upsert).
 // Uses service_role key to bypass RLS.
+//
+// Domain rules are imported from _shared/rules/ — the single source of truth
+// for entity extraction behavior. See rules/index.ts for architecture docs.
 // ============================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callGeminiWithFallback } from "../_shared/gemini-client.ts";
 import { DEFAULT_MODEL } from "../_shared/gemini-config.ts";
+import { buildExtractionPrompt } from "../_shared/rules/prompt.ts";
+import { normalizeKey, stripNikud } from "../_shared/rules/normalization.ts";
+import { shouldFilterEntity } from "../_shared/rules/filtering.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -30,7 +36,7 @@ interface ExtractRequest {
   user_id: string;
   offset?: number;
   limit?: number;
-  target_branch_id?: string; // If provided, extracted entities go to branch instead of Main
+  target_branch_id?: string;
 }
 
 interface ExtractedEntity {
@@ -83,12 +89,7 @@ interface ExtractedEntity {
   cost?: string | null;
   power_level?: string | null;
   magic_system?: string | null;
-  // Magic system fields
   source?: string | null;
-  rules?: string | null;
-  requirements?: string | null;
-  unique_properties?: string | null;
-  world_impact?: string | null;
 }
 
 interface ExtractedEvent {
@@ -113,7 +114,6 @@ interface GeminiExtraction {
   characters?: ExtractedEntity[];
   locations?: ExtractedEntity[];
   objects?: ExtractedEntity[];
-  magic_systems?: ExtractedEntity[];
   abilities?: ExtractedEntity[];
   organizations?: ExtractedEntity[];
   events?: ExtractedEvent[];
@@ -121,54 +121,15 @@ interface GeminiExtraction {
 }
 
 // ============================================
-// Prompt Builder (same as PoC)
+// Prompt — delegates to centralized rules
 // ============================================
 
 function buildPrompt(chunks: { position: number; content: string }[]): string {
-  const chunksText = chunks
-    .map((c) => `[chunk ${c.position}]: ${c.content}`)
-    .join("\n\n");
-
-  return `You are a literary entity extractor for Hebrew fiction. Extract entities from these text chunks.
-
-RULES:
-- Return entity names in Hebrew exactly as written.
-- Do NOT invent information. Only extract what appears in the text.
-- If information about a field is NOT in the text, set it to null.
-- Keep evidence SHORT (max 10 words each, max 2 per entity).
-- Be concise.
-
-Return JSON with these arrays (omit empty arrays):
-
-- characters: [{name, aliases[], age, gender, height, hair_color, eye_color, face_structure, common_clothing, scars, tattoos, description, narrative_role, evidence[], chunk_positions[]}]
-- locations: [{name, aliases[], location_type, parent_location, description, continent, country, region, city, narrative_importance, related_characters, evidence[], chunk_positions[]}]
-- objects: [{name, aliases[], object_type, description, appearance, materials, special_properties, origin, current_location, owners, narrative_importance, evidence[], chunk_positions[]}]
-- magic_systems: [{name, aliases[], description, source, users, rules, requirements, limitations, cost, unique_properties, world_impact, evidence[], chunk_positions[]}]
-- abilities: [{name, aliases[], ability_type, description, mechanism, activation_conditions, limitations, cost, power_level, magic_system, users, evidence[], chunk_positions[]}]
-- organizations: [{name, aliases[], description, members[], purpose, evidence[], chunk_positions[]}]
-- events: [{description, name, participants[], location, what_happened, evidence[], chunk_positions[]}]
-- relationships: [{character_a, character_b, relationship_type, evidence[], chunk_positions[]}]
-
-IMPORTANT — Character physical attributes:
-For every character, pay special attention to these 4 fields: age, height, eye_color, hair_color.
-- Extract them even when mentioned indirectly. Examples:
-  "חגג את יום הולדתו השמונה עשרה" → age: "18"
-  "התנשא לגובה של מטר ושמונים" → height: "1.80 מ'"
-  "שערו השחור נפל על עיניו" → hair_color: "שחור"
-  "הביט בה בעיניים ירוקות" → eye_color: "ירוק"
-- If a description is vague and cannot be converted to a concrete value (e.g. "גבוה למדי"), set the field to null. Do NOT guess a numeric value.
-- If no information exists for a field, set it to null.
-
-Notes:
-- A magic_system is a system or method of magic (e.g. "the Force", "Allomancy"). An ability is a specific power a character can use.
-- For each entity, only include fields that have actual information from the text. Fields without information should be null or omitted.
-
-TEXT:
-${chunksText}`;
+  return buildExtractionPrompt(chunks);
 }
 
 // ============================================
-// Normalization (same as PoC)
+// Normalization — uses centralized rules
 // ============================================
 
 interface NormalizedEntity {
@@ -186,7 +147,7 @@ interface NormalizedEntity {
 /** Build structured_fields from the entity's flat fields based on its type */
 function buildStructuredFields(type: string, entity: ExtractedEntity): Record<string, unknown> {
   const fields: Record<string, unknown> = {};
-  fields.name = entity.name || null;
+  fields.name = entity.name ? stripNikud(entity.name) : null;
   fields.description = entity.description || entity.significance || null;
 
   if (type === "character") {
@@ -231,8 +192,8 @@ function buildStructuredFields(type: string, entity: ExtractedEntity): Record<st
     fields.narrative_impact = null;
     fields.related_characters = entity.related_characters || null;
     fields.related_events = null;
-  } else if (type === "ability") {
-    fields.ability_type = entity.ability_type || null;
+  } else if (type === "ability" || type === "magic_ability") {
+    fields.ability_type = entity.ability_type || (type === "magic_ability" ? "magical" : "physical");
     fields.mechanism = entity.mechanism || null;
     fields.activation_conditions = entity.activation_conditions || null;
     fields.limitations = entity.limitations || null;
@@ -242,21 +203,8 @@ function buildStructuredFields(type: string, entity: ExtractedEntity): Record<st
     fields.users = entity.users ? entity.users.join(", ") : null;
     fields.narrative_impact = null;
     fields.related_events = null;
-  } else if (type === "magic") {
-    fields.source = entity.source || null;
-    fields.users = entity.users ? entity.users.join(", ") : null;
-    fields.rules = entity.rules || null;
-    fields.requirements = entity.requirements || null;
-    fields.limitations = entity.limitations || null;
-    fields.cost = entity.cost || null;
-    fields.unique_properties = entity.unique_properties || null;
-    fields.world_impact = entity.world_impact || null;
-    fields.narrative_impact = null;
-    fields.related_characters = null;
   }
-  // organization — store what we have
   if (type === "organization") {
-    // Organizations map to whatever we have
     fields.users = entity.members ? entity.members.join(", ") : null;
   }
 
@@ -267,7 +215,9 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
   const entityMap = new Map<string, NormalizedEntity>();
 
   function addEntity(name: string, type: string, entity: ExtractedEntity) {
-    const key = name.trim().toLowerCase();
+    if (!name || !name.trim()) return;
+    const cleanName = stripNikud(name.trim());
+    const key = normalizeKey(cleanName);
     if (!key) return;
 
     const existing = entityMap.get(key);
@@ -286,8 +236,17 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
       }
       if (entity.aliases) {
         for (const a of entity.aliases) {
-          if (a && !existing.aliases.includes(a)) existing.aliases.push(a);
+          if (a && !existing.aliases.includes(stripNikud(a))) existing.aliases.push(stripNikud(a));
         }
+      }
+      // Prefer longer name as canonical
+      if (cleanName.length > existing.canonical_name.length) {
+        if (!existing.aliases.includes(existing.canonical_name)) {
+          existing.aliases.push(existing.canonical_name);
+        }
+        existing.canonical_name = cleanName;
+      } else if (cleanName !== existing.canonical_name && !existing.aliases.includes(cleanName)) {
+        existing.aliases.push(cleanName);
       }
       if (entity.description && !existing.description) existing.description = entity.description;
       if (entity.significance && !existing.description) existing.description = entity.significance;
@@ -304,7 +263,6 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
         existing.attributes.members = [...((existing.attributes.members as string[]) || []), ...entity.members];
       }
       if (entity.purpose) existing.attributes.purpose = entity.purpose;
-      // Merge structured_fields: keep existing non-null values, add new ones
       const newStructured = buildStructuredFields(type, entity);
       for (const [k, v] of Object.entries(newStructured)) {
         if (v != null && existing.structured_fields[k] == null) {
@@ -320,13 +278,13 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
       if (entity.purpose) attrs.purpose = entity.purpose;
 
       entityMap.set(key, {
-        canonical_name: name.trim(),
+        canonical_name: cleanName,
         entity_type: type,
         entity_types: [type],
         description: entity.description || entity.significance || null,
         attributes: attrs,
         structured_fields: buildStructuredFields(type, entity),
-        aliases: (entity.aliases || []).filter(Boolean),
+        aliases: (entity.aliases || []).map(a => stripNikud(a)).filter(Boolean),
         evidence: entity.evidence || [],
         chunk_positions: entity.chunk_positions || [],
       });
@@ -336,11 +294,21 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
   for (const char of extraction.characters || []) addEntity(char.name, "character", char);
   for (const loc of extraction.locations || []) addEntity(loc.name, "location", loc);
   for (const obj of extraction.objects || []) addEntity(obj.name, "object", obj);
-  for (const magic of extraction.magic_systems || []) addEntity(magic.name, "magic", magic);
-  for (const ab of extraction.abilities || []) addEntity(ab.name, "ability", ab);
+  for (const ab of extraction.abilities || []) {
+    const type = ab.ability_type === "magical" ? "magic_ability" : "ability";
+    addEntity(ab.name, type, ab);
+  }
   for (const org of extraction.organizations || []) addEntity(org.name, "organization", org);
 
-  return Array.from(entityMap.values());
+  // Apply post-processing filters from centralized rules
+  const results: NormalizedEntity[] = [];
+  for (const entity of entityMap.values()) {
+    if (!shouldFilterEntity(entity)) {
+      results.push(entity);
+    }
+  }
+
+  return results;
 }
 
 // ============================================
@@ -426,56 +394,41 @@ Deno.serve(async (req) => {
 
     if (!geminiResult.success) {
       console.error("[extract-knowledge] Gemini fallback chain exhausted:", JSON.stringify(geminiResult.fallbackChain));
-      return errorResponse(
-        geminiResult.error,
-        geminiResult.status,
-        geminiResult.details
-      );
+      return errorResponse(geminiResult.error, geminiResult.status, geminiResult.details);
     }
 
     const { data: geminiData, modelUsed, latencyMs } = geminiResult;
-    // Extract text from response - handle multi-part responses (thinking models return thought + text parts)
     const candidate = (geminiData as any)?.candidates?.[0];
     const parts = candidate?.content?.parts || [];
-    // Filter out thought parts (they have thought: true) and get only text output parts
     const textParts = parts.filter((p: any) => p.text && !p.thought);
     const responseText = textParts.length > 0
       ? textParts.map((p: any) => p.text).join("")
       : parts.map((p: any) => p.text || "").filter(Boolean).join("");
     console.log(`[extract-knowledge] Model: ${modelUsed}, Response length: ${responseText.length}, Parts: ${parts.length}, TextParts: ${textParts.length}`);
 
-    // If response is empty, skip this batch (model returned no content - likely MAX_TOKENS with no output)
     if (!responseText || responseText.trim().length === 0) {
-      console.error(`[extract-knowledge] Empty response from ${modelUsed}. Parts dump: ${JSON.stringify(parts.map((p: any) => ({ hasText: !!p.text, hasThought: !!p.thought, textLen: p.text?.length || 0 })))}`);
-      // Return success with empty results so the loop continues to next batch
+      console.error(`[extract-knowledge] Empty response from ${modelUsed}.`);
       const done = chunks.length < limit;
       return new Response(
-        JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, latency_ms: latencyMs }, summary: { entities_saved: 0, mentions_saved: 0, aliases_saved: 0, relationships_saved: 0, events_saved: 0, event_mentions_saved: 0, event_participants_saved: 0, raw_extraction_id: null, normalized_entity_count: 0 } }),
+        JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, latency_ms: latencyMs }, summary: { entities_saved: 0, normalized_entity_count: 0 } }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     const usage = (geminiData as Record<string, unknown>)?.usageMetadata || {};
 
-    // Log fallback info if we didn't use the primary model
     if (modelUsed !== DEFAULT_MODEL) {
       console.log(`[extract-knowledge] Used fallback model: ${modelUsed} (primary: ${DEFAULT_MODEL})`);
-      console.log(`[extract-knowledge] Fallback chain: ${JSON.stringify(geminiResult.fallbackChain)}`);
     }
 
-
     // ==============================
-    // Step 3: Parse JSON � skip batch on failure (do not stop extraction)
+    // Step 3: Parse JSON — skip batch on failure
     // ==============================
     let extraction: GeminiExtraction;
     try {
-      // Strip code block markers if present
       let jsonText = responseText.trim();
       jsonText = jsonText.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "").trim();
-      
-      // Try direct parse
       extraction = JSON.parse(jsonText);
     } catch {
-      // Try finding JSON object in text
       try {
         const start = responseText.indexOf("{");
         const end = responseText.lastIndexOf("}");
@@ -485,11 +438,10 @@ Deno.serve(async (req) => {
           throw new Error("no JSON object found");
         }
       } catch {
-        // Skip this batch � return success so the loop continues
-        console.warn(`[extract-knowledge] Skipping batch offset=${offset}: unparseable JSON (len=${responseText.length})`);
+        console.warn(`[extract-knowledge] Skipping batch offset=${offset}: unparseable JSON`);
         const done = chunks.length < limit;
         return new Response(
-          JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, latency_ms: latencyMs, skipped: true }, summary: { entities_saved: 0, events_saved: 0, skipped_parse_error: true } }),
+          JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, latency_ms: latencyMs, skipped: true }, summary: { entities_saved: 0, skipped_parse_error: true } }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -536,7 +488,6 @@ Deno.serve(async (req) => {
     let branchEntitiesSaved = 0;
 
     for (const entity of normalizedEntities) {
-      // Check if entity already exists for this project+user+name+type
       const { data: existing } = await supabase
         .from("knowledge_entities")
         .select("id, structured_fields, attributes, source, description, entity_types")
@@ -549,22 +500,18 @@ Deno.serve(async (req) => {
       let entityId: string;
 
       if (existing) {
-        // --- Incremental merge: don't overwrite existing non-null values ---
         const existingStructured = (existing.structured_fields || {}) as Record<string, unknown>;
         const existingAttrs = (existing.attributes || {}) as Record<string, unknown>;
         const isUserSource = existing.source === "user";
 
-        // Merge structured_fields: only fill in null fields (never overwrite user data or previous values)
         const mergedStructured: Record<string, unknown> = { ...existingStructured };
         for (const [key, newVal] of Object.entries(entity.structured_fields)) {
-          if (newVal == null) continue; // AI returned null — skip
+          if (newVal == null) continue;
           const existingVal = existingStructured[key];
-          if (existingVal != null && existingVal !== "") continue; // already has a value — keep it
-          // If entity was user-created, only fill fields that user left empty
+          if (existingVal != null && existingVal !== "") continue;
           mergedStructured[key] = newVal;
         }
 
-        // Merge attributes: same logic — only add keys that don't exist or are null
         const mergedAttrs: Record<string, unknown> = { ...existingAttrs };
         for (const [key, newVal] of Object.entries(entity.attributes)) {
           if (newVal == null) continue;
@@ -572,11 +519,8 @@ Deno.serve(async (req) => {
           mergedAttrs[key] = newVal;
         }
 
-        // Merge entity_types array
         const existingTypes = (existing.entity_types || []) as string[];
         const mergedTypes = [...new Set([...existingTypes, ...entity.entity_types])];
-
-        // Merge description: only if currently null
         const mergedDescription = existing.description || entity.description;
 
         const { error: updateError } = await supabase
@@ -588,7 +532,6 @@ Deno.serve(async (req) => {
             description: mergedDescription,
             raw_extraction_id: rawExtractionId,
             updated_at: new Date().toISOString(),
-            // Keep source as-is if user created it
             ...(isUserSource ? {} : { source: "ai" }),
           })
           .eq("id", existing.id);
@@ -597,10 +540,8 @@ Deno.serve(async (req) => {
           console.error(`Failed to update entity '${entity.canonical_name}':`, updateError.message);
           continue;
         }
-
         entityId = existing.id;
       } else {
-        // --- New entity: insert fresh ---
         const { data: inserted, error: insertError } = await supabase
           .from("knowledge_entities")
           .insert({
@@ -626,14 +567,12 @@ Deno.serve(async (req) => {
           console.error(`Failed to insert entity '${entity.canonical_name}':`, insertError?.message);
           continue;
         }
-
         entityId = inserted.id;
       }
 
       entityIdMap.set(entity.canonical_name.toLowerCase(), entityId);
       entitiesSaved++;
 
-      // If target_branch_id is provided, also copy entity into branch for user review
       if (body.target_branch_id) {
         const { error: branchError } = await supabase
           .from("knowledge_branch_entities")
@@ -671,7 +610,6 @@ Deno.serve(async (req) => {
         mentionsSaved++;
       }
 
-      // Additional evidence as mentions
       if (entity.evidence.length > 1 && entity.chunk_positions.length > 0) {
         for (let i = 1; i < entity.evidence.length; i++) {
           await supabase.from("knowledge_entity_mentions").upsert(
