@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { Users, MapPin, Sword, Sparkles, Wand2, GitBranch, Plus } from 'lucide-react'
+import { Users, MapPin, Sword, Sparkles, Shield, GitBranch, Plus } from 'lucide-react'
 import { useEntityStore } from '@/stores/entityStore'
 import EntityCard from '@/components/entities/EntityCard'
 import MergeSuggestionComponent from '@/components/entities/MergeSuggestion'
@@ -13,8 +13,8 @@ const TYPE_FILTERS = [
   { value: 'character', label: 'entities.types.character', icon: Users },
   { value: 'location', label: 'entities.types.location', icon: MapPin },
   { value: 'object', label: 'entities.types.object', icon: Sword },
-  { value: 'magic', label: 'entities.types.magic_system', icon: Wand2 },
-  { value: 'ability', label: 'entities.types.ability', icon: Sparkles },
+  { value: 'ability', label: 'entities.types.ability', icon: Shield },
+  { value: 'magic_ability', label: 'entities.types.magic_ability', icon: Sparkles },
 ]
 
 export default function EntityReviewPage() {
@@ -90,10 +90,10 @@ export default function EntityReviewPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold">
-            {typeFilter ? t(`entities.types.${typeFilter === 'magic' ? 'magic_system' : typeFilter}`) : t('entities.title')}
+            {typeFilter ? t(`entities.types.${typeFilter}`) : t('entities.title')}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {typeFilter ? t('entities.subtitleByType', { type: t(`entities.types.${typeFilter === 'magic' ? 'magic_system' : typeFilter}`) }) : t('entities.subtitle')}
+            {typeFilter ? t('entities.subtitleByType', { type: t(`entities.types.${typeFilter}`) }) : t('entities.subtitle')}
           </p>
         </div>
         <button

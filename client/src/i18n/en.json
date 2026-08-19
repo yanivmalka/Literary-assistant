@@ -249,7 +249,8 @@
       "continent": "Continents",
       "region": "Regions",
       "object": "Objects",
-      "ability": "Magic & Abilities",
+      "ability": "Abilities",
+      "magic_ability": "Magic Abilities",
       "magic_system": "Magic Systems",
       "event": "Events"
     },
@@ -261,6 +262,7 @@
       "region": "Region",
       "object": "Object",
       "ability": "Ability",
+      "magic_ability": "Magic Ability",
       "magic_system": "Magic System",
       "event": "Event"
     },
@@ -413,6 +415,9 @@
     "mechanism": "Mechanism",
     "activation_conditions": "Activation Conditions",
     "power_level": "Power Level",
-    "magic_system": "Magic System"
+    "magic_system": "Magic System",
+    "aliases": "Aliases",
+    "aliasesPlaceholder": "Aliases separated by comma",
+    "aliasesHint": "Alternative names or nicknames for this entity, separated by commas"
   }
 }

@@ -249,7 +249,8 @@
       "continent": "יבשות",
       "region": "אזורים",
       "object": "חפצים",
-      "ability": "קסם ויכולות",
+      "ability": "יכולות",
+      "magic_ability": "יכולות קסם",
       "magic_system": "מערכות קסם",
       "event": "אירועים"
     },
@@ -261,6 +262,7 @@
       "region": "אזור",
       "object": "חפץ",
       "ability": "יכולת",
+      "magic_ability": "יכולת קסם",
       "magic_system": "מערכת קסם",
       "event": "אירוע"
     },
@@ -413,6 +415,9 @@
     "mechanism": "מנגנון פעולה",
     "activation_conditions": "תנאי הפעלה",
     "power_level": "עוצמה/דרגה",
-    "magic_system": "מערכת קסם"
+    "magic_system": "מערכת קסם",
+    "aliases": "כינויים",
+    "aliasesPlaceholder": "כינויים מופרדים בפסיק",
+    "aliasesHint": "שמות נוספים או כינויים של הישות, מופרדים בפסיק"
   }
 }

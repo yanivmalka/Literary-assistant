@@ -17,9 +17,8 @@ const TYPE_COLORS: Record<string, string> = {
   continent: 'bg-teal-100 text-teal-800',
   region: 'bg-cyan-100 text-cyan-800',
   object: 'bg-amber-100 text-amber-800',
-  ability: 'bg-purple-100 text-purple-800',
-  magic_system: 'bg-violet-100 text-violet-800',
-  magic: 'bg-violet-100 text-violet-800',
+  ability: 'bg-orange-100 text-orange-800',
+  magic_ability: 'bg-purple-100 text-purple-800',
   event: 'bg-rose-100 text-rose-800',
 }
 
@@ -37,7 +36,6 @@ const UNKNOWN_LABEL = 'לא ידוע'
 export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails, onClick }: EntityCardProps) {
   const { t } = useTranslation()
   const typeColor = TYPE_COLORS[entity.entity_type] || 'bg-gray-100 text-gray-800'
-  const typeKey = entity.entity_type === 'magic' ? 'magic_system' : entity.entity_type
   const isCharacter = entity.entity_type === 'character'
 
   return (
@@ -53,7 +51,7 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
           <div className="flex items-center gap-2">
             <h4 className="font-medium text-sm truncate">{entity.name}</h4>
             <span className={`text-xs px-1.5 py-0.5 rounded ${typeColor}`}>
-              {t(`entities.typesSingular.${typeKey}`)}
+              {t(`entities.typesSingular.${entity.entity_type}`)}
             </span>
             {entity.source === 'user' && (
               <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">

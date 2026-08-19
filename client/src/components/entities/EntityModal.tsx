@@ -10,6 +10,7 @@ import {
   ENTITY_TYPE_META,
 } from '@/lib/entityTypes'
 import { useEntityStore, type Entity } from '@/stores/entityStore'
+import { supabase } from '@/lib/supabase'
 
 interface EntityModalProps {
   isOpen: boolean
@@ -38,6 +39,7 @@ export default function EntityModal({
 
   // Form state: all fields as string | null
   const [formData, setFormData] = useState<Record<string, string | null>>({})
+  const [aliasesText, setAliasesText] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -80,6 +82,8 @@ export default function EntityModal({
     // Expand all groups by default
     setExpandedGroups(new Set(fieldGroups.map(g => g.key)))
     setShowDeleteConfirm(false)
+    // Initialize aliases
+    setAliasesText(entity?.aliases?.join(', ') || '')
   }, [isOpen, entity, entityType, allFields, fieldGroups])
 
   const handleFieldChange = useCallback((field: string, value: string) => {
@@ -101,6 +105,25 @@ export default function EntityModal({
     })
   }, [])
 
+  const syncAliases = async (entityId: string) => {
+    const newAliases = aliasesText
+      .split(',')
+      .map(a => a.trim())
+      .filter(a => a.length > 0)
+
+    // Delete existing aliases and re-insert (simpler than diffing)
+    await supabase
+      .from('knowledge_entity_aliases')
+      .delete()
+      .eq('entity_id', entityId)
+
+    if (newAliases.length > 0) {
+      await supabase
+        .from('knowledge_entity_aliases')
+        .insert(newAliases.map(alias => ({ entity_id: entityId, alias })))
+    }
+  }
+
   const handleSave = async () => {
     setSaving(true)
     try {
@@ -119,11 +142,17 @@ export default function EntityModal({
           description: (structuredFields.description as string) || null,
           structured_fields: structuredFields,
         })
+        // Sync aliases
+        await syncAliases(entity.id)
       } else {
         // Create new entity
         const name = (structuredFields.name as string) || 'ישות חדשה'
         structuredFields.name = name
-        await createEntity(projectId, entityType, structuredFields)
+        const created = await createEntity(projectId, entityType, structuredFields)
+        // Sync aliases for new entity
+        if (created) {
+          await syncAliases(created.id)
+        }
       }
 
       onSaved?.()
@@ -182,6 +211,22 @@ export default function EntityModal({
 
         {/* Body — scrollable */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {/* Aliases */}
+          <div className="border rounded-lg p-4">
+            <label htmlFor="aliases-input" className="block text-sm font-medium text-muted-foreground mb-1">
+              {t('entityFields.aliases')}
+            </label>
+            <input
+              id="aliases-input"
+              type="text"
+              value={aliasesText}
+              onChange={e => setAliasesText(e.target.value)}
+              placeholder={t('entityFields.aliasesPlaceholder')}
+              className="w-full px-3 py-2 border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            />
+            <p className="text-xs text-muted-foreground mt-1">{t('entityFields.aliasesHint')}</p>
+          </div>
+
           {fieldGroups.map(group => (
             <div key={group.key} className="border rounded-lg overflow-hidden">
               {/* Group header */}

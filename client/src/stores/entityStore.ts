@@ -81,12 +81,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         .order('canonical_name')
 
       if (filters?.type) {
-        // Handle magic/magic_system dual type for backwards compatibility
-        if (filters.type === 'magic') {
-          query = query.in('entity_type', ['magic', 'magic_system'])
-        } else {
-          query = query.eq('entity_type', filters.type)
-        }
+        query = query.eq('entity_type', filters.type)
       }
 
       const { data, error } = await query
@@ -95,13 +90,30 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         console.error('Failed to fetch entities:', error)
         set({ entities: [] })
       } else {
+        // Fetch aliases for all retrieved entities
+        const entityIds = (data || []).map((e: Record<string, unknown>) => e.id as string)
+        let aliasMap = new Map<string, string[]>()
+        if (entityIds.length > 0) {
+          const { data: aliasData } = await supabase
+            .from('knowledge_entity_aliases')
+            .select('entity_id, alias')
+            .in('entity_id', entityIds)
+          if (aliasData) {
+            for (const row of aliasData) {
+              const list = aliasMap.get(row.entity_id) || []
+              list.push(row.alias)
+              aliasMap.set(row.entity_id, list)
+            }
+          }
+        }
+
         // Map knowledge_entities format to Entity interface
         const mapped: Entity[] = (data || []).map((e: Record<string, unknown>) => ({
           id: e.id as string,
           name: e.canonical_name as string,
           entity_type: e.entity_type as string,
           status: 'confirmed',
-          aliases: [],
+          aliases: aliasMap.get(e.id as string) || [],
           metadata: (e.attributes as Record<string, unknown>) || {},
           created_at: e.created_at as string,
           updated_at: e.updated_at as string,
