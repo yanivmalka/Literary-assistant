@@ -29,7 +29,7 @@ export default function EntityReviewPage() {
   } = useEntityStore()
 
   const [typeFilter, setTypeFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('pending')
+  const [statusFilter, setStatusFilter] = useState('')
 
   useEffect(() => {
     if (projectId) {

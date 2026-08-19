@@ -395,6 +395,9 @@ Deno.serve(async (req) => {
             attributes: entity.attributes,
             raw_extraction_id: rawExtractionId,
             updated_at: new Date().toISOString(),
+            layer: "main",
+            structured_fields: {},
+            source: "gemini",
           },
           { onConflict: "version_id,canonical_name" }
         )
