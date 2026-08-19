@@ -513,9 +513,16 @@ Deno.serve(async (req) => {
       return errorResponse("Missing version_id, project_id, document_id, user_id, or active target_branch_id. AI extraction cannot write directly to Main.", 400);
     }
 
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiApiKey) {
-      return errorResponse("GEMINI_API_KEY not configured", 500);
+    const authHeader = req.headers.get("Authorization");
+    const authClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader ?? "" } } },
+    );
+    const { data: { user: authenticatedUser }, error: authError } = await authClient.auth.getUser();
+
+    if (authError || !authenticatedUser || authenticatedUser.id !== body.user_id) {
+      return errorResponse("Extraction rejected: authenticated user does not match the extraction request.", 401);
     }
 
     const supabase = createClient(
@@ -530,7 +537,7 @@ Deno.serve(async (req) => {
       .select("id")
       .eq("id", body.target_branch_id)
       .eq("project_id", body.project_id)
-      .eq("user_id", body.user_id)
+      .eq("user_id", authenticatedUser.id)
       .eq("is_current", true)
       .eq("status", "active")
       .maybeSingle();
@@ -540,6 +547,11 @@ Deno.serve(async (req) => {
     }
     if (!activeBranch) {
       return errorResponse("Extraction rejected: target_branch_id is not the active Branch for this project. AI cannot modify Main directly.", 400);
+    }
+
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiApiKey) {
+      return errorResponse("GEMINI_API_KEY not configured", 500);
     }
 
     console.log(`[extract-knowledge] Version: 2.5.0 | Branch: ${activeBranch.id} | Main writes disabled`);
@@ -686,12 +698,12 @@ Deno.serve(async (req) => {
 
     for (const entity of normalizedEntities) {
       // Check if entity already exists — exact match or name-prefix match
-      let existing: { id: string; structured_fields: unknown; attributes: unknown; source: string; description: string | null; entity_types: string[]; canonical_name?: string } | null = null;
+      let existing: { id: string; structured_fields: unknown; attributes: unknown; source: string; description: string | null; entity_type: string; entity_types: string[]; canonical_name: string } | null = null;
 
       // 1. Try exact match (case-insensitive)
       const { data: exactMatch } = await supabase
         .from("knowledge_entities")
-        .select("id, canonical_name, structured_fields, attributes, source, description, entity_types")
+        .select("id, canonical_name, entity_type, structured_fields, attributes, source, description, entity_types")
         .eq("project_id", body.project_id)
         .eq("user_id", body.user_id)
         .eq("layer", "main")
@@ -705,7 +717,7 @@ Deno.serve(async (req) => {
         //    e.g., existing "ליאו" matches new "ליאו פרוסט" → update existing to full name
         const { data: prefixMatches } = await supabase
           .from("knowledge_entities")
-          .select("id, canonical_name, structured_fields, attributes, source, description, entity_types")
+          .select("id, canonical_name, entity_type, structured_fields, attributes, source, description, entity_types")
           .eq("project_id", body.project_id)
           .eq("user_id", body.user_id)
           .eq("layer", "main")
@@ -729,62 +741,30 @@ Deno.serve(async (req) => {
       let entityId: string;
 
       if (existing) {
-        const existingStructured = (existing.structured_fields || {}) as Record<string, unknown>;
-        const existingAttrs = (existing.attributes || {}) as Record<string, unknown>;
-        const isUserSource = existing.source === "user";
-        const existingName = (existing as { canonical_name?: string }).canonical_name || "";
+        const { overrides, baseValues } = buildOverlayChanges(existing, entity);
+        const { error: overlayError } = await supabase
+          .from("knowledge_branch_entities")
+          .upsert(
+            {
+              branch_id: activeBranch.id,
+              source_entity_id: existing.id,
+              entity_id: existing.id,
+              project_id: body.project_id,
+              user_id: body.user_id,
+              overrides,
+              base_values: baseValues,
+              is_modified: Object.keys(overrides).length > 0,
+              modified_fields: Object.keys(overrides),
+            },
+            { onConflict: "branch_id,entity_id" }
+          );
 
-        // If new name is longer/more complete, upgrade canonical_name and save old as alias
-        const shouldUpgradeName = entity.canonical_name.length > existingName.length && !isUserSource;
-        const newCanonicalName = shouldUpgradeName ? entity.canonical_name : existingName;
-
-        const mergedStructured: Record<string, unknown> = { ...existingStructured };
-        for (const [key, newVal] of Object.entries(entity.structured_fields)) {
-          if (newVal == null) continue;
-          const existingVal = existingStructured[key];
-          if (existingVal != null && existingVal !== "") continue;
-          mergedStructured[key] = newVal;
-        }
-
-        const mergedAttrs: Record<string, unknown> = { ...existingAttrs };
-        for (const [key, newVal] of Object.entries(entity.attributes)) {
-          if (newVal == null) continue;
-          if (mergedAttrs[key] != null) continue;
-          mergedAttrs[key] = newVal;
-        }
-
-        const existingTypes = (existing.entity_types || []) as string[];
-        const mergedTypes = [...new Set([...existingTypes, ...entity.entity_types])];
-        const mergedDescription = existing.description || entity.description;
-
-        const { error: updateError } = await supabase
-          .from("knowledge_entities")
-          .update({
-            ...(shouldUpgradeName ? { canonical_name: newCanonicalName } : {}),
-            structured_fields: mergedStructured,
-            attributes: mergedAttrs,
-            entity_types: mergedTypes,
-            description: mergedDescription,
-            raw_extraction_id: rawExtractionId,
-            updated_at: new Date().toISOString(),
-            ...(isUserSource ? {} : { source: "ai" }),
-          })
-          .eq("id", existing.id);
-
-        if (updateError) {
-          console.error(`Failed to update entity '${entity.canonical_name}':`, updateError.message);
+        if (overlayError) {
+          console.error(`Failed to create overlay for '${entity.canonical_name}':`, overlayError.message);
           continue;
         }
-
-        // If name was upgraded, save old name as alias
-        if (shouldUpgradeName && existingName && existingName !== newCanonicalName) {
-          await supabase.from("knowledge_entity_aliases").upsert(
-            { entity_id: existing.id, alias: existingName },
-            { onConflict: "entity_id,alias" }
-          );
-        }
-
         entityId = existing.id;
+        branchEntitiesSaved++;
       } else {
         const { data: inserted, error: insertError } = await supabase
           .from("knowledge_entities")
@@ -793,6 +773,7 @@ Deno.serve(async (req) => {
             document_id: body.document_id,
             version_id: body.version_id,
             user_id: body.user_id,
+            branch_id: activeBranch.id,
             canonical_name: entity.canonical_name,
             entity_type: entity.entity_type,
             entity_types: entity.entity_types,
@@ -800,7 +781,7 @@ Deno.serve(async (req) => {
             attributes: entity.attributes,
             raw_extraction_id: rawExtractionId,
             updated_at: new Date().toISOString(),
-            layer: "main",
+            layer: "branch",
             structured_fields: entity.structured_fields,
             source: "ai",
           })
@@ -808,48 +789,50 @@ Deno.serve(async (req) => {
           .single();
 
         if (insertError || !inserted) {
-          console.error(`Failed to insert entity '${entity.canonical_name}':`, insertError?.message);
+          console.error(`Failed to insert branch entity '${entity.canonical_name}':`, insertError?.message);
           continue;
         }
         entityId = inserted.id;
+
+        const { error: branchMappingError } = await supabase
+          .from("knowledge_branch_entities")
+          .upsert(
+            {
+              branch_id: activeBranch.id,
+              source_entity_id: null,
+              entity_id: entityId,
+              project_id: body.project_id,
+              user_id: body.user_id,
+              overrides: {
+                canonical_name: entity.canonical_name,
+                entity_type: entity.entity_type,
+                description: entity.description,
+                attributes: entity.attributes,
+                structured_fields: entity.structured_fields,
+              },
+              base_values: {},
+              is_modified: true,
+              modified_fields: ["canonical_name", "entity_type", "description", "attributes", "structured_fields"],
+            },
+            { onConflict: "branch_id,entity_id" }
+          );
+
+        if (branchMappingError) {
+          console.error(`Failed to map branch-only entity '${entity.canonical_name}':`, branchMappingError.message);
+          continue;
+        }
+        branchEntitiesSaved++;
       }
 
       entityIdMap.set(entity.canonical_name.toLowerCase(), entityId);
       entitiesSaved++;
 
-      if (body.target_branch_id) {
-        const { error: branchError } = await supabase
-          .from("knowledge_branch_entities")
-          .upsert(
-            {
-              branch_id: body.target_branch_id,
-              source_entity_id: entityId,
-              project_id: body.project_id,
-              user_id: body.user_id,
-              canonical_name: entity.canonical_name,
-              entity_type: entity.entity_type,
-              entity_types: entity.entity_types || [],
-              description: entity.description || null,
-              attributes: entity.attributes || {},
-              structured_fields: entity.structured_fields || {},
-              is_modified: false,
-              modified_fields: [],
-            },
-            { onConflict: "branch_id,source_entity_id" }
-          );
-        if (branchError) {
-          console.error(`Failed to copy entity '${entity.canonical_name}' to branch:`, branchError.message);
-        } else {
-          branchEntitiesSaved++;
-        }
-      }
-
       // Mentions
       for (const pos of entity.chunk_positions) {
         const ev = entity.evidence.length > 0 ? entity.evidence[0]?.slice(0, 500) : null;
         await supabase.from("knowledge_entity_mentions").upsert(
-          { entity_id: entityId, chunk_position: pos, evidence: ev },
-          { onConflict: "entity_id,chunk_position,evidence" }
+          { entity_id: entityId, branch_id: activeBranch.id, chunk_position: pos, evidence: ev },
+          { onConflict: "entity_id,chunk_position,evidence,branch_id" }
         );
         mentionsSaved++;
       }
@@ -857,8 +840,8 @@ Deno.serve(async (req) => {
       if (entity.evidence.length > 1 && entity.chunk_positions.length > 0) {
         for (let i = 1; i < entity.evidence.length; i++) {
           await supabase.from("knowledge_entity_mentions").upsert(
-            { entity_id: entityId, chunk_position: entity.chunk_positions[0], evidence: entity.evidence[i]?.slice(0, 500) },
-            { onConflict: "entity_id,chunk_position,evidence" }
+            { entity_id: entityId, branch_id: activeBranch.id, chunk_position: entity.chunk_positions[0], evidence: entity.evidence[i]?.slice(0, 500) },
+            { onConflict: "entity_id,chunk_position,evidence,branch_id" }
           );
           mentionsSaved++;
         }
@@ -868,8 +851,8 @@ Deno.serve(async (req) => {
       for (const alias of entity.aliases) {
         if (!alias) continue;
         await supabase.from("knowledge_entity_aliases").upsert(
-          { entity_id: entityId, alias },
-          { onConflict: "entity_id,alias" }
+          { entity_id: entityId, alias, branch_id: activeBranch.id },
+          { onConflict: "entity_id,alias,branch_id" }
         );
         aliasesSaved++;
       }
@@ -895,8 +878,9 @@ Deno.serve(async (req) => {
           evidence: rel.evidence?.join(" | ")?.slice(0, 1000) || null,
           chunk_position: rel.chunk_positions?.[0] || null,
           raw_extraction_id: rawExtractionId,
+          branch_id: activeBranch.id,
         },
-        { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type" }
+        { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" }
       );
       relationshipsSaved++;
     }
@@ -923,8 +907,9 @@ Deno.serve(async (req) => {
             description: event.what_happened || event.description || null,
             attributes: { location: event.location || null, participants: event.participants || [] },
             raw_extraction_id: rawExtractionId,
+            branch_id: activeBranch.id,
           },
-          { onConflict: "version_id,name" }
+          { onConflict: "version_id,name,branch_id" }
         )
         .select("id")
         .single();
@@ -936,8 +921,8 @@ Deno.serve(async (req) => {
       for (const pos of event.chunk_positions || []) {
         const ev = event.evidence?.length ? event.evidence[0]?.slice(0, 500) : null;
         await supabase.from("knowledge_event_mentions").upsert(
-          { event_id: eventId, chunk_position: pos, evidence: ev },
-          { onConflict: "event_id,chunk_position,evidence" }
+          { event_id: eventId, branch_id: activeBranch.id, chunk_position: pos, evidence: ev },
+          { onConflict: "event_id,chunk_position,evidence,branch_id" }
         );
         eventMentionsSaved++;
       }
@@ -982,6 +967,7 @@ Deno.serve(async (req) => {
           event_participants_saved: eventParticipantsSaved,
           branch_entities_saved: branchEntitiesSaved,
           raw_extraction_id: rawExtractionId,
+          branch_id: activeBranch.id,
           normalized_entity_count: normalizedEntities.length,
         },
       }),

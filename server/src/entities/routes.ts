@@ -322,6 +322,16 @@ router.post(
     try {
       const { version_id, project_id, user_id, offset = 0, limit = 3 } = req.body
 
+      // This route is permanently disabled because it writes to legacy Main-scoped tables.
+      // All AI extraction must use the Branch-validated extract-knowledge function.
+      const legacyExtractionDisabled = true
+      if (legacyExtractionDisabled) {
+        res.status(410).json({
+          error: 'Legacy entity extraction is disabled. Use extract-knowledge with an active target_branch_id.',
+        })
+        return
+      }
+
       if (!version_id || !project_id || !user_id) {
         res.status(400).json({ error: 'version_id, project_id, and user_id are required' })
         return

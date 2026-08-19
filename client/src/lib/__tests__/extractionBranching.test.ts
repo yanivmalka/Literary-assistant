@@ -1,272 +1,129 @@
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import {
+  buildBranchEntityAliasRecord,
+  buildBranchEntityMentionRecord,
+  buildBranchEntityRecord,
+  buildEntityOverlayRecord,
+  buildExtractionRequest,
+  buildRawExtractionRecord,
+  validateBranchContext,
+} from '../extractionBranching'
 
-// ============================================
-// Minimal Implementations for Testing
-// ============================================
-
-export function validateBranchContextSync(branchId: string | null | undefined): void {
-  if (!branchId) {
-    throw new Error(
-      'Extraction rejected: No active branch. ' +
-      'AI is not permitted to modify Main directly. ' +
-      'Create or activate a Branch first.'
-    )
-  }
-}
-
-export function createBranchEntitySync(
-  branchId: string | null | undefined,
-  entityData: Record<string, unknown>
-): Record<string, unknown> {
-  validateBranchContextSync(branchId)
-
-  return {
-    layer: 'branch',
-    branch_id: branchId,
-    source: 'ai',
-    ...entityData,
-  }
-}
-
-export function createEntityOverlaySync(
-  branchId: string | null | undefined,
-  mainEntityId: string,
-  overrides: Record<string, unknown>,
-  baseValues: Record<string, unknown>
-): Record<string, unknown> {
-  validateBranchContextSync(branchId)
-
-  return {
-    branch_id: branchId,
-    source_entity_id: mainEntityId,
-    entity_id: mainEntityId,
-    overrides,
-    base_values: baseValues,
-    is_modified: Object.keys(overrides).length > 0,
-    modified_fields: Object.keys(overrides),
-  }
-}
-
-// ============================================
-// Test Suite: validateBranchContext
-// ============================================
-
-describe('validateBranchContext', () => {
-  it('should throw error when branch_id is null', () => {
-    expect(() => validateBranchContextSync(null)).toThrow(
-      'Extraction rejected: No active branch'
-    )
+describe('AI extraction branch routing', () => {
+  it('rejects extraction when there is no active branch', () => {
+    expect(() => validateBranchContext(null)).toThrow('No active branch')
+    expect(() => validateBranchContext(undefined)).toThrow('AI is not permitted to modify Main directly')
+    expect(() => buildExtractionRequest('v1', 'p1', 'd1', 'u1', '', 0, 2)).toThrow('No active branch')
   })
 
-  it('should throw error when branch_id is undefined', () => {
-    expect(() => validateBranchContextSync(undefined)).toThrow(
-      'Extraction rejected: No active branch'
-    )
+  it('requires and forwards the active branch in every extraction request', () => {
+    expect(buildExtractionRequest('v1', 'p1', 'd1', 'u1', 'branch-1', 0, 2)).toEqual({
+      version_id: 'v1',
+      project_id: 'p1',
+      document_id: 'd1',
+      user_id: 'u1',
+      target_branch_id: 'branch-1',
+      offset: 0,
+      limit: 2,
+    })
   })
 
-  it('should not throw error when branch_id is valid', () => {
-    expect(() => validateBranchContextSync('branch-123')).not.toThrow()
-  })
-
-  it('should emphasize AI cannot modify Main', () => {
-    try {
-      validateBranchContextSync(null)
-    } catch (err: any) {
-      expect(err.message).toContain('AI is not permitted to modify Main directly')
-    }
-  })
-})
-
-// ============================================
-// Test Suite: createBranchEntity
-// ============================================
-
-describe('createBranchEntity', () => {
-  it('should create entity with layer=branch and branch_id set', () => {
-    const result = createBranchEntitySync('branch-1', {
+  it('creates a new AI entity as Branch-only, never Main', () => {
+    const row = buildBranchEntityRecord('p1', 'u1', 'branch-1', {
       canonical_name: 'New Character',
       entity_type: 'character',
+      description: 'Found by AI',
     })
 
-    expect(result.layer).toBe('branch')
-    expect(result.branch_id).toBe('branch-1')
-    expect(result.source).toBe('ai')
-  })
-
-  it('should throw error when branch_id is null', () => {
-    expect(() =>
-      createBranchEntitySync(null, {
-        canonical_name: 'New Character',
-        entity_type: 'character',
-      })
-    ).toThrow('Extraction rejected: No active branch')
-  })
-
-  it('should preserve entity data', () => {
-    const entityData = {
-      canonical_name: 'Hero',
-      entity_type: 'character',
-      description: 'Main protagonist',
-    }
-
-    const result = createBranchEntitySync('branch-1', entityData)
-
-    expect(result.canonical_name).toBe('Hero')
-    expect(result.entity_type).toBe('character')
-    expect(result.description).toBe('Main protagonist')
-  })
-})
-
-// ============================================
-// Test Suite: createEntityOverlay
-// ============================================
-
-describe('createEntityOverlay', () => {
-  it('should create overlay with overrides and base_values', () => {
-    const overrides = { canonical_name: 'Modified' }
-    const baseValues = { canonical_name: 'Original' }
-
-    const result = createEntityOverlaySync('branch-1', 'main-entity-1', overrides, baseValues)
-
-    expect(result.source_entity_id).toBe('main-entity-1')
-    expect(result.overrides).toEqual(overrides)
-    expect(result.base_values).toEqual(baseValues)
-  })
-
-  it('should calculate modified_fields from overrides', () => {
-    const overrides = {
-      canonical_name: 'Modified',
-      description: 'New desc',
-    }
-
-    const result = createEntityOverlaySync('branch-1', 'main-entity-1', overrides, {})
-
-    expect(result.modified_fields).toEqual(['canonical_name', 'description'])
-  })
-
-  it('should set is_modified=true when overrides exist', () => {
-    const result = createEntityOverlaySync('branch-1', 'main-entity-1', { field: 'value' }, {})
-
-    expect(result.is_modified).toBe(true)
-  })
-
-  it('should set is_modified=false when no overrides', () => {
-    const result = createEntityOverlaySync('branch-1', 'main-entity-1', {}, {})
-
-    expect(result.is_modified).toBe(false)
-  })
-
-  it('should throw error when branch_id is null', () => {
-    expect(() => createEntityOverlaySync(null, 'main-entity-1', {}, {})).toThrow(
-      'Extraction rejected: No active branch'
-    )
-  })
-})
-
-// ============================================
-// Integration Tests
-// ============================================
-
-describe('AI Extraction Branch Routing - Core Logic', () => {
-  it('should prevent AI from modifying Main - no branch context', () => {
-    // Attempt to create entity without branch
-    expect(() =>
-      createBranchEntitySync(null, {
-        canonical_name: 'New Entity',
-        entity_type: 'character',
-      })
-    ).toThrow('No active branch')
-
-    // Attempt to create overlay without branch
-    expect(() => createEntityOverlaySync(null, 'main-1', {}, {})).toThrow('No active branch')
-  })
-
-  it('should always include branch_id in creation', () => {
-    const result1 = createBranchEntitySync('branch-1', {
-      canonical_name: 'Character A',
-      entity_type: 'character',
+    expect(row).toMatchObject({
+      project_id: 'p1',
+      user_id: 'u1',
+      layer: 'branch',
+      branch_id: 'branch-1',
+      source: 'ai',
     })
-
-    const result2 = createBranchEntitySync('branch-2', {
-      canonical_name: 'Character A',
-      entity_type: 'character',
-    })
-
-    expect(result1.branch_id).toBe('branch-1')
-    expect(result2.branch_id).toBe('branch-2')
-    expect(result1.branch_id).not.toBe(result2.branch_id)
+    expect(row.layer).not.toBe('main')
+    expect(row.branch_id).not.toBeNull()
   })
 
-  it('should track modifications in overlay', () => {
-    const overlay1 = createEntityOverlaySync(
+  it('creates an override for an existing Main entity with base values', () => {
+    const overlay = buildEntityOverlayRecord(
       'branch-1',
-      'main-1',
-      { name: 'Modified' },
-      { name: 'Original' }
+      'main-entity-1',
+      {
+        description: 'Branch description',
+        'structured_fields.age': '30',
+      },
+      {
+        description: 'Main description',
+        'structured_fields.age': '25',
+      },
     )
 
-    const overlay2 = createEntityOverlaySync('branch-1', 'main-1', {}, {})
-
-    expect(overlay1.is_modified).toBe(true)
-    expect(overlay2.is_modified).toBe(false)
-    expect((overlay1.modified_fields as string[]).includes('name')).toBe(true)
-    expect((overlay2.modified_fields as string[]).length).toBe(0)
+    expect(overlay).toMatchObject({
+      branch_id: 'branch-1',
+      source_entity_id: 'main-entity-1',
+      entity_id: 'main-entity-1',
+      overrides: {
+        description: 'Branch description',
+        'structured_fields.age': '30',
+      },
+      base_values: {
+        description: 'Main description',
+        'structured_fields.age': '25',
+      },
+      is_modified: true,
+    })
+    expect(overlay).not.toHaveProperty('canonical_name')
   })
 
-  it('should enforce branch isolation in entity creation', () => {
-    // Branch 1 creates entity
-    const entity1 = createBranchEntitySync('branch-1', {
+  it('routes raw extraction records to the active Branch', () => {
+    const row = buildRawExtractionRecord('p1', 'd1', 'v1', 'u1', 'branch-1', {
+      model: 'test-model',
+      raw_response: { entities: [] },
+    })
+
+    expect(row).toMatchObject({
+      project_id: 'p1',
+      document_id: 'd1',
+      version_id: 'v1',
+      user_id: 'u1',
+      branch_id: 'branch-1',
+    })
+    expect(() => buildRawExtractionRecord('p1', 'd1', 'v1', 'u1', '', {})).toThrow('No active branch')
+  })
+
+  it('routes AI evidence and aliases to the active Branch', () => {
+    expect(buildBranchEntityMentionRecord('entity-1', 4, 'Evidence text', 'branch-1')).toEqual({
+      entity_id: 'entity-1',
+      chunk_position: 4,
+      evidence: 'Evidence text',
+      branch_id: 'branch-1',
+    })
+    expect(buildBranchEntityAliasRecord('entity-1', 'The Hero', 'branch-1')).toEqual({
+      entity_id: 'entity-1',
+      alias: 'The Hero',
+      branch_id: 'branch-1',
+    })
+    expect(() => buildBranchEntityMentionRecord('entity-1', 4, 'Evidence text', '')).toThrow('No active branch')
+    expect(() => buildBranchEntityAliasRecord('entity-1', 'The Hero', undefined as unknown as string)).toThrow('No active branch')
+  })
+
+  it('keeps two Branches isolated in every generated record', () => {
+    const branchOneEntity = buildBranchEntityRecord('p1', 'u1', 'branch-1', {
       canonical_name: 'Same Name',
       entity_type: 'character',
     })
-
-    // Branch 2 creates entity with same name
-    const entity2 = createBranchEntitySync('branch-2', {
+    const branchTwoEntity = buildBranchEntityRecord('p1', 'u1', 'branch-2', {
       canonical_name: 'Same Name',
       entity_type: 'character',
     })
+    const branchOneMention = buildBranchEntityMentionRecord('entity-1', 1, 'same evidence', 'branch-1')
+    const branchTwoMention = buildBranchEntityMentionRecord('entity-1', 1, 'same evidence', 'branch-2')
 
-    // Both should have their own branch_id
-    expect(entity1.branch_id).toBe('branch-1')
-    expect(entity2.branch_id).toBe('branch-2')
-    expect(entity1.branch_id).not.toEqual(entity2.branch_id)
-  })
-
-  it('should maintain base_values for conflict detection', () => {
-    const baseValues = {
-      age: '25',
-      name: 'Original Name',
-    }
-
-    const overlay = createEntityOverlaySync('branch-1', 'main-1', { age: '30' }, baseValues)
-
-    // Base values preserved
-    expect(overlay.base_values).toEqual(baseValues)
-    // Only changed field in overrides
-    expect(overlay.overrides).toEqual({ age: '30' })
-    // Name not in overrides (unchanged)
-    expect((overlay.overrides as any).name).toBeUndefined()
-  })
-
-  it('should require branch context for all extraction operations', () => {
-    // Validation must happen before ANY operation
-    const operations = [
-      () => createBranchEntitySync(null, { canonical_name: 'Test', entity_type: 'char' }),
-      () => createEntityOverlaySync(null, 'entity', {}, {}),
-    ]
-
-    operations.forEach((op) => {
-      expect(op).toThrow('Extraction rejected: No active branch')
-    })
-  })
-
-  it('should mark AI-sourced entities correctly', () => {
-    const entity = createBranchEntitySync('branch-1', {
-      canonical_name: 'AI Found',
-      entity_type: 'character',
-    })
-
-    expect(entity.source).toBe('ai')
-    expect(entity.layer).toBe('branch')
+    expect(branchOneEntity.branch_id).toBe('branch-1')
+    expect(branchTwoEntity.branch_id).toBe('branch-2')
+    expect(branchOneEntity.branch_id).not.toBe(branchTwoEntity.branch_id)
+    expect(branchOneMention.branch_id).not.toBe(branchTwoMention.branch_id)
   })
 })

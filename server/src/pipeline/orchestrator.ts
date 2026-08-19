@@ -11,8 +11,6 @@ import { extractDocument } from '../documents/extractors/index.js'
 import { detectStructure } from '../documents/structure-detector.js'
 import { chunkDocument, mergeSmallChunks, loadChunkerConfig } from '../documents/chunker.js'
 import { generateEmbeddingsForVersion } from '../documents/embeddings.js'
-import { extractEntitiesFromVersion, saveExtractedEntities } from '../entities/extractor.js'
-import { extractAttributesForProject } from '../entities/attributes.js'
 import { detectContradictions } from '../entities/contradictions.js'
 import type { PipelineStage, StageResult, ErrorCategory } from './types.js'
 import { PIPELINE_STAGES, STAGE_START_STATUS, STAGE_TO_STATUS } from './types.js'
@@ -346,40 +344,27 @@ async function runIndexing(versionId: string): Promise<StageResult> {
  * Stage: Extract entities from chunks using AI.
  * Skips gracefully if no CompletionProvider available.
  */
-async function runEntityExtraction(versionId: string, projectId: string, userId: string): Promise<StageResult> {
-  const result = await extractEntitiesFromVersion(versionId, projectId, userId)
-
-  if (result.error) {
-    // Check if this is a "no provider" skip
-    if (result.error.includes('No completion provider') || result.error.includes('not available')) {
-      return { skipped: true, success: true, skipReason: result.error }
-    }
-    return { success: false, error: result.error, errorCategory: 'ai_provider_error' }
+async function runEntityExtraction(_versionId: string, _projectId: string, _userId: string): Promise<StageResult> {
+  // The legacy server extractor writes Main-scoped tables and has no Branch context.
+  // Keep the pipeline safe by refusing this stage until it is routed through the
+  // Branch-validated extract-knowledge function.
+  return {
+    skipped: true,
+    success: true,
+    skipReason: 'Legacy AI entity extraction disabled: active Branch routing is required.',
   }
-
-  // Save extracted entities
-  if (result.entities.length > 0) {
-    await saveExtractedEntities(projectId, userId, result.entities, result.mentionsByEntity)
-  }
-
-  return { success: true }
 }
 
 /**
  * Stage: Extract detailed attributes for entities.
  * Skips if no CompletionProvider available.
  */
-async function runAttributeExtraction(projectId: string): Promise<StageResult> {
-  const result = await extractAttributesForProject(projectId)
-
-  if (result.errors.length > 0 && result.totalExtracted === 0) {
-    const firstError = result.errors[0]
-    if (firstError.includes('No completion provider')) {
-      return { skipped: true, success: true, skipReason: firstError }
-    }
+async function runAttributeExtraction(_projectId: string): Promise<StageResult> {
+  return {
+    skipped: true,
+    success: true,
+    skipReason: 'Legacy AI attribute extraction disabled: active Branch routing is required.',
   }
-
-  return { success: true }
 }
 
 /**
