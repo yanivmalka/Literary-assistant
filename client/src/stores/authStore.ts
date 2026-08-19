@@ -81,33 +81,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   fetchProfile: async () => {
+    // profiles table removed - derive from auth user metadata
     const { user } = get()
     if (!user) return
-
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
-
-    if (data) {
-      set({ profile: data as Profile })
-    }
+    set({ profile: { id: user.id, email: user.email || "", display_name: user.email?.split("@")[0] || "", avatar_url: null, preferred_language: "he", created_at: new Date().toISOString(), updated_at: new Date().toISOString() } as Profile })
   },
 
-  updateProfile: async (updates) => {
-    const { user } = get()
-    if (!user) return
-
-    const { data } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single()
-
-    if (data) {
-      set({ profile: data as Profile })
-    }
+  updateProfile: async (_updates) => {
+    // profiles table removed - no-op
+    console.log("[Auth] updateProfile: profiles table not available")
   },
 }))
