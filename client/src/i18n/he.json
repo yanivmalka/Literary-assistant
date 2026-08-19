@@ -243,15 +243,15 @@
     "mentions": "אזכורים",
     "attributes": "תכונות",
     "types": {
-      "character": "דמות",
-      "location": "מקום",
-      "country": "מדינה",
-      "continent": "יבשת",
-      "region": "אזור",
-      "object": "חפץ",
-      "ability": "יכולת",
-      "magic_system": "מערכת קסם",
-      "event": "אירוע"
+      "character": "דמויות",
+      "location": "מקומות",
+      "country": "מדינות",
+      "continent": "יבשות",
+      "region": "אזורים",
+      "object": "חפצים",
+      "ability": "קסם ויכולות",
+      "magic_system": "מערכות קסם",
+      "event": "אירועים"
     },
     "status": {
       "pending": "ממתין",

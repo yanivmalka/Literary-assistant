@@ -243,15 +243,15 @@
     "mentions": "Mentions",
     "attributes": "Attributes",
     "types": {
-      "character": "Character",
-      "location": "Location",
-      "country": "Country",
-      "continent": "Continent",
-      "region": "Region",
-      "object": "Object",
-      "ability": "Ability",
-      "magic_system": "Magic System",
-      "event": "Event"
+      "character": "Characters",
+      "location": "Locations",
+      "country": "Countries",
+      "continent": "Continents",
+      "region": "Regions",
+      "object": "Objects",
+      "ability": "Magic & Abilities",
+      "magic_system": "Magic Systems",
+      "event": "Events"
     },
     "status": {
       "pending": "Pending",
