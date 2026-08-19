@@ -49,13 +49,14 @@ export function stripNikud(text: string): string {
 
 /**
  * Create a normalized key for entity deduplication.
- * Strips nikud, removes leading ה' הידיעה from words, lowercases.
+ * Strips nikud, removes leading ה' הידיעה, lowercases.
  * Used as the map key when merging entities within a single extraction batch.
  */
 export function normalizeKey(name: string): string {
   let normalized = stripNikud(name).trim();
-  // Remove leading ה from words that have at least 2 more Hebrew letters after it
-  normalized = normalized.replace(/\bה(?=[א-ת]{2,})/g, "");
+  // Remove leading ה from start of string if followed by at least 2 Hebrew letters
+  // Pattern: ^ה + (2+ Hebrew letters)
+  normalized = normalized.replace(/^ה(?=[א-ת]{2,})/g, "");
   return normalized.toLowerCase().trim();
 }
 
