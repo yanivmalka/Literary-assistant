@@ -234,6 +234,7 @@
   "entities": {
     "title": "Entities",
     "subtitle": "Characters, locations, and other elements found in your documents",
+    "subtitleByType": "{{type}} found in your documents",
     "empty": "No entities found yet. Upload a document to get started.",
     "confirm": "Confirm",
     "dismiss": "Dismiss",

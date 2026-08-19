@@ -67,8 +67,12 @@ export default function EntityReviewPage() {
       <ProjectBreadcrumb currentPage="entities" />
 
       <div className="mb-6">
-        <h2 className="text-xl font-bold">{t('entities.title')}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{t('entities.subtitle')}</p>
+        <h2 className="text-xl font-bold">
+          {typeFilter ? t(`entities.types.${typeFilter}`) : t('entities.title')}
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {typeFilter ? t('entities.subtitleByType', { type: t(`entities.types.${typeFilter}`) }) : t('entities.subtitle')}
+        </p>
       </div>
 
       {/* Merge suggestions */}
