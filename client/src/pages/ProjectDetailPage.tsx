@@ -94,7 +94,6 @@ export default function ProjectDetailPage() {
         <KnowledgeOverview
           projectId={projectId!}
           documents={documents}
-          entities={entities}
           contradictions={contradictions}
         />
       </section>
