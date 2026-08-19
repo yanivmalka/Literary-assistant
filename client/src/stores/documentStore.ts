@@ -246,7 +246,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     if (!user) return
 
     // Use Supabase Edge Function (Gemini 3.6 Flash) for entity extraction
-    const BATCH_SIZE = 5
+    const BATCH_SIZE = 2
     let offset = 0
     let done = false
 

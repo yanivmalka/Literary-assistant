@@ -17,7 +17,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-const BATCH_SIZE = 5;
+const BATCH_SIZE = 3;
 
 // ============================================
 // Types
@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: 16384,
+          maxOutputTokens: 65536,
         },
       },
       geminiApiKey,
@@ -309,6 +309,17 @@ Deno.serve(async (req) => {
       ? textParts.map((p: any) => p.text).join("")
       : parts.map((p: any) => p.text || "").filter(Boolean).join("");
     console.log(`[extract-knowledge] Model: ${modelUsed}, Response length: ${responseText.length}, Parts: ${parts.length}, TextParts: ${textParts.length}`);
+
+    // If response is empty, skip this batch (model returned no content - likely MAX_TOKENS with no output)
+    if (!responseText || responseText.trim().length === 0) {
+      console.error(`[extract-knowledge] Empty response from ${modelUsed}. Parts dump: ${JSON.stringify(parts.map((p: any) => ({ hasText: !!p.text, hasThought: !!p.thought, textLen: p.text?.length || 0 })))}`);
+      // Return success with empty results so the loop continues to next batch
+      const done = chunks.length < limit;
+      return new Response(
+        JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, latency_ms: latencyMs }, summary: { entities_saved: 0, mentions_saved: 0, aliases_saved: 0, relationships_saved: 0, events_saved: 0, event_mentions_saved: 0, event_participants_saved: 0, raw_extraction_id: null, normalized_entity_count: 0 } }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const usage = (geminiData as Record<string, unknown>)?.usageMetadata || {};
 
     // Log fallback info if we didn't use the primary model
@@ -317,37 +328,67 @@ Deno.serve(async (req) => {
       console.log(`[extract-knowledge] Fallback chain: ${JSON.stringify(geminiResult.fallbackChain)}`);
     }
 
+
     // ==============================
-    // Step 3: Parse JSON (robust - handles code blocks, leading text, partial JSON)
+    // Step 3: Parse JSON (robust - handles truncated code blocks, partial JSON)
     // ==============================
     let extraction: GeminiExtraction;
+    const jsonToParse = (() => {
+      let text = responseText.trim();
+      // Strip code block markers (opening and closing)
+      if (text.startsWith("```")) {
+        // Remove opening ```json or ```
+        text = text.replace(/^```(?:json)?\s*\n?/, "");
+        // Remove closing ``` if present
+        text = text.replace(/\n?```\s*$/, "");
+      }
+      return text.trim();
+    })();
+
     try {
-      extraction = JSON.parse(responseText);
+      extraction = JSON.parse(jsonToParse);
     } catch {
-      // Try markdown code block
-      const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (codeBlockMatch) {
-        try {
-          extraction = JSON.parse(codeBlockMatch[1].trim());
-        } catch {
-          console.error(`[extract-knowledge] Code block JSON parse failed. First 500: ${responseText.slice(0, 500)}`);
-          return errorResponse("Failed to parse Gemini JSON from code block", 500, responseText.slice(0, 500));
+      // JSON might be truncated due to maxOutputTokens - try to repair by closing brackets
+      const jsonStart = jsonToParse.indexOf("{");
+      if (jsonStart !== -1) {
+        let partial = jsonToParse.slice(jsonStart);
+        // Count open/close braces and brackets to attempt repair
+        let braces = 0, brackets = 0;
+        for (const ch of partial) {
+          if (ch === "{") braces++;
+          else if (ch === "}") braces--;
+          else if (ch === "[") brackets++;
+          else if (ch === "]") brackets--;
         }
-      } else {
-        // Try to find a raw JSON object in the text
-        const jsonStart = responseText.indexOf("{");
-        const jsonEnd = responseText.lastIndexOf("}");
-        if (jsonStart !== -1 && jsonEnd > jsonStart) {
+        // Try truncating at the last complete entry and closing
+        // Find last complete object/array close
+        const lastClose = Math.max(partial.lastIndexOf("}"), partial.lastIndexOf("]"));
+        if (lastClose > 0) {
+          let repaired = partial.slice(0, lastClose + 1);
+          // Close remaining open brackets/braces
+          let rb = 0, rk = 0;
+          for (const ch of repaired) {
+            if (ch === "{") rb++;
+            else if (ch === "}") rb--;
+            else if (ch === "[") rk++;
+            else if (ch === "]") rk--;
+          }
+          while (rk > 0) { repaired += "]"; rk--; }
+          while (rb > 0) { repaired += "}"; rb--; }
           try {
-            extraction = JSON.parse(responseText.slice(jsonStart, jsonEnd + 1));
+            extraction = JSON.parse(repaired);
+            console.log(`[extract-knowledge] JSON was truncated but repaired successfully`);
           } catch {
-            console.error(`[extract-knowledge] Raw JSON parse failed. First 500: ${responseText.slice(0, 500)}`);
+            console.error(`[extract-knowledge] JSON repair failed. First 500: ${responseText.slice(0, 500)}`);
             return errorResponse("Failed to parse Gemini JSON", 500, responseText.slice(0, 500));
           }
         } else {
-          console.error(`[extract-knowledge] No JSON found. First 500: ${responseText.slice(0, 500)}`);
+          console.error(`[extract-knowledge] No closable JSON. First 500: ${responseText.slice(0, 500)}`);
           return errorResponse("Failed to parse Gemini JSON", 500, responseText.slice(0, 500));
         }
+      } else {
+        console.error(`[extract-knowledge] No JSON found. First 500: ${responseText.slice(0, 500)}`);
+        return errorResponse("Failed to parse Gemini JSON", 500, responseText.slice(0, 500));
       }
     }
 
