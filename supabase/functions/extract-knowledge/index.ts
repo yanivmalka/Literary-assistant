@@ -8,6 +8,14 @@
 //
 // Domain rules are imported from _shared/rules/ — the single source of truth
 // for entity extraction behavior. See rules/index.ts for architecture docs.
+//
+// VERSION: 2.3.0
+// FILTERS ACTIVE:
+//   - CHARACTER_RULES.blockPatterns: v2 (family roles + generic descriptors)
+//   - CHARACTER_RULES.minNameLength: 2
+//   - LOCATION_RULES.blockWords: comprehensive generic terms
+//   - Consolidation: prefix matching (ליאו + ליאו פרוסט → merge)
+//   - NO magic_systems extraction
 // ============================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -366,10 +374,16 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
 
   // Apply post-processing filters from centralized rules
   const results: NormalizedEntity[] = [];
+  let filteredCount = 0;
   for (const entity of entityMap.values()) {
     if (!shouldFilterEntity(entity)) {
       results.push(entity);
+    } else {
+      filteredCount++;
     }
+  }
+  if (filteredCount > 0) {
+    console.log(`[extract-knowledge] Filtered out ${filteredCount} entities (generic/invalid)`);
   }
 
   return results;
@@ -411,6 +425,8 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    console.log(`[extract-knowledge] Version: 2.3.0 | Character Filters: blockPatterns-v2 + minNameLength=2 | Location Filters: blockWords | Consolidation: prefix-matching | NO magic_systems`);
 
     const offset = body.offset ?? 0;
     const limit = body.limit ?? BATCH_SIZE;
