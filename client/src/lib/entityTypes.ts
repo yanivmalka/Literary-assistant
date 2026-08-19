@@ -11,7 +11,7 @@
 // Entity Type Constants
 // ============================================
 
-export const ENTITY_TYPES = ['character', 'location', 'object', 'ability', 'magic_ability'] as const
+export const ENTITY_TYPES = ['character', 'location', 'object', 'ability', 'magic_ability', 'event'] as const
 export type EntityType = typeof ENTITY_TYPES[number]
 
 // ============================================
@@ -77,7 +77,7 @@ export interface LocationFields {
   // Basic details
   name: string | null
   location_type: string | null
-  parent_location: string | null
+  // BREAKING CHANGE (MVP): parent_location removed - use bidirectional entity relationships instead
   description: string | null
 
   // Geo hierarchy
@@ -89,15 +89,14 @@ export interface LocationFields {
   // Narrative role
   narrative_impact: string | null
   narrative_importance: string | null
-  related_events: string | null
-  related_characters: string | null
+  // BREAKING CHANGE (MVP): related_events and related_characters removed - use bidirectional entity relationships instead
 }
 
 export const LOCATION_FIELD_GROUPS = [
   {
     key: 'basic',
     labelKey: 'entityFields.groups.basic',
-    fields: ['name', 'location_type', 'parent_location', 'description'] as (keyof LocationFields)[],
+    fields: ['name', 'location_type', 'description'] as (keyof LocationFields)[],
   },
   {
     key: 'geo',
@@ -107,7 +106,7 @@ export const LOCATION_FIELD_GROUPS = [
   {
     key: 'narrative',
     labelKey: 'entityFields.groups.narrative',
-    fields: ['narrative_impact', 'narrative_importance', 'related_events', 'related_characters'] as (keyof LocationFields)[],
+    fields: ['narrative_impact', 'narrative_importance'] as (keyof LocationFields)[],
   },
 ] as const
 
@@ -127,13 +126,12 @@ export interface ObjectFields {
   // Info
   origin: string | null
   current_location: string | null
-  owners: string | null
+  // BREAKING CHANGE (MVP): owners removed - use bidirectional entity relationships instead
 
   // Narrative role
   narrative_importance: string | null
   narrative_impact: string | null
-  related_characters: string | null
-  related_events: string | null
+  // BREAKING CHANGE (MVP): related_characters and related_events removed - use bidirectional entity relationships instead
 }
 
 export const OBJECT_FIELD_GROUPS = [
@@ -145,12 +143,12 @@ export const OBJECT_FIELD_GROUPS = [
   {
     key: 'info',
     labelKey: 'entityFields.groups.info',
-    fields: ['origin', 'current_location', 'owners'] as (keyof ObjectFields)[],
+    fields: ['origin', 'current_location'] as (keyof ObjectFields)[],
   },
   {
     key: 'narrative',
     labelKey: 'entityFields.groups.narrative',
-    fields: ['narrative_importance', 'narrative_impact', 'related_characters', 'related_events'] as (keyof ObjectFields)[],
+    fields: ['narrative_importance', 'narrative_impact'] as (keyof ObjectFields)[],
   },
 ] as const
 
@@ -174,12 +172,11 @@ export interface AbilityFields {
   power_level: string | null
 
   // Connections
-  magic_system: string | null
-  users: string | null
+  // BREAKING CHANGE (MVP): magic_system and users removed - use bidirectional entity relationships instead
 
   // Narrative role
   narrative_impact: string | null
-  related_events: string | null
+  // BREAKING CHANGE (MVP): related_events removed - use bidirectional entity relationships instead
 }
 
 export const ABILITY_FIELD_GROUPS = [
@@ -194,14 +191,40 @@ export const ABILITY_FIELD_GROUPS = [
     fields: ['mechanism', 'activation_conditions', 'limitations', 'cost', 'power_level'] as (keyof AbilityFields)[],
   },
   {
-    key: 'connections',
-    labelKey: 'entityFields.groups.connections',
-    fields: ['magic_system', 'users'] as (keyof AbilityFields)[],
-  },
-  {
     key: 'narrative',
     labelKey: 'entityFields.groups.narrative',
-    fields: ['narrative_impact', 'related_events'] as (keyof AbilityFields)[],
+    fields: ['narrative_impact'] as (keyof AbilityFields)[],
+  },
+] as const
+
+// ============================================
+// 5. Events
+// ============================================
+
+export interface EventFields {
+  // Basic details
+  name: string | null
+  description: string | null
+  narrative_order: string | null
+
+  // Temporal
+  time_label: string | null
+  time_start: string | null
+  time_end: string | null
+  time_precision: string | null
+  temporal_notes: string | null
+}
+
+export const EVENT_FIELD_GROUPS = [
+  {
+    key: 'basic',
+    labelKey: 'entityFields.groups.basic',
+    fields: ['name', 'description', 'narrative_order'] as (keyof EventFields)[],
+  },
+  {
+    key: 'temporal',
+    labelKey: 'entityFields.groups.temporal',
+    fields: ['time_label', 'time_start', 'time_end', 'time_precision', 'temporal_notes'] as (keyof EventFields)[],
   },
 ] as const
 
@@ -214,6 +237,7 @@ export type EntityStructuredFields =
   | LocationFields
   | ObjectFields
   | AbilityFields
+  | EventFields
 
 // ============================================
 // Field group definition type
@@ -240,6 +264,8 @@ export function getFieldGroupsForType(entityType: EntityType): FieldGroup<string
     case 'ability':
     case 'magic_ability':
       return ABILITY_FIELD_GROUPS as unknown as FieldGroup<string>[]
+    case 'event':
+      return EVENT_FIELD_GROUPS as unknown as FieldGroup<string>[]
     default:
       return []
   }
@@ -284,8 +310,8 @@ export const TEXTAREA_FIELDS = new Set([
   'mechanism',
   'activation_conditions',
   'special_properties',
-  'related_events',
-  'related_characters',
+  'temporal_notes',
+  'time_label',
 ])
 
 // ============================================
@@ -298,4 +324,5 @@ export const ENTITY_TYPE_META: Record<EntityType, { labelKey: string; icon: stri
   object: { labelKey: 'entities.types.object', icon: '🗡️', color: 'amber' },
   ability: { labelKey: 'entities.types.ability', icon: '⚔️', color: 'orange' },
   magic_ability: { labelKey: 'entities.types.magic_ability', icon: '✨', color: 'purple' },
+  event: { labelKey: 'entities.types.event', icon: '📅', color: 'indigo' },
 }
