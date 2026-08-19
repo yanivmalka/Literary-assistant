@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { Users, MapPin, Sword, Sparkles, Shield, GitBranch, Plus } from 'lucide-react'
 import { useEntityStore } from '@/stores/entityStore'
 import EntityCard from '@/components/entities/EntityCard'
@@ -21,6 +21,7 @@ export default function EntityReviewPage() {
   const { t } = useTranslation()
   const { projectId } = useParams<{ projectId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const {
     entities,
     mergeSuggestions,
@@ -73,8 +74,7 @@ export default function EntityReviewPage() {
   }
 
   const handleEditEntity = (entity: typeof entities[0]) => {
-    setEditingEntity(entity)
-    setModalOpen(true)
+    navigate(`/projects/${projectId}/entities/${entity.id}`)
   }
 
   const handleModalSaved = () => {

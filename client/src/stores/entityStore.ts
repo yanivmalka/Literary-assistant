@@ -53,9 +53,9 @@ interface EntityState {
   dismissEntity: (projectId: string, entityId: string) => Promise<void>
   mergeEntities: (projectId: string, entityAId: string, entityBId: string) => Promise<void>
   fetchEntityDetail: (projectId: string, entityId: string) => Promise<void>
-  createEntity: (projectId: string, entityType: EntityType, structuredFields: Record<string, unknown>) => Promise<Entity | null>
-  updateEntity: (entityId: string, updates: { canonical_name?: string; description?: string | null; structured_fields?: Record<string, unknown>; attributes?: Record<string, unknown> }) => Promise<boolean>
-  deleteEntity: (entityId: string) => Promise<boolean>
+  createEntity: (projectId: string, entityType: EntityType, structuredFields: Record<string, unknown>, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => Promise<Entity | null>
+  updateEntity: (entityId: string, updates: { canonical_name?: string; description?: string | null; structured_fields?: Record<string, unknown>; attributes?: Record<string, unknown> }, branchContext?: { branchId: string; sourceEntityId: string }) => Promise<boolean>
+  deleteEntity: (entityId: string, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => Promise<boolean>
 }
 
 export const useEntityStore = create<EntityState>((set, get) => ({
@@ -212,12 +212,16 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   // ==============================
   // Create a new entity manually
   // ==============================
-  createEntity: async (projectId, entityType, structuredFields) => {
+  // If a branch is active (passed via branchContext), entity is created in branch.
+  // Otherwise, entity is created in Main.
+  createEntity: async (projectId, entityType, structuredFields, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return null
 
       const name = (structuredFields.name as string) || 'ישות חדשה'
+      const layer = branchContext?.layer || 'main'
+      const branchId = branchContext?.branchId || null
 
       const { data, error } = await supabase
         .from('knowledge_entities')
@@ -230,7 +234,8 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           description: (structuredFields.description as string) || null,
           attributes: {},
           structured_fields: structuredFields,
-          layer: 'main',
+          layer,
+          branch_id: branchId,
           source: 'user',
         })
         .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, created_at, updated_at')
@@ -268,51 +273,160 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   // ==============================
   // Update an existing entity
   // ==============================
-  updateEntity: async (entityId, updates) => {
+  // If branchContext provided with sourceEntityId: create/update overlay in branch
+  // Otherwise: update Main entity directly
+  updateEntity: async (entityId, updates, branchContext?: { branchId: string; sourceEntityId: string }) => {
     try {
-      const dbUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+      if (branchContext) {
+        // Branch mode: create overlay instead of updating Main
+        const { branchId, sourceEntityId } = branchContext
 
-      if (updates.canonical_name !== undefined) dbUpdates.canonical_name = updates.canonical_name
-      if (updates.description !== undefined) dbUpdates.description = updates.description
-      if (updates.structured_fields !== undefined) dbUpdates.structured_fields = updates.structured_fields
-      if (updates.attributes !== undefined) dbUpdates.attributes = updates.attributes
+        // Get current main entity to build base_values
+        const { data: mainEntity } = await supabase
+          .from('knowledge_entities')
+          .select('*')
+          .eq('id', sourceEntityId)
+          .eq('layer', 'main')
+          .single()
 
-      const { error } = await supabase
-        .from('knowledge_entities')
-        .update(dbUpdates)
-        .eq('id', entityId)
+        if (!mainEntity) {
+          console.error('Main entity not found for branch overlay')
+          return false
+        }
 
-      if (error) {
-        console.error('Failed to update entity:', error)
-        return false
-      }
+        // Check if overlay already exists
+        const { data: existingOverlay } = await supabase
+          .from('knowledge_branch_entities')
+          .select('*')
+          .eq('branch_id', branchId)
+          .eq('source_entity_id', sourceEntityId)
+          .maybeSingle()
 
-      // Update local state
-      set({
-        entities: get().entities.map(e => {
-          if (e.id !== entityId) return e
-          return {
-            ...e,
-            name: updates.canonical_name ?? e.name,
-            description: updates.description !== undefined ? updates.description : e.description,
-            structured_fields: updates.structured_fields ?? e.structured_fields,
-            attributes: updates.attributes ?? e.attributes,
-            metadata: updates.attributes ?? e.metadata,
-            updated_at: new Date().toISOString(),
+        // Build overrides object (only changed fields)
+        const overrides: Record<string, unknown> = existingOverlay?.overrides || {}
+
+        if (updates.canonical_name !== undefined) {
+          overrides['canonical_name'] = updates.canonical_name
+        }
+        if (updates.description !== undefined) {
+          overrides['description'] = updates.description
+        }
+        if (updates.structured_fields) {
+          for (const [key, value] of Object.entries(updates.structured_fields)) {
+            overrides[`structured_fields.${key}`] = value
           }
-        }),
-        selectedEntity: get().selectedEntity?.id === entityId
-          ? {
-              ...get().selectedEntity!,
-              name: updates.canonical_name ?? get().selectedEntity!.name,
-              description: updates.description !== undefined ? updates.description : get().selectedEntity!.description,
-              structured_fields: updates.structured_fields ?? get().selectedEntity!.structured_fields,
-              attributes: updates.attributes ?? get().selectedEntity!.attributes,
+        }
+        if (updates.attributes) {
+          for (const [key, value] of Object.entries(updates.attributes)) {
+            overrides[`attributes.${key}`] = value
+          }
+        }
+
+        // Build base_values if new overlay
+        let baseValues = existingOverlay?.base_values || {}
+        if (!existingOverlay) {
+          baseValues = {
+            canonical_name: mainEntity.canonical_name,
+            entity_type: mainEntity.entity_type,
+            description: mainEntity.description,
+          }
+          if (mainEntity.structured_fields) {
+            for (const [key, value] of Object.entries(mainEntity.structured_fields)) {
+              baseValues[`structured_fields.${key}`] = value
+            }
+          }
+          if (mainEntity.attributes) {
+            for (const [key, value] of Object.entries(mainEntity.attributes)) {
+              baseValues[`attributes.${key}`] = value
+            }
+          }
+        }
+
+        if (existingOverlay) {
+          // Update existing overlay
+          const { error } = await supabase
+            .from('knowledge_branch_entities')
+            .update({
+              overrides,
+              is_modified: Object.keys(overrides).length > 0,
+              modified_fields: Object.keys(overrides),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingOverlay.id)
+
+          if (error) {
+            console.error('Failed to update branch overlay:', error)
+            return false
+          }
+        } else {
+          // Create new overlay
+          const { error } = await supabase
+            .from('knowledge_branch_entities')
+            .insert({
+              branch_id: branchId,
+              source_entity_id: sourceEntityId,
+              entity_id: sourceEntityId,
+              project_id: mainEntity.project_id,
+              user_id: mainEntity.user_id,
+              overrides,
+              base_values: baseValues,
+              is_modified: Object.keys(overrides).length > 0,
+              modified_fields: Object.keys(overrides),
+            })
+
+          if (error) {
+            console.error('Failed to create branch overlay:', error)
+            return false
+          }
+        }
+
+        return true
+      } else {
+        // Main mode: update Main entity directly
+        const dbUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+
+        if (updates.canonical_name !== undefined) dbUpdates.canonical_name = updates.canonical_name
+        if (updates.description !== undefined) dbUpdates.description = updates.description
+        if (updates.structured_fields !== undefined) dbUpdates.structured_fields = updates.structured_fields
+        if (updates.attributes !== undefined) dbUpdates.attributes = updates.attributes
+
+        const { error } = await supabase
+          .from('knowledge_entities')
+          .update(dbUpdates)
+          .eq('id', entityId)
+
+        if (error) {
+          console.error('Failed to update entity:', error)
+          return false
+        }
+
+        // Update local state
+        set({
+          entities: get().entities.map(e => {
+            if (e.id !== entityId) return e
+            return {
+              ...e,
+              name: updates.canonical_name ?? e.name,
+              description: updates.description !== undefined ? updates.description : e.description,
+              structured_fields: updates.structured_fields ?? e.structured_fields,
+              attributes: updates.attributes ?? e.attributes,
+              metadata: updates.attributes ?? e.metadata,
               updated_at: new Date().toISOString(),
             }
-          : get().selectedEntity,
-      })
-      return true
+          }),
+          selectedEntity: get().selectedEntity?.id === entityId
+            ? {
+                ...get().selectedEntity!,
+                name: updates.canonical_name ?? get().selectedEntity!.name,
+                description: updates.description !== undefined ? updates.description : get().selectedEntity!.description,
+                structured_fields: updates.structured_fields ?? get().selectedEntity!.structured_fields,
+                attributes: updates.attributes ?? get().selectedEntity!.attributes,
+                updated_at: new Date().toISOString(),
+              }
+            : get().selectedEntity,
+        })
+        return true
+      }
     } catch (error) {
       console.error('Failed to update entity:', error)
       return false
@@ -322,23 +436,57 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   // ==============================
   // Delete an entity
   // ==============================
-  deleteEntity: async (entityId) => {
+  // Only allow delete if:
+  // - branchContext provided with layer='branch' (delete branch-only or overlay), OR
+  // - Entity is branch-only and no reference from Main
+  // Prevent hard delete of Main entities
+  deleteEntity: async (entityId, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => {
     try {
-      const { error } = await supabase
-        .from('knowledge_entities')
-        .delete()
-        .eq('id', entityId)
+      if (branchContext?.layer === 'branch') {
+        // Branch deletion allowed
+        // If it's a branch-only entity, delete directly
+        // If it's an overlay, delete the overlay record
+        const { data: entity } = await supabase
+          .from('knowledge_entities')
+          .select('layer, branch_id')
+          .eq('id', entityId)
+          .single()
 
-      if (error) {
-        console.error('Failed to delete entity:', error)
+        if (entity?.layer === 'branch') {
+          // Branch-only entity: safe to delete
+          const { error } = await supabase
+            .from('knowledge_entities')
+            .delete()
+            .eq('id', entityId)
+
+          if (error) {
+            console.error('Failed to delete branch entity:', error)
+            return false
+          }
+        } else {
+          // Overlay: delete from knowledge_branch_entities
+          const { error } = await supabase
+            .from('knowledge_branch_entities')
+            .delete()
+            .eq('branch_id', branchContext.branchId)
+            .eq('source_entity_id', entityId)
+
+          if (error) {
+            console.error('Failed to delete branch overlay:', error)
+            return false
+          }
+        }
+
+        set({
+          entities: get().entities.filter(e => e.id !== entityId),
+          selectedEntity: get().selectedEntity?.id === entityId ? null : get().selectedEntity,
+        })
+        return true
+      } else {
+        // Main deletion: blocked for safety
+        console.warn('Cannot hard-delete Main entity. Use archive or branch deletion instead.')
         return false
       }
-
-      set({
-        entities: get().entities.filter(e => e.id !== entityId),
-        selectedEntity: get().selectedEntity?.id === entityId ? null : get().selectedEntity,
-      })
-      return true
     } catch (error) {
       console.error('Failed to delete entity:', error)
       return false
