@@ -18,6 +18,9 @@
     "back": "Back",
     "next": "Next"
   },
+  "nav": {
+    "breadcrumb": "Breadcrumb navigation"
+  },
   "home": {
     "welcome": "Build Maps for Your Fantasy Worlds",
     "subtitle": "An interactive tool for fantasy authors to create, edit, and visualize world maps with AI-powered prompt generation",

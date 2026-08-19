@@ -5,6 +5,7 @@ import { Users, MapPin, Sword, Sparkles, GitBranch } from 'lucide-react'
 import { useEntityStore } from '@/stores/entityStore'
 import EntityCard from '@/components/entities/EntityCard'
 import MergeSuggestionComponent from '@/components/entities/MergeSuggestion'
+import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
 
 const TYPE_FILTERS = [
   { value: 'character', label: 'entities.types.character', icon: Users },
@@ -63,6 +64,8 @@ export default function EntityReviewPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
+      <ProjectBreadcrumb currentPage="entities" />
+
       <div className="mb-6">
         <h2 className="text-xl font-bold">{t('entities.title')}</h2>
         <p className="text-sm text-muted-foreground mt-1">{t('entities.subtitle')}</p>

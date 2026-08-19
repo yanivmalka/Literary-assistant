@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router-dom'
 import { GitBranch, Plus, ArrowRight, Check, Edit3, X, Save, RefreshCw } from 'lucide-react'
 import { useBranchStore, type BranchEntity, type EntityComparison } from '@/stores/branchStore'
+import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
 
 type ViewMode = 'main' | 'branch' | 'compare'
 
@@ -349,6 +350,8 @@ export default function BranchPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
+      <ProjectBreadcrumb currentPage="branches" />
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">

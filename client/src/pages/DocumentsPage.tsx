@@ -5,6 +5,7 @@ import { FileText } from 'lucide-react'
 import { useDocumentStore } from '@/stores/documentStore'
 import DocumentUploader from '@/components/documents/DocumentUploader'
 import DocumentList from '@/components/documents/DocumentList'
+import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
 
 export default function DocumentsPage() {
   const { t } = useTranslation()
@@ -50,6 +51,8 @@ export default function DocumentsPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
+      <ProjectBreadcrumb currentPage="documents" />
+
       <div className="mb-6">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <FileText className="h-5 w-5" />

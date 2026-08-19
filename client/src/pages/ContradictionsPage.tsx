@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
 import { useContradictionStore } from '@/stores/contradictionStore'
 import ContradictionCard from '@/components/contradictions/ContradictionCard'
+import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
 
 export default function ContradictionsPage() {
   const { t } = useTranslation()
@@ -27,6 +28,8 @@ export default function ContradictionsPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
+      <ProjectBreadcrumb currentPage="contradictions" />
+
       <div className="mb-6">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <AlertTriangle className="h-5 w-5" />

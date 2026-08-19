@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { MessageSquare } from 'lucide-react'
 import QAPanel from '@/components/qa/QAPanel'
+import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
 
 export default function QAPage() {
   const { t } = useTranslation()
@@ -11,6 +12,8 @@ export default function QAPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
+      <ProjectBreadcrumb currentPage="qa" />
+
       <div className="mb-4">
         <h2 className="text-xl font-bold flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
