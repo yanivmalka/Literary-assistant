@@ -197,10 +197,10 @@ export default function EntityModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="entity-modal-title">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-2xl max-h-[90vh] bg-card border rounded-xl shadow-xl flex flex-col mx-4 overflow-hidden">
+      <div className="relative w-full max-w-2xl max-h-[90vh] bg-card border rounded-xl shadow-xl flex flex-col mx-4 overflow-hidden z-10">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30 shrink-0">
           <div className="flex items-center gap-3">
