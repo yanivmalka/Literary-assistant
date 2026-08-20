@@ -105,10 +105,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         const timeout = setTimeout(resolve, 500) // 500ms to allow listener to fire
         
         // Listen for the next auth state change
-        const unsubscribe = supabase.auth.onAuthStateChange((event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
           if (event === 'SIGNED_IN' && session?.user) {
             clearTimeout(timeout)
-            unsubscribe()
+            subscription.unsubscribe()
             resolve(null)
           }
         })
