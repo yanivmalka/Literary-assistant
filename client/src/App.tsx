@@ -21,6 +21,7 @@ import ContradictionsPage from './pages/ContradictionsPage'
 import BranchPage from './pages/BranchPage'
 import DevTestPage from './pages/DevTestPage'
 import DebugAuthPage from './pages/DebugAuthPage'
+import ReviewChangesPage from './pages/ReviewChangesPage'
 import AccountSettingsPage from './pages/AccountSettingsPage'
 
 function App() {
@@ -53,6 +54,7 @@ function App() {
         <Route path="projects/:projectId/entities" element={<EntityReviewPage />} />
         <Route path="projects/:projectId/entities/:entityId" element={<CharacterProfilePage />} />
         <Route path="projects/:projectId/timeline" element={<TimelinePage />} />
+        <Route path="projects/:projectId/review" element={<ReviewChangesPage />} />
         <Route path="projects/:projectId/qa" element={<QAPage />} />
         <Route path="projects/:projectId/contradictions" element={<ContradictionsPage />} />
         <Route path="projects/:projectId/branches" element={<BranchPage />} />

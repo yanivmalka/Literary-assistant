@@ -21,7 +21,7 @@ export default function TimelinePage() {
     setLoading(true)
     getTimelineEventsSorted(projectId, currentBranch?.id)
       .then(setEvents)
-      .catch(err => console.error('Failed to load events:', err))
+      .catch((err: any) => console.error('Failed to load events:', err))
       .finally(() => setLoading(false))
   }, [projectId, currentBranch?.id])
 
