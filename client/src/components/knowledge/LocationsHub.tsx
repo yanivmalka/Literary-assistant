@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch, Plus } from 'lucide-react'
 import { useBranchStore } from '@/stores/branchStore'
@@ -18,13 +18,11 @@ export default function LocationsHub({ projectId }: LocationsHubProps) {
   const { t } = useTranslation()
 
   const { currentBranch } = useBranchStore()
-  const { createEntity, fetchEntities: fetchEntitiesStore, getMainOnlyEntities, getEffectiveBranchEntities } = useEntityStore()
+  const { fetchEntities: fetchEntitiesStore, getMainOnlyEntities, getEffectiveBranchEntities } = useEntityStore()
 
   const [selectedVersion, setSelectedVersion] = useState<VersionType>('main')
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState<Entity | null>(null)
-  const [isCreating, setIsCreating] = useState(false)
-  const createInProgressRef = useRef(false)
 
   // Get locations for selected version (Main or Branch)
   const locations = selectedVersion === 'main'
@@ -36,32 +34,9 @@ export default function LocationsHub({ projectId }: LocationsHubProps) {
     setEditModalOpen(true)
   }
 
-  const handleCreateNew = async () => {
-    // React state updates are asynchronous, so use a ref to prevent
-    // duplicate submissions from rapid clicks or repeated events.
-    if (createInProgressRef.current) return
-
-    createInProgressRef.current = true
-    setIsCreating(true)
-    try {
-      const newEntity = await createEntity(
-        projectId,
-        'location',
-        { name: t('entities.newLocation') },
-        selectedVersion === 'branch' && currentBranch
-          ? { branchId: currentBranch.id, layer: 'branch' }
-          : undefined
-      )
-      if (newEntity) {
-        setSelectedLocation(newEntity)
-        setEditModalOpen(true)
-      }
-    } catch (error) {
-      console.error('Failed to create location:', error)
-    } finally {
-      createInProgressRef.current = false
-      setIsCreating(false)
-    }
+  const handleCreateNew = () => {
+    setSelectedLocation(null)
+    setEditModalOpen(true)
   }
 
   const handleCloseEditModal = () => {
@@ -132,8 +107,7 @@ export default function LocationsHub({ projectId }: LocationsHubProps) {
           </h2>
           <button
             onClick={handleCreateNew}
-            disabled={isCreating}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
           >
             <Plus className="h-4 w-4" />
             {t('entities.newLocation')}

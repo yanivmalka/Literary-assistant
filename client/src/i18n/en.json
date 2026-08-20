@@ -379,6 +379,7 @@
     "createTitle": "Create {{type}}",
     "editTitle": "Edit {{type}}",
     "confirmDelete": "Delete this entity?",
+    "nameRequired": "Entity name is required",
     "unknownPlaceholder": "Unknown",
     "createNew": "Create Manually"
   },

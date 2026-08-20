@@ -111,7 +111,16 @@ export default function LocationEditModal({
         structuredFields[field] = value && value.trim() ? value.trim() : null
       }
 
-      const locationName = (structuredFields.name as string) || t('entities.types.location')
+      let locationName = (structuredFields.name as string)?.trim() || ''
+      
+      // Validate that name is not empty
+      if (!locationName) {
+        alert(t('entityModal.nameRequired') || 'Location name is required')
+        setSaving(false)
+        return
+      }
+
+      structuredFields.name = locationName
 
       if (isNewLocation) {
         // Create new location
@@ -244,11 +253,13 @@ export default function LocationEditModal({
                     const value = formData[field as string] ?? ''
                     const isTextarea = TEXTAREA_FIELDS.has(field as string)
                     const fieldLabel = t(`entityFields.${field}`, { defaultValue: field })
+                    const isNameField = field === 'name'
+                    const placeholder = isNameField ? t('entities.types.location') : ''
 
                     return (
                       <div key={field}>
                         <label className="text-sm font-medium" htmlFor={field}>
-                          {fieldLabel}
+                          {fieldLabel} {isNameField && <span className="text-red-600">*</span>}
                         </label>
                         {isTextarea ? (
                           <textarea
@@ -257,6 +268,7 @@ export default function LocationEditModal({
                             onChange={e => handleFieldChange(field as string, e.target.value)}
                             className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground resize-none"
                             rows={4}
+                            placeholder={placeholder}
                           />
                         ) : (
                           <input
@@ -265,6 +277,8 @@ export default function LocationEditModal({
                             value={value}
                             onChange={e => handleFieldChange(field as string, e.target.value)}
                             className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground"
+                            placeholder={placeholder}
+                            required={isNameField}
                           />
                         )}
                       </div>

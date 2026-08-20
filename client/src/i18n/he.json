@@ -379,6 +379,7 @@
     "createTitle": "יצירת {{type}}",
     "editTitle": "עריכת {{type}}",
     "confirmDelete": "האם למחוק ישות זו?",
+    "nameRequired": "שם הישות נדרש",
     "unknownPlaceholder": "לא ידוע",
     "createNew": "יצירה ידנית"
   },
