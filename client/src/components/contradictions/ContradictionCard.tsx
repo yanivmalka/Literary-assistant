@@ -18,27 +18,26 @@ export default function ContradictionCard({ contradiction, onResolve }: Contradi
         <AlertTriangle className={`h-4 w-4 flex-shrink-0 mt-0.5 ${isOpen ? 'text-amber-600' : 'text-muted-foreground'}`} />
         <div>
           <p className="text-sm font-medium">
-            {contradiction.entities?.name || t('contradictions.unknownEntity')}
+            {contradiction.entity_id ? `Entity: ${contradiction.entity_id.slice(0, 8)}` : t('contradictions.unknownEntity')}
           </p>
-          {contradiction.description && (
-            <p className="text-xs text-muted-foreground mt-0.5">{contradiction.description}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{contradiction.field_path}</p>
+          {contradiction.contradiction_type && (
+            <p className="text-xs text-muted-foreground">{contradiction.contradiction_type}</p>
           )}
         </div>
       </div>
 
-      {/* Side by side values */}
-      {contradiction.attribute_a && contradiction.attribute_b && (
-        <div className="grid grid-cols-2 gap-3 mb-3">
-          <div className="bg-red-50 border border-red-100 rounded p-2">
-            <p className="text-xs text-muted-foreground">{contradiction.attribute_a.attribute_name}</p>
-            <p className="text-sm font-medium text-red-800">{contradiction.attribute_a.attribute_value}</p>
-          </div>
-          <div className="bg-blue-50 border border-blue-100 rounded p-2">
-            <p className="text-xs text-muted-foreground">{contradiction.attribute_b.attribute_name}</p>
-            <p className="text-sm font-medium text-blue-800">{contradiction.attribute_b.attribute_value}</p>
-          </div>
+      {/* Values (placeholder: will be enhanced in v1.5) */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="bg-red-50 border border-red-100 rounded p-2">
+          <p className="text-xs text-muted-foreground">Value A</p>
+          <p className="text-sm font-medium text-red-800 truncate">{contradiction.value_a_id?.slice(0, 8) || 'N/A'}</p>
         </div>
-      )}
+        <div className="bg-blue-50 border border-blue-100 rounded p-2">
+          <p className="text-xs text-muted-foreground">Value B</p>
+          <p className="text-sm font-medium text-blue-800 truncate">{contradiction.value_b_id?.slice(0, 8) || 'N/A'}</p>
+        </div>
+      </div>
 
       {/* Resolution buttons */}
       {isOpen && (

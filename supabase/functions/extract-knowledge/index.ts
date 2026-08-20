@@ -27,6 +27,7 @@ import { buildExtractionPrompt } from "../_shared/rules/prompt.ts";
 import { normalizeKey, stripNikud } from "../_shared/rules/normalization.ts";
 import { shouldFilterEntity } from "../_shared/rules/filtering.ts";
 import { isPrefixMatch, scoreConsolidation, CONSOLIDATION_THRESHOLDS } from "../_shared/rules/consolidation.ts";
+import { syncEntityValues } from "../_shared/value-sync.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -764,6 +765,9 @@ Deno.serve(async (req) => {
     let mentionsSaved = 0;
     let aliasesSaved = 0;
     let branchEntitiesSaved = 0;
+    let valuesSynced = 0;
+    let valueEvidenceSynced = 0;
+    const valueSyncErrors: string[] = [];
 
     for (const entity of normalizedEntities) {
       // Check if entity already exists — exact match or name-prefix match
@@ -908,6 +912,20 @@ Deno.serve(async (req) => {
 
       entityIdMap.set(entity.canonical_name.toLowerCase(), entityId);
       entitiesSaved++;
+
+      // Sync canonical values to knowledge_entity_values (after entity is created)
+      const { valuesSynced: valueCount, evidenceSynced: evidenceCount, errors: syncErrors } = await syncEntityValues({
+        supabase,
+        entityId,
+        projectId: body.project_id,
+        userId: body.user_id,
+        rawExtractionId,
+        branchId: targetBranchId,
+        normalizedEntity: entity,
+      });
+      valuesSynced += valueCount;
+      valueEvidenceSynced += evidenceCount;
+      valueSyncErrors.push(...syncErrors);
 
       // Mentions (saved for both Main and Branch)
       for (const pos of entity.chunk_positions) {
@@ -1084,10 +1102,13 @@ Deno.serve(async (req) => {
           event_mentions_saved: eventMentionsSaved,
           event_participants_saved: eventParticipantsSaved,
           branch_entities_saved: branchEntitiesSaved,
+          values_synced: valuesSynced,
+          value_evidence_synced: valueEvidenceSynced,
           raw_extraction_id: rawExtractionId,
           branch_id: targetBranchId || null,
-        layer: targetLayer,
+          layer: targetLayer,
           normalized_entity_count: normalizedEntities.length,
+          value_sync_errors: valueSyncErrors.length > 0 ? valueSyncErrors : undefined,
         },
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }

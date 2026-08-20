@@ -23,6 +23,7 @@ export interface EffectiveEntity {
   description: string | null
   attributes: Record<string, unknown>
   structured_fields: Record<string, unknown>
+  review_status: string
   
   // Source info: which fields came from Main vs Branch
   _sources: {
@@ -52,6 +53,7 @@ export interface MainEntityRecord {
   description: string | null
   attributes: Record<string, unknown>
   structured_fields: Record<string, unknown>
+  review_status?: string
   created_at: string
   updated_at: string
 }
@@ -95,6 +97,7 @@ export function getEffectiveBranchView(
     description: main.description,
     attributes: { ...(main.attributes || {}) },
     structured_fields: { ...(main.structured_fields || {}) },
+    review_status: main.review_status || 'pending',
     _sources: {
       canonical_name: 'main',
       entity_type: 'main',
@@ -165,6 +168,7 @@ export function getEffectiveBranchOnlyView(
     description: branchEntity.description,
     attributes: { ...(branchEntity.attributes || {}) },
     structured_fields: { ...(branchEntity.structured_fields || {}) },
+    review_status: branchEntity.review_status || 'pending',
     _sources: {
       canonical_name: 'branch',
       entity_type: 'branch',

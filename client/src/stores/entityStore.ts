@@ -17,6 +17,7 @@ export interface Entity {
   attributes?: Record<string, unknown>
   structured_fields?: Record<string, unknown>
   source?: string
+  review_status?: 'pending' | 'confirmed' | 'dismissed' | 'merged'
 }
 
 export interface EntityMention {
@@ -55,6 +56,7 @@ interface EntityState {
   confirmEntity: (projectId: string, entityId: string) => Promise<void>
   dismissEntity: (projectId: string, entityId: string) => Promise<void>
   mergeEntities: (projectId: string, entityAId: string, entityBId: string) => Promise<void>
+  updateReviewStatus: (projectId: string, entityId: string, reviewStatus: 'confirmed' | 'dismissed' | 'pending') => Promise<void>
   fetchEntityDetail: (projectId: string, entityId: string) => Promise<void>
   createEntity: (projectId: string, entityType: EntityType, structuredFields: Record<string, unknown>, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => Promise<Entity | null>
   updateEntity: (entityId: string, updates: { canonical_name?: string; description?: string | null; structured_fields?: Record<string, unknown>; attributes?: Record<string, unknown> }, branchContext?: { branchId: string; sourceEntityId: string }) => Promise<boolean>
@@ -84,7 +86,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
       // Step 1: Fetch Main layer entities
       let mainQuery = supabase
         .from('knowledge_entities')
-        .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, created_at, updated_at, project_id, user_id')
+        .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, review_status, created_at, updated_at, project_id, user_id')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
         .eq('layer', 'main')
@@ -126,7 +128,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         // Fetch branch-only entities (layer='branch', no Main parent)
         const { data: branchOnly } = await supabase
           .from('knowledge_entities')
-          .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, created_at, updated_at, project_id, user_id, branch_id')
+          .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, review_status, created_at, updated_at, project_id, user_id, branch_id')
           .eq('project_id', projectId)
           .eq('user_id', user.id)
           .eq('layer', 'branch')
@@ -198,6 +200,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
             description: mainEntity.description as string | null,
             attributes: mainEntity.attributes as Record<string, unknown> || {},
             structured_fields: mainEntity.structured_fields as Record<string, unknown> || {},
+            review_status: (mainEntity.review_status as string) || 'pending',
             created_at: mainEntity.created_at as string,
             updated_at: mainEntity.updated_at as string,
           }
@@ -216,6 +219,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
             attributes: effectiveData.attributes,
             structured_fields: effectiveData.structured_fields,
             source: (mainEntity.source as string) || 'ai',
+            review_status: effectiveData.review_status as 'pending' | 'confirmed' | 'dismissed' | 'merged',
           }
 
           mainOnlyEntities.set(mainId, entity)
@@ -250,6 +254,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
               description: mainEntity.description as string | null,
               attributes: mainEntity.attributes as Record<string, unknown> || {},
               structured_fields: mainEntity.structured_fields as Record<string, unknown> || {},
+              review_status: (mainEntity.review_status as string) || 'pending',
               created_at: mainEntity.created_at as string,
               updated_at: mainEntity.updated_at as string,
             }
@@ -269,6 +274,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
             attributes: effectiveData.attributes,
             structured_fields: effectiveData.structured_fields,
             source: (mainEntity.source as string) || 'ai',
+            review_status: effectiveData.review_status as 'pending' | 'confirmed' | 'dismissed' | 'merged',
           }
 
           effectiveEntities.set(mainId, entity)
@@ -331,14 +337,34 @@ export const useEntityStore = create<EntityState>((set, get) => ({
     set({ mergeSuggestions: [] })
   },
 
-  confirmEntity: async (_projectId, _entityId) => {
-    // knowledge_entities does not have a status column yet — no-op
-    console.log('[Knowledge] confirmEntity: status management not yet implemented for knowledge_entities')
+  confirmEntity: async (projectId, entityId) => {
+    await get().updateReviewStatus(projectId, entityId, 'confirmed')
   },
 
   dismissEntity: async (_projectId, entityId) => {
-    // For now, remove from local state only (knowledge_entities has no status column)
-    set({ entities: get().entities.filter(e => e.id !== entityId) })
+    await get().updateReviewStatus(_projectId, entityId, 'dismissed')
+  },
+
+  updateReviewStatus: async (_projectId, entityId, reviewStatus) => {
+    try {
+      const { error } = await supabase
+        .from('knowledge_entities')
+        .update({ review_status: reviewStatus })
+        .eq('id', entityId)
+
+      if (!error) {
+        set({
+          entities: get().entities.map(e =>
+            e.id === entityId ? { ...e, review_status: reviewStatus } : e
+          ),
+          selectedEntity: get().selectedEntity?.id === entityId
+            ? { ...get().selectedEntity!, review_status: reviewStatus }
+            : get().selectedEntity,
+        })
+      }
+    } catch (error) {
+      console.error('Failed to update review status:', error)
+    }
   },
 
   mergeEntities: async (projectId, _entityAId, _entityBId) => {
@@ -376,6 +402,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         attributes: entity.attributes,
         structured_fields: entity.structured_fields || {},
         source: entity.source || 'ai',
+        review_status: entity.review_status || 'pending',
       } : null
 
       // Map mentions to EntityMention interface
@@ -430,8 +457,9 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           layer,
           branch_id: branchId,
           source: 'user',
+          review_status: 'confirmed',  // User-created entities start as confirmed
         })
-        .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, created_at, updated_at')
+        .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, review_status, created_at, updated_at')
         .single()
 
       if (error || !data) {
@@ -453,6 +481,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         attributes: data.attributes || {},
         structured_fields: data.structured_fields || {},
         source: data.source || 'user',
+        review_status: data.review_status || 'confirmed',
       }
 
       set({ entities: [...get().entities, newEntity] })
