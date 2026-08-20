@@ -58,6 +58,14 @@ export default function ProjectDetailPage() {
       {/* Sub-navigation */}
       <nav className="flex flex-wrap gap-2 mb-8 border-b pb-3">
         <Link
+          to={`/projects/${projectId}/knowledge`}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md hover:bg-muted transition-colors"
+        >
+          <Users className="h-4 w-4" />
+          {t('knowledge.title')}
+        </Link>
+
+        <Link
           to={`/projects/${projectId}/documents`}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md hover:bg-muted transition-colors"
         >

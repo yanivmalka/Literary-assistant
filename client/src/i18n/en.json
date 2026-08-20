@@ -269,6 +269,10 @@
       "magic_system": "Magic System",
       "event": "Event"
     },
+    "newCharacter": "New Character",
+    "newLocation": "New Location",
+    "newObject": "New Object",
+    "basicInfo": "Basic Information",
     "status": {
       "pending": "Pending",
       "confirmed": "Confirmed",
@@ -321,6 +325,12 @@
   "branch": {
     "title": "Main / Branch",
     "subtitle": "Manage canonical entity data (Main) and working copies (Branch)",
+    "version": "Version",
+    "main": "Main Version",
+    "mainDescription": "The authoritative version of your knowledge base",
+    "branchDescription": "A working copy for edits and refinements",
+    "noBranch": "No Active Branch",
+    "createBranchFirst": "Create a branch to get started",
     "mainEntities": "Main Entities",
     "entities": "entities",
     "noMainEntities": "No entities in Main yet. Run entity extraction first.",
@@ -345,10 +355,17 @@
     "transfer": "Transfer",
     "transferAll": "Transfer All",
     "transferToMain": "Transfer to Main",
+    "proposal": "Branch proposal",
     "fields": {
       "name": "Name",
       "description": "Description"
     }
+  },
+  "timeline": {
+    "title": "Timeline",
+    "noEvents": "No events found",
+    "eventsComingSoon": "Timeline events will be populated as you create events in your story",
+    "mainLayer": "Main Layer"
   },
   "entityModal": {
     "createTitle": "Create {{type}}",
@@ -429,7 +446,10 @@
       "unknown": "Unknown",
       "switchLanguage": "Switch language",
       "notAuthenticated": "Please log in to continue",
-      "unexpectedError": "Something went wrong. Please try again."
+      "unexpectedError": "Something went wrong. Please try again.",
+      "viewDetails": "View Details",
+      "edit": "Edit",
+      "saving": "Saving..."
     },
     "documents": {
       "extractKnowledge": "Extract",
@@ -468,6 +488,9 @@
     "entities": {
       "manual": "Manual",
       "unknownType": "Entity"
+    },
+    "abilities": {
+      "title": "Abilities"
     },
     "branch": {
       "main": "Main",

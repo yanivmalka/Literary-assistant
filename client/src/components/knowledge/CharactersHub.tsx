@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import { GitBranch, Plus } from 'lucide-react'
 import { useBranchStore } from '@/stores/branchStore'
 import { useEntityStore } from '@/stores/entityStore'
@@ -18,10 +17,9 @@ type VersionType = 'main' | 'branch'
 
 export default function CharactersHub({ projectId, entities }: CharactersHubProps) {
   const { t } = useTranslation()
-  const navigate = useNavigate()
 
   const { currentBranch } = useBranchStore()
-  const { createEntity } = useEntityStore()
+  const { createEntity, fetchEntities } = useEntityStore()
 
   const [selectedVersion, setSelectedVersion] = useState<VersionType>('main')
   const [detailModalOpen, setDetailModalOpen] = useState(false)
@@ -171,7 +169,6 @@ export default function CharactersHub({ projectId, entities }: CharactersHubProp
         <CharacterDetailModal
           isOpen={detailModalOpen}
           character={selectedCharacter}
-          projectId={projectId}
           onClose={handleCloseDetailModal}
         />
       )}
@@ -185,6 +182,7 @@ export default function CharactersHub({ projectId, entities }: CharactersHubProp
           onClose={handleCloseEditModal}
           onCharacterUpdated={() => {
             handleCloseEditModal()
+            fetchEntities(projectId)
           }}
         />
       )}

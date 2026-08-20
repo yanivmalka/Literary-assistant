@@ -269,6 +269,10 @@
       "magic_system": "מערכת קסם",
       "event": "אירוע"
     },
+    "newCharacter": "דמות חדשה",
+    "newLocation": "מקום חדש",
+    "newObject": "חפץ חדש",
+    "basicInfo": "מידע בסיסי",
     "status": {
       "pending": "ממתין",
       "confirmed": "מאושר",
@@ -321,6 +325,12 @@
   "branch": {
     "title": "ראשי / ענף",
     "subtitle": "ניהול מידע קנוני (ראשי) ועותקי עבודה (ענף)",
+    "version": "גרסה",
+    "main": "גרסה ראשית",
+    "mainDescription": "הגרסה המסמכת של בסיס הידע שלך",
+    "branchDescription": "עותק עבודה לעריכה וחידודים",
+    "noBranch": "אין ענף פעיל",
+    "createBranchFirst": "צור ענף כדי להתחיל",
     "mainEntities": "ישויות ראשיות",
     "entities": "ישויות",
     "noMainEntities": "אין ישויות ב-Main עדיין. הפעל חילוץ ישויות תחילה.",
@@ -345,10 +355,17 @@
     "transfer": "העבר",
     "transferAll": "העבר הכל",
     "transferToMain": "העבר ל-Main",
+    "proposal": "הצעת ענף",
     "fields": {
       "name": "שם",
       "description": "תיאור"
     }
+  },
+  "timeline": {
+    "title": "ציר זמן",
+    "noEvents": "לא נמצאו אירועים",
+    "eventsComingSoon": "אירועי ציר הזמן יתמלאו ככל שתיצור אירועים בסיפורך",
+    "mainLayer": "שכבה ראשית"
   },
   "entityModal": {
     "createTitle": "יצירת {{type}}",
@@ -429,7 +446,10 @@
       "unknown": "לא ידוע",
       "switchLanguage": "החלף שפה",
       "notAuthenticated": "יש להתחבר כדי להמשיך",
-      "unexpectedError": "משהו השתבש. נסה שוב."
+      "unexpectedError": "משהו השתבש. נסה שוב.",
+      "viewDetails": "הצג פרטים",
+      "edit": "ערוך",
+      "saving": "שמירה..."
     },
     "documents": {
       "extractKnowledge": "חלץ",
@@ -468,6 +488,9 @@
     "entities": {
       "manual": "ידני",
       "unknownType": "ישות"
+    },
+    "abilities": {
+      "title": "יכולות"
     },
     "branch": {
       "main": "ראשי",

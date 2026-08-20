@@ -16,6 +16,7 @@ import DocumentsPage from './pages/DocumentsPage'
 import EntityReviewPage from './pages/EntityReviewPage'
 import CharacterProfilePage from './pages/CharacterProfilePage'
 import TimelinePage from './pages/TimelinePage'
+import KnowledgeHubPage from './pages/KnowledgeHubPage'
 import QAPage from './pages/QAPage'
 import ContradictionsPage from './pages/ContradictionsPage'
 import BranchPage from './pages/BranchPage'
@@ -51,6 +52,7 @@ function App() {
         <Route path="projects/:projectId/maps/new" element={<MapWizardPage />} />
         <Route path="projects/:projectId/maps/:mapId" element={<MapEditorPage />} />
         <Route path="projects/:projectId/documents" element={<DocumentsPage />} />
+        <Route path="projects/:projectId/knowledge" element={<KnowledgeHubPage />} />
         <Route path="projects/:projectId/entities" element={<EntityReviewPage />} />
         <Route path="projects/:projectId/entities/:entityId" element={<CharacterProfilePage />} />
         <Route path="projects/:projectId/timeline" element={<TimelinePage />} />
