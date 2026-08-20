@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import { buildExtractionRequest, hasMainEntities, ensureMainBootstrapped, getOrCreateActiveBranch } from '@/lib/extractionBranching'
+import { buildExtractionRequest, hasMainEntities, getOrCreateActiveBranch } from '@/lib/extractionBranching'
 
 export interface DocumentVersion {
   id: string
@@ -281,9 +281,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       const mainExists = await hasMainEntities(projectId)
 
       if (!mainExists) {
-        // Bootstrap: first extraction goes to Main
-        console.log('[Knowledge] First extraction - bootstrapping Main layer')
-        await ensureMainBootstrapped(projectId)
+        // Bootstrap: first extraction goes to Main (implicit initialization)
+        console.log('[Knowledge] First extraction - initializing Main layer with real entities')
         useMainForExtraction = true
         activeBranch = null
       } else {

@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '@/lib/supabase'
+import { LEGACY_BOOTSTRAP_CANONICAL_NAME } from '@/lib/mainLayer'
 
 export interface BranchEntityData {
   canonical_name: string
@@ -713,8 +714,9 @@ export async function verifyBranchIsolation(
  */
 
 /**
- * Check if Main layer has any entities for this project
- * Safe check: does NOT create Main
+ * Main initialization is implicit: an empty Main layer has no entity rows.
+ * Legacy projects may still contain the historical __bootstrap__ row; it is
+ * excluded from Main-exists checks and entity reads without being deleted.
  */
 export async function hasMainEntities(projectId: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser()
@@ -726,65 +728,18 @@ export async function hasMainEntities(projectId: string): Promise<boolean> {
     .eq('project_id', projectId)
     .eq('user_id', user.id)
     .eq('layer', 'main')
+    .neq('canonical_name', LEGACY_BOOTSTRAP_CANONICAL_NAME)
     .limit(1)
 
-  // DIAGNOSTIC: Log the query result for 409 debugging
   const hasMain = (count ?? 0) > 0
-  console.log('[DIAGNOSTIC] hasMainEntities() - projectId:', projectId, 'returned_count:', count ?? 0, 'final_result:', hasMain)
+  console.log('[Knowledge] hasMainEntities() - projectId:', projectId, 'real_main_count:', count ?? 0, 'result:', hasMain)
 
   if (error) {
-    console.error('[DIAGNOSTIC] hasMainEntities() - Query error - status:', error.code, 'message:', error.message, 'details:', error.details)
+    console.error('[Knowledge] hasMainEntities() - Query error - status:', error.code, 'message:', error.message, 'details:', error.details)
     return false
   }
 
   return hasMain
-}
-
-/**
- * Ensure Main layer exists for project. 
- * Creates exactly one marker entity if Main doesn't exist.
- * 
- * Uses Supabase RLS/constraints to prevent race conditions.
- * If concurrent attempts create duplicate entries, only first succeeds.
- */
-export async function ensureMainBootstrapped(projectId: string): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
-
-  // Check if Main already exists
-  const hasMain = await hasMainEntities(projectId)
-  if (hasMain) return
-
-  // Try to create bootstrap marker
-  // If race condition: another client already created it, query will return empty
-  // and we silently continue (Main exists now)
-  const { error } = await supabase
-    .from('knowledge_entities')
-    .insert({
-      project_id: projectId,
-      user_id: user.id,
-      canonical_name: '__bootstrap__',
-      entity_type: 'character',
-      description: 'Bootstrap marker for Main layer',
-      layer: 'main',
-      source: 'ai',
-      attributes: {},
-      structured_fields: {},
-    })
-
-  // DIAGNOSTIC: Log any error response for 409 debugging
-  if (error) {
-    console.error('[DIAGNOSTIC] ensureMainBootstrapped() - INSERT error - operation: POST /rest/v1/knowledge_entities - table: knowledge_entities - projectId:', projectId, 'payload: {canonical_name: __bootstrap__, layer: main} - error_code:', error.code, 'error_message:', error.message, 'error_hint:', error.hint, 'error_details:', error.details)
-    
-    // Ignore "duplicate" errors - means another concurrent request created it
-    if (!error.message.includes('duplicate')) {
-      throw error
-    }
-    console.log('[DIAGNOSTIC] Duplicate error ignored, Main likely exists from concurrent request')
-    return
-  }
-
-  console.log('[Knowledge] Main layer bootstrapped for project:', projectId)
 }
 
 /**
