@@ -741,7 +741,7 @@ export async function ensureMainBootstrapped(projectId: string): Promise<void> {
       entity_type: 'character',
       description: 'Bootstrap marker for Main layer',
       layer: 'main',
-      source: 'system',
+      source: 'ai',
       attributes: {},
       structured_fields: {},
     })
