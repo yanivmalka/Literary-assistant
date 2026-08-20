@@ -138,22 +138,46 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         }
       }
 
-      // Step 4: Fetch aliases for all entities
+      // Step 4: Fetch aliases for all entities with branch scope
+      // Build separate maps for Main and Branch aliases keyed by (entity_id, branch_id)
       const allEntityIds = new Set<string>()
       mainEntities?.forEach(e => allEntityIds.add(e.id as string))
       branchOnlyEntities.forEach(e => allEntityIds.add(e.id as string))
       
+      // Maps keyed by "entity_id" for Main, "entity_id::branch_id" for Branch
       let aliasMap = new Map<string, string[]>()
       if (allEntityIds.size > 0) {
-        const { data: aliasData } = await supabase
+        // Fetch Main aliases (no branch_id)
+        const { data: mainAliasData } = await supabase
           .from('knowledge_entity_aliases')
-          .select('entity_id, alias')
+          .select('entity_id, alias, branch_id')
           .in('entity_id', Array.from(allEntityIds))
-        if (aliasData) {
-          for (const row of aliasData) {
+          .is('branch_id', null)  // Main aliases have null branch_id
+        
+        if (mainAliasData) {
+          for (const row of mainAliasData) {
             const list = aliasMap.get(row.entity_id) || []
             list.push(row.alias)
             aliasMap.set(row.entity_id, list)
+          }
+        }
+
+        // Fetch Branch aliases (scoped by branch_id)
+        if (activeBranch?.id) {
+          const { data: branchAliasData } = await supabase
+            .from('knowledge_entity_aliases')
+            .select('entity_id, alias, branch_id')
+            .in('entity_id', Array.from(allEntityIds))
+            .eq('branch_id', activeBranch.id)
+          
+          if (branchAliasData) {
+            for (const row of branchAliasData) {
+              // Key Branch aliases by (entity_id, branch_id) tuple
+              const key = `${row.entity_id}::${row.branch_id}`
+              const list = aliasMap.get(key) || []
+              list.push(row.alias)
+              aliasMap.set(key, list)
+            }
           }
         }
       }

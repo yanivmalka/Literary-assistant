@@ -122,22 +122,34 @@ export default function EntityModal({
     })
   }, [])
 
-  const syncAliases = async (entityId: string) => {
+  const syncAliases = async (entityId: string, branchId?: string) => {
     const newAliases = aliasesText
       .split(',')
       .map(a => a.trim())
       .filter(a => a.length > 0)
 
     // Delete existing aliases and re-insert (simpler than diffing)
-    await supabase
+    // Scope delete by (entity_id, branch_id) to isolate Main vs Branch aliases
+    let deleteQuery = supabase
       .from('knowledge_entity_aliases')
       .delete()
       .eq('entity_id', entityId)
+    
+    if (branchId) {
+      deleteQuery = deleteQuery.eq('branch_id', branchId)
+    }
+    
+    await deleteQuery
 
     if (newAliases.length > 0) {
+      const aliasRecords = newAliases.map(alias => ({ 
+        entity_id: entityId, 
+        alias,
+        ...(branchId && { branch_id: branchId })
+      }))
       await supabase
         .from('knowledge_entity_aliases')
-        .insert(newAliases.map(alias => ({ entity_id: entityId, alias })))
+        .insert(aliasRecords)
     }
   }
 
@@ -164,8 +176,9 @@ export default function EntityModal({
           description: (structuredFields.description as string) || null,
           structured_fields: structuredFields,
         }, branchContext)
-        // Sync aliases
-        await syncAliases(entity.id)
+        // Sync aliases with branch scope
+        const branchId = selectedVersion === 'branch' && currentBranch ? currentBranch.id : undefined
+        await syncAliases(entity.id, branchId)
       } else {
         // Create new entity
         const name = (structuredFields.name as string) || 'ישות חדשה'
@@ -176,9 +189,10 @@ export default function EntityModal({
           : undefined
         
         const created = await createEntity(projectId, entityType, structuredFields, branchContext)
-        // Sync aliases for new entity
+        // Sync aliases for new entity with branch scope
         if (created) {
-          await syncAliases(created.id)
+          const branchId = selectedVersion === 'branch' && currentBranch ? currentBranch.id : undefined
+          await syncAliases(created.id, branchId)
         }
       }
 
