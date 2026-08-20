@@ -443,6 +443,43 @@ export const useEntityStore = create<EntityState>((set, get) => ({
       const layer = branchContext?.layer || 'main'
       const branchId = branchContext?.branchId || null
 
+      // Check for duplicate name in the same layer and project
+      const { data: existingEntities, error: checkError } = await supabase
+        .from('knowledge_entities')
+        .select('id, canonical_name, layer')
+        .eq('project_id', projectId)
+        .eq('canonical_name', name)
+        .eq('layer', layer)
+        .maybeSingle()
+
+      if (checkError) {
+        console.error('Failed to check for duplicate entity:', checkError)
+      }
+
+      if (existingEntities) {
+        console.warn('Entity with this name already exists in this layer', existingEntities)
+        // Return the existing entity instead of failing
+        // This prevents the 409 conflict error while maintaining data integrity
+        const existingEntity: Entity = {
+          id: existingEntities.id,
+          name: existingEntities.canonical_name,
+          entity_type: entityType,
+          status: 'confirmed',
+          aliases: [],
+          metadata: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          entity_types: [entityType],
+          description: null,
+          attributes: {},
+          structured_fields: structuredFields,
+          source: 'user',
+          review_status: 'confirmed',
+        }
+        set({ entities: [...get().entities, existingEntity] })
+        return existingEntity
+      }
+
       const { data, error } = await supabase
         .from('knowledge_entities')
         .insert({
@@ -464,6 +501,10 @@ export const useEntityStore = create<EntityState>((set, get) => ({
 
       if (error || !data) {
         console.error('Failed to create entity:', error)
+        // If it's a duplicate key error (23505), return null and let caller handle it
+        if (error?.code === '23505') {
+          console.warn('Duplicate entity name detected. User should use a different name.')
+        }
         return null
       }
 
