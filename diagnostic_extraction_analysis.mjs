@@ -10,9 +10,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase credentials
-const SUPABASE_URL = 'https://lqfqfzqcrqluxanhnjwu.supabase.co';
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxZnFmenFjcnFsdXhhbmhuand1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NTgwODEsImV4cCI6MjEwMjUzNDA4MX0.D27T3yEG8rbp7eQMKxG-L7Z62PPaKzDYD3q4SCLjoww';
+// Supabase credentials - Production
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://lqfqfzqcrqluxanhnjwu.supabase.co';
+const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxZnFmenFjcnFsdXhhbmhuand1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NTgwODEsImV4cCI6MjEwMjUzNDA4MX0.D27T3yEG8rbp7eQMKxG-L7Z62PPaKzDYD3q4SCLjoww';
 
 const supabase = createClient(SUPABASE_URL, ANON_KEY, {
   auth: {
