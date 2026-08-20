@@ -10,6 +10,9 @@ import {
   TEXTAREA_FIELDS,
 } from '@/lib/entityTypes'
 import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
+import RelationshipPanel from '@/components/entities/RelationshipPanel'
+import { getEntityRelationships, createBranchRelationship, reviewBranchRelationship, removeBranchRelationship } from '@/lib/relationshipService'
+import type { Relationship } from '@/lib/relationshipService'
 
 type ViewMode = 'profile' | 'edit'
 
@@ -30,6 +33,8 @@ export default function CharacterProfilePage() {
   const [originalFormData, setOriginalFormData] = useState<FormData>({})
   const [saving, setSaving] = useState(false)
   const [isBranch, setIsBranch] = useState(false)
+  const [relationships, setRelationships] = useState<Relationship[]>([])
+  const [loadingRelationships, setLoadingRelationships] = useState(false)
 
   const entity = entities.find(e => e.id === entityId)
   const entityType = entity?.entity_type as any
@@ -45,6 +50,17 @@ export default function CharacterProfilePage() {
       })
     }
   }, [projectId, fetchEntities, fetchCurrentBranch])
+
+  // Load relationships
+  useEffect(() => {
+    if (!projectId || !entityId) return
+    
+    setLoadingRelationships(true)
+    getEntityRelationships(entityId, projectId, currentBranch?.id)
+      .then(rels => setRelationships(rels))
+      .catch(err => console.error('Failed to load relationships:', err))
+      .finally(() => setLoadingRelationships(false))
+  }, [projectId, entityId, currentBranch?.id])
 
   // Initialize form data from entity
   useEffect(() => {
@@ -239,20 +255,61 @@ export default function CharacterProfilePage() {
         </div>
       )}
 
-      {/* Placeholder for future features */}
-      <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-6">
-        <div className="p-4 rounded-lg bg-muted/30 text-center text-sm text-muted-foreground">
-          <p className="font-medium mb-1">{t('entities.relationships')}</p>
-          <p className="text-xs">{t('common.comingSoon')}</p>
-        </div>
-        <div className="p-4 rounded-lg bg-muted/30 text-center text-sm text-muted-foreground">
-          <p className="font-medium mb-1">{t('entities.history')}</p>
-          <p className="text-xs">{t('common.comingSoon')}</p>
-        </div>
-        <div className="p-4 rounded-lg bg-muted/30 text-center text-sm text-muted-foreground">
-          <p className="font-medium mb-1">{t('entities.mentions')}</p>
-          <p className="text-xs">{t('common.comingSoon')}</p>
-        </div>
+      {/* Relationships */}
+      <div className="mt-10 border-t pt-6">
+        {loadingRelationships ? (
+          <p className="text-center text-muted-foreground">{t('common.loading')}</p>
+        ) : (
+          <RelationshipPanel
+            entity={{ id: entity.id, name: entity.name, entity_type: entity.entity_type }}
+            relationships={relationships}
+            allEntities={entities}
+            branchId={currentBranch?.id}
+            isEditMode={viewMode === 'edit'}
+            onAddRelationship={async (targetId, type) => {
+              if (!currentBranch) {
+                console.error('No active branch')
+                return
+              }
+              try {
+                const newRel = await createBranchRelationship(
+                  projectId!,
+                  entity.id,
+                  targetId,
+                  type,
+                  currentBranch.id
+                )
+                setRelationships([...relationships, newRel])
+              } catch (err) {
+                console.error('Failed to create relationship:', err)
+              }
+            }}
+            onReviewRelationship={async (relId, approved) => {
+              try {
+                await reviewBranchRelationship(relId, approved)
+                setRelationships(
+                  relationships.map(r =>
+                    r.id === relId ? { ...r, review_status: approved ? 'approved' : 'rejected' } : r
+                  )
+                )
+              } catch (err) {
+                console.error('Failed to review relationship:', err)
+              }
+            }}
+            onRemoveRelationship={async (relId) => {
+              if (!currentBranch) {
+                console.error('No active branch')
+                return
+              }
+              try {
+                const removalRel = await removeBranchRelationship(relId, currentBranch.id)
+                setRelationships([...relationships, removalRel])
+              } catch (err) {
+                console.error('Failed to remove relationship:', err)
+              }
+            }}
+          />
+        )}
       </div>
     </div>
   )
