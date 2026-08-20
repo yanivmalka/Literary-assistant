@@ -138,6 +138,8 @@ export default function RelationshipPanel({
           <h4 className="font-medium text-sm">Add Relationship</h4>
           <div className="space-y-2">
             <select
+              id="relationship-type"
+              name="relationship-type"
               value={selectedType}
               onChange={e => setSelectedType(e.target.value as typeof RELATIONSHIP_TYPES[number])}
               className="w-full px-3 py-2 border rounded-md text-sm"
@@ -150,6 +152,8 @@ export default function RelationshipPanel({
             </select>
 
             <select
+              id="relationship-target"
+              name="relationship-target"
               value={selectedTarget}
               onChange={e => setSelectedTarget(e.target.value)}
               className="w-full px-3 py-2 border rounded-md text-sm"

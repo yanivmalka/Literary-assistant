@@ -78,6 +78,7 @@ export default function DocumentUploader({ projectId, documentId, onUploadComple
       >
         <input
           id="doc-file-input"
+          name="document-file"
           type="file"
           accept=".pdf,.docx"
           onChange={handleFileSelect}
