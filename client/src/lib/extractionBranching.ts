@@ -23,9 +23,12 @@ export interface MainEntityRoutingData {
   id: string
   canonical_name: string
   entity_type: string
+  entity_types?: string[]
   description: string | null
   attributes: Record<string, unknown>
   structured_fields: Record<string, unknown>
+  project_id?: string
+  user_id?: string
 }
 
 /**
@@ -52,10 +55,16 @@ export function buildBranchEntityRecord(
 
 /**
  * Build an overlay row for an existing Main entity without changing Main.
+ * 
+ * Required parameters:
+ * - mainEntity: The Main layer entity (provides canonical_name, entity_type, and other base values)
+ * - overrides: Delta changes (Branch-specific modifications)
+ * - baseValues: Snapshot of Main values at overlay creation time
  */
 export function buildEntityOverlayRecord(
   branchId: string,
   mainEntityId: string,
+  mainEntity: MainEntityRoutingData,
   overrides: Record<string, unknown>,
   baseValues: Record<string, unknown>,
   metadata: Record<string, unknown> = {}
@@ -67,6 +76,13 @@ export function buildEntityOverlayRecord(
     branch_id: branchId,
     source_entity_id: mainEntityId,
     entity_id: mainEntityId,
+    // Required legacy columns: use Main entity values
+    canonical_name: mainEntity.canonical_name,
+    entity_type: mainEntity.entity_type,
+    entity_types: mainEntity.entity_types || [],
+    description: mainEntity.description || null,
+    attributes: mainEntity.attributes || {},
+    // Overlay model columns: contain Branch changes
     overrides,
     base_values: baseValues,
     is_modified: Object.keys(overrides).length > 0,
@@ -220,16 +236,19 @@ export async function createBranchEntity(
  * 
  * Used when AI extracts data for an entity that already exists in Main.
  * Creates an Overlay record in knowledge_branch_entities with overrides.
+ * Requires the Main entity data to populate required legacy columns.
  */
 export async function createEntityOverlay(
   branchId: string,
   mainEntityId: string,
+  mainEntity: MainEntityRoutingData,
   overrides: Record<string, unknown>,
-  baseValues: Record<string, unknown>
+  baseValues: Record<string, unknown>,
+  metadata?: Record<string, unknown>
 ) {
   const { data, error } = await supabase
     .from('knowledge_branch_entities')
-    .insert(buildEntityOverlayRecord(branchId, mainEntityId, overrides, baseValues))
+    .insert(buildEntityOverlayRecord(branchId, mainEntityId, mainEntity, overrides, baseValues, metadata))
     .select('*')
     .single()
 

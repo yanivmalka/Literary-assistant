@@ -472,6 +472,8 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           }
         } else {
           // Create new overlay
+          // Include required legacy columns from Main entity to satisfy schema NOT NULL constraints
+          // The edited values remain in overrides; base columns preserve Main/source values
           const { error } = await supabase
             .from('knowledge_branch_entities')
             .insert({
@@ -480,6 +482,13 @@ export const useEntityStore = create<EntityState>((set, get) => ({
               entity_id: sourceEntityId,
               project_id: mainEntity.project_id,
               user_id: mainEntity.user_id,
+              // Required legacy columns: use Main entity as source to preserve Main/Branch distinction
+              canonical_name: mainEntity.canonical_name,
+              entity_type: mainEntity.entity_type,
+              entity_types: mainEntity.entity_types || [],
+              description: mainEntity.description || null,
+              attributes: mainEntity.attributes || {},
+              // Overlay model columns: contain user's Branch changes
               overrides,
               base_values: baseValues,
               is_modified: Object.keys(overrides).length > 0,

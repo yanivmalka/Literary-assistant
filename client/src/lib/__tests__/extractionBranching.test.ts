@@ -62,9 +62,20 @@ describe('AI extraction branch routing', () => {
   })
 
   it('creates an override for an existing Main entity with base values', () => {
+    const mainEntity = {
+      id: 'main-entity-1',
+      canonical_name: 'Leo',
+      entity_type: 'character',
+      entity_types: ['character'],
+      description: 'Main description',
+      attributes: { age: '25' },
+      structured_fields: { age: '25' },
+    }
+
     const overlay = buildEntityOverlayRecord(
       'branch-1',
       'main-entity-1',
+      mainEntity,
       {
         description: 'Branch description',
         'structured_fields.age': '30',
@@ -79,6 +90,8 @@ describe('AI extraction branch routing', () => {
       branch_id: 'branch-1',
       source_entity_id: 'main-entity-1',
       entity_id: 'main-entity-1',
+      canonical_name: 'Leo',
+      entity_type: 'character',
       overrides: {
         description: 'Branch description',
         'structured_fields.age': '30',
@@ -89,7 +102,6 @@ describe('AI extraction branch routing', () => {
       },
       is_modified: true,
     })
-    expect(overlay).not.toHaveProperty('canonical_name')
   })
 
   it('routes raw extraction records to the active Branch', () => {

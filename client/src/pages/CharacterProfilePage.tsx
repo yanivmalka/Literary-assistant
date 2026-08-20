@@ -133,10 +133,17 @@ export default function CharacterProfilePage() {
         ? { branchId: currentBranch.id, sourceEntityId: entityId }
         : undefined
 
-      await updateEntity(entityId, updates, branchContext)
+      const success = await updateEntity(entityId, updates, branchContext)
 
-      setOriginalFormData(formData)
-      setViewMode('profile')
+      // Only leave edit mode if save succeeded
+      if (success) {
+        setOriginalFormData(formData)
+        setViewMode('profile')
+      } else {
+        // Save failed; remain in edit mode with user's data intact
+        console.error('Failed to save entity changes')
+        // Note: formData is already in state, so user sees their edits intact
+      }
     } finally {
       setSaving(false)
     }
