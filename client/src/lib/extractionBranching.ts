@@ -698,7 +698,7 @@ export async function hasMainEntities(projectId: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { data, error, count } = await supabase
+  const { error, count } = await supabase
     .from('knowledge_entities')
     .select('id', { count: 'exact', head: true })
     .eq('project_id', projectId)
@@ -707,9 +707,8 @@ export async function hasMainEntities(projectId: string): Promise<boolean> {
     .limit(1)
 
   // DIAGNOSTIC: Log the query result for 409 debugging
-  const resultCount = count ?? (data && data.length > 0 ? 1 : 0)
-  const hasMain = (data && data.length > 0) || false
-  console.log('[DIAGNOSTIC] hasMainEntities() - projectId:', projectId, 'returned_count:', resultCount, 'data_empty:', !data || data.length === 0, 'final_result:', hasMain)
+  const hasMain = (count ?? 0) > 0
+  console.log('[DIAGNOSTIC] hasMainEntities() - projectId:', projectId, 'returned_count:', count ?? 0, 'final_result:', hasMain)
 
   if (error) {
     console.error('[DIAGNOSTIC] hasMainEntities() - Query error - status:', error.code, 'message:', error.message, 'details:', error.details)
