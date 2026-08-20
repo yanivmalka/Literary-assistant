@@ -17,7 +17,6 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
   if (selectedCategory) {
     const isLifeSkills = selectedCategory === 'life_skills'
     const title = isLifeSkills ? 'Life Skills' : 'Magic Skills'
-    const icon = isLifeSkills ? Shield : Sparkles
 
     return (
       <div className="max-w-2xl">
