@@ -260,7 +260,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
             name: effectiveData.canonical_name,
             entity_type: effectiveData.entity_type,
             status: 'confirmed',
-            aliases: aliasMap.get(mainId) || [],
+            aliases: (activeBranch?.id ? aliasMap.get(`${mainId}::${activeBranch.id}`) : null) || aliasMap.get(mainId) || [],
             metadata: effectiveData.attributes,
             created_at: effectiveData.created_at,
             updated_at: effectiveData.updated_at,
@@ -278,9 +278,10 @@ export const useEntityStore = create<EntityState>((set, get) => ({
       // Add branch-only entities
       for (const branchEntity of branchOnlyEntities) {
         const branchId = branchEntity.id as string
+        const branchContextId = activeBranch?.id || branchEntity.branch_id as string
         const effectiveData = getEffectiveBranchOnlyView(
           branchEntity as any,
-          activeBranch?.id || branchEntity.branch_id as string
+          branchContextId
         )
 
         const entity: Entity = {
@@ -288,7 +289,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           name: effectiveData.canonical_name,
           entity_type: effectiveData.entity_type,
           status: 'confirmed',
-          aliases: aliasMap.get(branchId) || [],
+          aliases: (branchContextId ? aliasMap.get(`${branchId}::${branchContextId}`) : null) || aliasMap.get(branchId) || [],
           metadata: effectiveData.attributes,
           created_at: effectiveData.created_at,
           updated_at: effectiveData.updated_at,
