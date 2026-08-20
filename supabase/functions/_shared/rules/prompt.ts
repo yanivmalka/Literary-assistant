@@ -154,32 +154,33 @@ DO extract:
 
 === ABILITIES ===
 
-ONLY extract DISTINCT, SPECIAL abilities — not ordinary actions.
+Extract TWO separate arrays based on ability type. Look for:
+1. Phrases with "יכולת" (ability), "כושר" (power/capacity), "מיומנות" (skill), "טכניקה" (technique)
+2. Named special powers or martial techniques
+3. Context showing a character "uses" or "has" this ability
 
-Extract into TWO separate arrays based on ability type:
-
-**abilities[]** — Physical/combat abilities (NOT ordinary actions):
-- Exceptional physical feats
-- Combat techniques with names
-- Special martial skills
-- Athletic abilities beyond normal
-- Example: "קתיע קרב", "יכולת אתלטית יוצאת דופן"
+**abilities[]** — Physical/combat abilities:
+- Martial techniques: "לחימה בשתי חרבות", "קריאת שפתיים", "כושר טלקינזיס"
+- Combat skills, athletic abilities, trained techniques
+- Physical feats mentioned as special or distinct
+- Example: "קתיע קרב", "לחימה בשתי חרבות", "קריאת שפתיים", "ריפוי אנרגטי"
 
 **magic_abilities[]** — Magical/supernatural abilities:
-- Magic powers and spells
-- Supernatural abilities
-- Mystical techniques
-- Example: "רונת אש" (fire magic), "יכולת ראייה דרך קירות" (vision through walls)
+- Magical powers: "רונת אש", "טלקינזיס", "ראייה דרך קירות"
+- Spells, supernatural techniques, mystical powers
+- Abilities explicitly described as magical or supernatural
+- Example: "רונת אש" (fire magic), "יכולת ראייה דרך קירות" (vision through walls), "טלקינזיס"
 
 DO NOT extract:
-- Ordinary actions: running, walking, talking, eating
-- General magic system concepts: if term refers to a general system (not a specific usable ability), do NOT extract as entity
-- Vague references to "power" without specifics
+- Pure generic descriptors: "חזק", "מהיר", "חכם" (without being framed as a special technique)
+- General magic system concepts UNLESS they refer to a specific usable ability (e.g., "כישוף" as a system ≠ extract; "רונת אש" ✓ do extract)
+- Vague references to "power" WITHOUT specifics or named techniques
 
-DO extract:
-- Specific named abilities in both categories
-- Abilities that characters actively USE
-- Distinct techniques with identifiable names
+DO extract — PRIORITY:
+- ANY phrase containing "יכולת" + a specific name (e.g., "יכולת קריאת שפתיים" → extract "קריאת שפתיים")
+- Specific martial/combat techniques named and attributed to characters
+- Specific magical abilities with names
+- Named abilities even if short description provided
 
 === CONTEXT AWARENESS ===
 - If a word can be either a character name or a concept (e.g., "רונה" could be a person or a type of magic), decide based on context.
