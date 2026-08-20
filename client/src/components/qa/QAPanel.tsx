@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Loader2, Trash2 } from 'lucide-react'
+import { Send, Loader2, Trash2, AlertCircle } from 'lucide-react'
 import { useQAStore } from '@/stores/qaStore'
 import SourceReference from './SourceReference'
 
@@ -43,7 +43,7 @@ export default function QAPanel({ projectId }: QAPanelProps) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && (
+        {messages.length === 0 && !loading && (
           <div className="text-center text-muted-foreground py-8">
             <p className="text-sm">{t('qa.placeholder')}</p>
             <p className="text-xs mt-1 opacity-70">{t('qa.examples')}</p>
@@ -56,17 +56,55 @@ export default function QAPanel({ projectId }: QAPanelProps) {
               <div className="bg-primary text-primary-foreground rounded-lg px-3 py-2 max-w-[80%]">
                 <p className="text-sm">{msg.text}</p>
               </div>
+            ) : msg.type === 'error' ? (
+              <div className="flex items-start gap-2 bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-2 max-w-[90%]">
+                <AlertCircle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-destructive">{msg.text}</p>
+              </div>
             ) : (
-              <div className="space-y-2">
-                <div className="bg-muted rounded-lg px-3 py-2">
-                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                </div>
+              <div className="space-y-2 max-w-[90%]">
+                {/* Answer text - only show if present */}
+                {msg.text && msg.text !== t('ui.qa.staticModeAnswer') && (
+                  <div className="bg-muted rounded-lg px-3 py-2">
+                    <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
+                  </div>
+                )}
+
+                {/* Insufficient context state */}
+                {msg.noSufficientContext && !msg.text && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <p className="text-sm text-amber-900">{t('ui.qa.noResults')}</p>
+                  </div>
+                )}
+
+                {/* Insufficient context warning (even with partial answer) */}
+                {msg.noSufficientContext && msg.text && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <p className="text-xs text-amber-900">{t('ui.qa.partialResults')}</p>
+                  </div>
+                )}
+
+                {/* Sources section */}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="space-y-1 ps-2">
                     <p className="text-xs text-muted-foreground font-medium">{t('qa.sources')}:</p>
                     {msg.sources.map((source, idx) => (
                       <SourceReference key={source.chunkId} source={source} index={idx} />
                     ))}
+                  </div>
+                )}
+
+                {/* Entities referenced */}
+                {msg.entitiesReferenced && msg.entitiesReferenced.length > 0 && (
+                  <div className="space-y-1 ps-2">
+                    <p className="text-xs text-muted-foreground font-medium">{t('qa.entities')}:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {msg.entitiesReferenced.map((entity) => (
+                        <span key={entity} className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">
+                          {entity}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

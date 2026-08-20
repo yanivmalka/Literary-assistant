@@ -14,7 +14,7 @@ export interface QASource {
 
 export interface QAMessage {
   id: string
-  type: 'question' | 'answer'
+  type: 'question' | 'answer' | 'error'
   text: string
   sources?: QASource[]
   entitiesReferenced?: string[]
@@ -25,14 +25,29 @@ export interface QAMessage {
 interface QAState {
   messages: QAMessage[]
   loading: boolean
+  error: string | null
 
   ask: (projectId: string, question: string) => Promise<void>
   clearHistory: () => void
 }
 
+interface EdgeFunctionResponse {
+  success: boolean
+  error?: string
+  result?: {
+    answer: string
+    sources: QASource[]
+    entitiesReferenced: string[]
+    noSufficientContext: boolean
+    modelUsed?: string
+    latencyMs?: number
+  }
+}
+
 export const useQAStore = create<QAState>((set, get) => ({
   messages: [],
   loading: false,
+  error: null,
 
   ask: async (projectId, question) => {
     const questionMsg: QAMessage = {
@@ -41,114 +56,106 @@ export const useQAStore = create<QAState>((set, get) => ({
       text: question,
       timestamp: new Date(),
     }
-    set({ messages: [...get().messages, questionMsg], loading: true })
+    set({ messages: [...get().messages, questionMsg], loading: true, error: null })
 
     try {
-      // Direct Supabase full-text search (basic Q&A without LLM)
-      // This works on static hosting. Full AI-powered Q&A requires the Express server.
+      // Get authenticated user
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        set({ loading: false })
-        return
-      }
-
-      // Get project documents
-      const { data: docs } = await supabase
-        .from('documents')
-        .select('id')
-        .eq('project_id', projectId)
-        .eq('user_id', user.id)
-
-      if (!docs || docs.length === 0) {
-        const noDocsMsg: QAMessage = {
+        const errorMsg: QAMessage = {
           id: crypto.randomUUID(),
-          type: 'answer',
-          text: i18n.t('ui.qa.noDocuments'),
-          noSufficientContext: true,
+          type: 'error',
+          text: i18n.t('ui.qa.authRequired'),
           timestamp: new Date(),
         }
-        set({ messages: [...get().messages, noDocsMsg], loading: false })
+        set({ messages: [...get().messages, errorMsg], loading: false, error: 'Not authenticated' })
         return
       }
 
-      const docIds = docs.map(d => d.id)
-
-      // Get versions
-      const { data: versions } = await supabase
-        .from('document_versions')
-        .select('id')
-        .in('document_id', docIds)
-        .in('status', ['ready', 'indexed', 'skipped_no_provider'])
-
-      if (!versions || versions.length === 0) {
-        const notReadyMsg: QAMessage = {
+      // Get session token for authorization
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        const errorMsg: QAMessage = {
           id: crypto.randomUUID(),
-          type: 'answer',
-          text: i18n.t('ui.qa.processing'),
-          noSufficientContext: true,
+          type: 'error',
+          text: i18n.t('ui.qa.authRequired'),
           timestamp: new Date(),
         }
-        set({ messages: [...get().messages, notReadyMsg], loading: false })
+        set({ messages: [...get().messages, errorMsg], loading: false, error: 'No session token' })
         return
       }
 
-      const versionIds = versions.map(v => v.id)
+      // Call ask-question Edge Function
+      const edgeFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ask-question`
+      
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          project_id: projectId,
+          question: question.trim(),
+          top_k: 5,
+        }),
+      })
 
-      // Full-text search in chunks
-      const { data: chunks } = await supabase
-        .from('document_chunks')
-        .select('id, content, chapter_number, chapter_title, page, position, version_id')
-        .in('version_id', versionIds)
-        .textSearch('content', question.trim().split(/\s+/).map(term => term.replace(/[.,!?;:()[\]{}]/g, '')).filter(term => term.length > 1).join(' & '), {
-          type: 'plain',
-          config: 'simple',
-        })
-        .limit(5)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))
+        throw new Error(errorData.error || `Edge Function error: HTTP ${response.status}`)
+      }
 
-      const sources: QASource[] = (chunks || []).map(chunk => ({
-        chunkId: chunk.id,
-        content: chunk.content,
-        chapterNumber: chunk.chapter_number,
-        chapterTitle: chunk.chapter_title,
-        page: chunk.page,
-        score: 1,
-        documentName: undefined,
-      }))
+      const data = await response.json() as EdgeFunctionResponse
 
-      if (sources.length === 0) {
-        const noResultsMsg: QAMessage = {
+      if (!data.success || !data.result) {
+        throw new Error(data.error || 'Edge Function returned invalid response')
+      }
+
+      const result = data.result
+
+      // No context available
+      if (result.noSufficientContext && !result.answer) {
+        const noContextMsg: QAMessage = {
           id: crypto.randomUUID(),
           type: 'answer',
           text: i18n.t('ui.qa.noResults'),
-          sources: [],
+          sources: result.sources,
+          entitiesReferenced: result.entitiesReferenced,
           noSufficientContext: true,
           timestamp: new Date(),
         }
-        set({ messages: [...get().messages, noResultsMsg], loading: false })
+        set({ messages: [...get().messages, noContextMsg], loading: false })
         return
       }
 
-      // Without LLM: show relevant sources directly
+      // Generate answer from LLM
       const answerMsg: QAMessage = {
         id: crypto.randomUUID(),
         type: 'answer',
-        text: i18n.t('ui.qa.staticModeAnswer'),
-        sources,
-        noSufficientContext: false,
+        text: result.answer || i18n.t('ui.qa.staticModeAnswer'),
+        sources: result.sources,
+        entitiesReferenced: result.entitiesReferenced,
+        noSufficientContext: result.noSufficientContext,
         timestamp: new Date(),
       }
       set({ messages: [...get().messages, answerMsg], loading: false })
     } catch (error) {
       console.error('Q&A error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       const errorMsg: QAMessage = {
         id: crypto.randomUUID(),
-        type: 'answer',
-        text: i18n.t('ui.qa.searchError'),
+        type: 'error',
+        text: `${i18n.t('ui.qa.searchError')}: ${errorMessage}`,
         timestamp: new Date(),
       }
-      set({ messages: [...get().messages, errorMsg], loading: false })
+      set({ 
+        messages: [...get().messages, errorMsg], 
+        loading: false,
+        error: errorMessage,
+      })
     }
   },
 
-  clearHistory: () => set({ messages: [] }),
+  clearHistory: () => set({ messages: [], error: null }),
 }))
