@@ -28,6 +28,12 @@ import { normalizeKey, stripNikud } from "../_shared/rules/normalization.ts";
 import { shouldFilterEntity } from "../_shared/rules/filtering.ts";
 import { isPrefixMatch, scoreConsolidation, CONSOLIDATION_THRESHOLDS } from "../_shared/rules/consolidation.ts";
 import { syncEntityValues } from "../_shared/value-sync.ts";
+import {
+  applyEntityOverrides,
+  hasConflictingEntityContext,
+  resolveExtractionCandidate,
+  type EntityResolutionRecord,
+} from "../_shared/entity-resolution.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -245,7 +251,24 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
     const key = normalizeKey(cleanName);
     if (!key) return;
 
-    const existing = entityMap.get(key);
+    const incomingStructuredFields = buildStructuredFields(type, entity);
+    const incomingContext: EntityResolutionRecord = {
+      canonical_name: cleanName,
+      entity_type: type,
+      description: entity.description || entity.significance || null,
+      attributes: entity.attributes || {},
+      structured_fields: incomingStructuredFields,
+    };
+
+    let entityMapKey = key;
+    let existing = entityMap.get(entityMapKey);
+    let suffix = 2;
+    while (existing && hasConflictingEntityContext(existing, incomingContext)) {
+      entityMapKey = `${key}::${suffix}`;
+      existing = entityMap.get(entityMapKey);
+      suffix++;
+    }
+
     if (existing) {
       if (!existing.entity_types.includes(type)) existing.entity_types.push(type);
       if (entity.attributes) existing.attributes = { ...existing.attributes, ...entity.attributes };
@@ -288,7 +311,7 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
         existing.attributes.members = [...((existing.attributes.members as string[]) || []), ...entity.members];
       }
       if (entity.purpose) existing.attributes.purpose = entity.purpose;
-      const newStructured = buildStructuredFields(type, entity);
+      const newStructured = incomingStructuredFields;
       for (const [k, v] of Object.entries(newStructured)) {
         if (v != null && existing.structured_fields[k] == null) {
           existing.structured_fields[k] = v;
@@ -302,13 +325,13 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
       if (entity.members && entity.members.length > 0) attrs.members = entity.members;
       if (entity.purpose) attrs.purpose = entity.purpose;
 
-      entityMap.set(key, {
+      entityMap.set(entityMapKey, {
         canonical_name: cleanName,
         entity_type: type,
         entity_types: [type],
         description: entity.description || entity.significance || null,
         attributes: attrs,
-        structured_fields: buildStructuredFields(type, entity),
+        structured_fields: incomingStructuredFields,
         aliases: (entity.aliases || []).map(a => stripNikud(a)).filter(Boolean),
         evidence: entity.evidence || [],
         chunk_positions: entity.chunk_positions || [],
@@ -353,6 +376,12 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
       const [keyB, entityB] = entries[j];
       if (!entityMap.has(keyB)) continue; // already merged away
       if (entityA.entity_type !== entityB.entity_type) continue; // different types
+      if (normalizeKey(entityA.canonical_name) === normalizeKey(entityB.canonical_name) &&
+          hasConflictingEntityContext(entityA, entityB)) {
+        // Same names with contradictory context are distinct entities, not a
+        // consolidation candidate.
+        continue;
+      }
 
       const nameA = entityA.canonical_name;
       const nameB = entityB.canonical_name;
@@ -476,13 +505,7 @@ function errorResponse(message: string, status: number, details?: string): Respo
 }
 
 function buildOverlayChanges(
-  existing: {
-    canonical_name: string;
-    entity_type: string;
-    structured_fields: unknown;
-    attributes: unknown;
-    description: string | null;
-  },
+  existing: EntityResolutionRecord,
   entity: NormalizedEntity,
 ): { overrides: Record<string, unknown>; baseValues: Record<string, unknown> } {
   const overrides: Record<string, unknown> = {};
@@ -508,6 +531,168 @@ function buildOverlayChanges(
   }
 
   return { overrides, baseValues };
+}
+
+type ExtractionEntityCandidate = EntityResolutionRecord & {
+  id: string;
+  source: string;
+  layer: "main" | "branch";
+  branch_id: string | null;
+  overlayOverrides?: Record<string, unknown>;
+  overlayBaseValues?: Record<string, unknown>;
+};
+
+async function loadEntityAliases(
+  supabase: any,
+  entityIds: string[],
+  branchId: string | null,
+): Promise<Map<string, string[]>> {
+  const aliasesByEntity = new Map<string, string[]>();
+  if (entityIds.length === 0) return aliasesByEntity;
+
+  let query = supabase
+    .from("knowledge_entity_aliases")
+    .select("entity_id, alias")
+    .in("entity_id", entityIds);
+  query = branchId ? query.eq("branch_id", branchId) : query.is("branch_id", null);
+
+  const { data: aliases, error } = await query;
+  if (error) throw new Error(`Failed to fetch entity aliases: ${error.message}`);
+
+  for (const alias of aliases || []) {
+    const values = aliasesByEntity.get(alias.entity_id) || [];
+    values.push(alias.alias);
+    aliasesByEntity.set(alias.entity_id, values);
+  }
+
+  return aliasesByEntity;
+}
+
+async function findExistingEntity(
+  supabase: any,
+  projectId: string,
+  userId: string,
+  branchId: string,
+  entity: NormalizedEntity,
+): Promise<ExtractionEntityCandidate | null> {
+  const entitySelect = "id, canonical_name, entity_type, entity_types, structured_fields, attributes, source, description, layer, branch_id";
+  const [mainResult, branchResult, overlayResult] = await Promise.all([
+    supabase
+      .from("knowledge_entities")
+      .select(entitySelect)
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .eq("layer", "main"),
+    supabase
+      .from("knowledge_entities")
+      .select(entitySelect)
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .eq("layer", "branch")
+      .eq("branch_id", branchId),
+    supabase
+      .from("knowledge_branch_entities")
+      .select("entity_id, source_entity_id, overrides, base_values")
+      .eq("branch_id", branchId)
+      .not("source_entity_id", "is", null),
+  ]);
+
+  if (mainResult.error) throw new Error(`Failed to fetch Main entity candidates: ${mainResult.error.message}`);
+  if (branchResult.error) throw new Error(`Failed to fetch Branch entity candidates: ${branchResult.error.message}`);
+  if (overlayResult.error) throw new Error(`Failed to fetch Branch overlays: ${overlayResult.error.message}`);
+
+  const mainRows = (mainResult.data || []) as ExtractionEntityCandidate[];
+  const branchRows = (branchResult.data || []) as ExtractionEntityCandidate[];
+  const overlays = (overlayResult.data || []) as Array<{
+    entity_id: string;
+    source_entity_id: string | null;
+    overrides: Record<string, unknown> | null;
+    base_values: Record<string, unknown> | null;
+  }>;
+
+  const mainIds = mainRows.map((row) => row.id);
+  const branchIds = branchRows.map((row) => row.id);
+  const mainAliases = await loadEntityAliases(supabase, mainIds, null);
+  const branchAliases = await loadEntityAliases(supabase, [...mainIds, ...branchIds], branchId);
+  const overlayByMainId = new Map(
+    overlays
+      .filter((overlay) => overlay.source_entity_id)
+      .map((overlay) => [overlay.source_entity_id as string, overlay]),
+  );
+
+  const mainCandidates = mainRows.map((row) => {
+    const overlay = overlayByMainId.get(row.id);
+    const effective = overlay
+      ? applyEntityOverrides(row, overlay.overrides || {})
+      : row;
+
+    return {
+      ...effective,
+      id: row.id,
+      layer: "main" as const,
+      branch_id: null,
+      aliases: [
+        ...(mainAliases.get(row.id) || []),
+        ...(branchAliases.get(row.id) || []),
+      ],
+      overlayOverrides: overlay?.overrides || undefined,
+      overlayBaseValues: overlay?.base_values || undefined,
+    };
+  });
+
+  const branchCandidates = branchRows.map((row) => ({
+    ...row,
+    layer: "branch" as const,
+    aliases: branchAliases.get(row.id) || [],
+  }));
+
+  return resolveExtractionCandidate(entity, branchCandidates, mainCandidates);
+}
+
+function mergeNonNullFields(
+  existing: Record<string, unknown> | null | undefined,
+  incoming: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged = { ...(existing || {}) };
+  for (const [key, value] of Object.entries(incoming)) {
+    if (value !== null && value !== undefined) merged[key] = value;
+  }
+  return merged;
+}
+
+function mergeExistingBranchEntity(
+  existing: ExtractionEntityCandidate,
+  incoming: NormalizedEntity,
+): NormalizedEntity {
+  const canonicalName = incoming.canonical_name.length > existing.canonical_name.length
+    ? incoming.canonical_name
+    : existing.canonical_name;
+
+  return {
+    canonical_name: canonicalName,
+    entity_type: existing.entity_type,
+    entity_types: [...new Set([...(existing.entity_types || []), ...incoming.entity_types])],
+    description: existing.description || incoming.description,
+    attributes: mergeNonNullFields(existing.attributes, incoming.attributes),
+    structured_fields: mergeNonNullFields(existing.structured_fields, incoming.structured_fields),
+    aliases: [...new Set([...(existing.aliases || []), ...incoming.aliases])],
+    evidence: [...new Set([...(incoming.evidence || [])])],
+    chunk_positions: [...new Set([...(incoming.chunk_positions || [])])],
+  };
+}
+
+function findBatchEntityId(
+  name: string,
+  entries: Array<{ entity: NormalizedEntity; id: string }>,
+): string | null {
+  const key = normalizeKey(name);
+  const matches = entries.filter(({ entity }) =>
+    normalizeKey(entity.canonical_name) === key ||
+    entity.aliases.some((alias) => normalizeKey(alias) === key),
+  );
+  const ids = [...new Set(matches.map(({ id }) => id))];
+  // Name-only references are safe only when the batch contains one candidate.
+  return ids.length === 1 ? ids[0] : null;
 }
 
 // ============================================
@@ -760,7 +945,7 @@ Deno.serve(async (req) => {
     // Priority: user data > existing extracted data > new extracted data > null
     // ==============================
     const normalizedEntities = normalizeEntities(extraction);
-    const entityIdMap = new Map<string, string>();
+    const entityIdEntries: Array<{ entity: NormalizedEntity; id: string }> = [];
     let entitiesSaved = 0;
     let mentionsSaved = 0;
     let aliasesSaved = 0;
@@ -770,80 +955,117 @@ Deno.serve(async (req) => {
     const valueSyncErrors: string[] = [];
 
     for (const entity of normalizedEntities) {
-      // Check if entity already exists — exact match or name-prefix match
-      // NOTE: In Main bootstrap mode, we're writing fresh entities to Main
-      // In Branch mode, we check against Main layer to create overlays
-      let existing: { id: string; structured_fields: unknown; attributes: unknown; source: string; description: string | null; entity_type: string; entity_types: string[]; canonical_name: string } | null = null;
+      // In Main bootstrap mode, entities receive new UUIDs directly.
+      // In Branch mode, resolve current-Branch entities first, then Main/overlays.
+      let existing: ExtractionEntityCandidate | null = null;
 
-      // Only check for existing entities if we're in Branch extraction mode
       if (targetLayer === "branch") {
-        // 1. Try exact match (case-insensitive) in Main
-        const { data: exactMatch } = await supabase
-          .from("knowledge_entities")
-          .select("id, canonical_name, entity_type, structured_fields, attributes, source, description, entity_types")
-          .eq("project_id", body.project_id)
-          .eq("user_id", body.user_id)
-          .eq("layer", "main")
-          .ilike("canonical_name", entity.canonical_name)
-          .maybeSingle();
-
-        if (exactMatch) {
-          existing = exactMatch;
-        } else {
-          // 2. Try prefix match: find existing entity whose name starts with new name or vice versa
-          //    e.g., existing "ליאו" matches new "ליאו פרוסט" → update existing to full name
-          const { data: prefixMatches } = await supabase
-            .from("knowledge_entities")
-            .select("id, canonical_name, entity_type, structured_fields, attributes, source, description, entity_types")
-            .eq("project_id", body.project_id)
-            .eq("user_id", body.user_id)
-            .eq("layer", "main")
-            .eq("entity_type", entity.entity_type)
-            .or(`canonical_name.ilike.${entity.canonical_name}%,canonical_name.ilike.%${entity.canonical_name}`)
-            .limit(1);
-
-          if (prefixMatches && prefixMatches.length > 0) {
-            // Verify it's actually a name-prefix relationship (not just substring coincidence)
-            const match = prefixMatches[0];
-            const matchName = (match.canonical_name || "").toLowerCase();
-            const newName = entity.canonical_name.toLowerCase();
-            if (matchName.startsWith(newName + " ") || newName.startsWith(matchName + " ") ||
-                matchName.startsWith(newName + "'") || newName.startsWith(matchName + "'") ||
-                matchName === newName) {
-              existing = match;
-            }
-          }
-        }
+        existing = await findExistingEntity(
+          supabase,
+          body.project_id,
+          body.user_id,
+          targetBranchId!,
+          entity,
+        );
       }
 
       let entityId: string;
 
       if (existing) {
-        // Branch mode: entity exists in Main → create overlay
-        const { overrides, baseValues } = buildOverlayChanges(existing, entity);
-        const { error: overlayError } = await supabase
-          .from("knowledge_branch_entities")
-          .upsert(
-            {
-              branch_id: targetBranchId!,
-              source_entity_id: existing.id,
-              entity_id: existing.id,
-              project_id: body.project_id,
-              user_id: body.user_id,
-              overrides,
-              base_values: baseValues,
-              is_modified: Object.keys(overrides).length > 0,
-              modified_fields: Object.keys(overrides),
-            },
-            { onConflict: "branch_id,entity_id" }
-          );
+        if (existing.layer === "branch") {
+          // Reuse the current Branch UUID and merge only non-null observations.
+          // A missing field in a later extraction must not erase Branch data.
+          const merged = mergeExistingBranchEntity(existing, entity);
+          const { error: branchUpdateError } = await supabase
+            .from("knowledge_entities")
+            .update({
+              canonical_name: merged.canonical_name,
+              entity_types: merged.entity_types,
+              description: merged.description,
+              attributes: merged.attributes,
+              structured_fields: merged.structured_fields,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existing.id)
+            .eq("project_id", body.project_id)
+            .eq("branch_id", targetBranchId!);
 
-        if (overlayError) {
-          console.error(`Failed to create overlay for '${entity.canonical_name}':`, overlayError.message);
-          continue;
+          if (branchUpdateError) {
+            console.error(`Failed to update Branch entity '${entity.canonical_name}':`, branchUpdateError.message);
+            continue;
+          }
+
+          const { error: branchMappingError } = await supabase
+            .from("knowledge_branch_entities")
+            .upsert(
+              {
+                branch_id: targetBranchId!,
+                source_entity_id: null,
+                entity_id: existing.id,
+                project_id: body.project_id,
+                user_id: body.user_id,
+                canonical_name: merged.canonical_name,
+                entity_type: merged.entity_type,
+                entity_types: merged.entity_types,
+                description: merged.description,
+                attributes: merged.attributes,
+                overrides: {
+                  canonical_name: merged.canonical_name,
+                  entity_type: merged.entity_type,
+                  description: merged.description,
+                  attributes: merged.attributes,
+                  structured_fields: merged.structured_fields,
+                },
+                base_values: {},
+                is_modified: true,
+                modified_fields: ["canonical_name", "entity_type", "description", "attributes", "structured_fields"],
+              },
+              { onConflict: "branch_id,entity_id" },
+            );
+
+          if (branchMappingError) {
+            console.error(`Failed to update Branch mapping for '${entity.canonical_name}':`, branchMappingError.message);
+            continue;
+          }
+
+          entityId = existing.id;
+          branchEntitiesSaved++;
+        } else {
+          // Main entity: create or update the active Branch overlay. Preserve
+          // prior overrides when this extraction omits those fields.
+          const { overrides, baseValues } = buildOverlayChanges(existing, entity);
+          const mergedOverrides = { ...(existing.overlayOverrides || {}), ...overrides };
+          const mergedBaseValues = { ...(existing.overlayBaseValues || {}), ...baseValues };
+          const { error: overlayError } = await supabase
+            .from("knowledge_branch_entities")
+            .upsert(
+              {
+                branch_id: targetBranchId!,
+                source_entity_id: existing.id,
+                entity_id: existing.id,
+                project_id: body.project_id,
+                user_id: body.user_id,
+                // Preserve the legacy snapshot columns while using UUIDs for identity.
+                canonical_name: existing.canonical_name,
+                entity_type: existing.entity_type,
+                entity_types: existing.entity_types || [],
+                description: existing.description || null,
+                attributes: existing.attributes || {},
+                overrides: mergedOverrides,
+                base_values: mergedBaseValues,
+                is_modified: Object.keys(mergedOverrides).length > 0,
+                modified_fields: Object.keys(mergedOverrides),
+              },
+              { onConflict: "branch_id,entity_id" },
+            );
+
+          if (overlayError) {
+            console.error(`Failed to create overlay for '${entity.canonical_name}':`, overlayError.message);
+            continue;
+          }
+          entityId = existing.id;
+          branchEntitiesSaved++;
         }
-        entityId = existing.id;
-        branchEntitiesSaved++;
       } else {
         // New entity: insert based on target layer
         const { data: inserted, error: insertError } = await supabase
@@ -885,6 +1107,12 @@ Deno.serve(async (req) => {
                 entity_id: entityId,
                 project_id: body.project_id,
                 user_id: body.user_id,
+                // Preserve the legacy snapshot columns while using the new row UUID as identity.
+                canonical_name: entity.canonical_name,
+                entity_type: entity.entity_type,
+                entity_types: entity.entity_types,
+                description: entity.description,
+                attributes: entity.attributes,
                 overrides: {
                   canonical_name: entity.canonical_name,
                   entity_type: entity.entity_type,
@@ -910,7 +1138,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      entityIdMap.set(entity.canonical_name.toLowerCase(), entityId);
+      entityIdEntries.push({ entity, id: entityId });
       entitiesSaved++;
 
       // Sync canonical values to knowledge_entity_values (after entity is created)
@@ -968,8 +1196,8 @@ Deno.serve(async (req) => {
         const relationshipType = rel.relationship_type?.trim();
         if (!relationshipType || !INITIAL_RELATIONSHIP_TYPES.has(relationshipType)) continue;
 
-        const sourceId = entityIdMap.get(rel.character_a?.trim().toLowerCase());
-        const targetId = entityIdMap.get(rel.character_b?.trim().toLowerCase());
+        const sourceId = findBatchEntityId(rel.character_a?.trim() || "", entityIdEntries);
+        const targetId = findBatchEntityId(rel.character_b?.trim() || "", entityIdEntries);
         if (!sourceId || !targetId) continue;
 
         // A Branch proposal records whether the same edge existed in Main at the
@@ -1063,7 +1291,7 @@ Deno.serve(async (req) => {
         }
 
         for (const participantName of event.participants || []) {
-          const participantId = entityIdMap.get(participantName.trim().toLowerCase());
+          const participantId = findBatchEntityId(participantName.trim(), entityIdEntries);
           if (!participantId) continue;
           await supabase.from("knowledge_event_participants").upsert(
             { event_id: eventId, entity_id: participantId, role: null },

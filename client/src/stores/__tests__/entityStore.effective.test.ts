@@ -25,7 +25,7 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
 
   describe('fetchEntities: Main-only entities', () => {
     it('should display Main-only entities when no active Branch exists', async () => {
-      const mockAuthUser = { user: { id: 'user-1' } }
+      const mockAuthUser = { data: { user: { id: 'user-1' } } }
       ;(supabase.auth.getUser as any).mockResolvedValue(mockAuthUser)
 
       const mainEntities = [
@@ -63,7 +63,9 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
         },
         knowledge_entity_aliases: {
           select: vi.fn().mockReturnThis(),
-          in: vi.fn().mockResolvedValue({ data: [] }),
+          in: vi.fn().mockReturnThis(),
+          is: vi.fn().mockResolvedValue({ data: [] }),
+          eq: vi.fn().mockResolvedValue({ data: [] }),
         },
       }
 
@@ -82,16 +84,16 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
         return mockFromCalls[table] || { select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis() }
       })
 
-      const store = useEntityStore()
+      const store = useEntityStore.getState()
       await store.fetchEntities('project-1')
 
-      expect(store.entities.length).toBeGreaterThan(0)
+      expect(useEntityStore.getState().entities.length).toBeGreaterThan(0)
     })
   })
 
   describe('fetchEntities: Branch-only entities', () => {
     it('should display Branch-only entities extracted from Document 2+', async () => {
-      const mockAuthUser = { user: { id: 'user-1' } }
+      const mockAuthUser = { data: { user: { id: 'user-1' } } }
       ;(supabase.auth.getUser as any).mockResolvedValue(mockAuthUser)
 
       void [
@@ -112,7 +114,7 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
         },
       ]
 
-      const store = useEntityStore()
+      const store = useEntityStore.getState()
 
       // Mock should return branch-only entities when layer='branch'
       // Verify test structure is ready for implementation
@@ -122,7 +124,7 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
 
   describe('fetchEntities: Main + Branch overlay merge', () => {
     it('should apply Branch overrides to Main entities', async () => {
-      const mockAuthUser = { user: { id: 'user-1' } }
+      const mockAuthUser = { data: { user: { id: 'user-1' } } }
       ;(supabase.auth.getUser as any).mockResolvedValue(mockAuthUser)
 
       // Scenario:
@@ -156,7 +158,7 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
         updated_at: '2024-01-02T00:00:00Z',
       }
 
-      const store = useEntityStore()
+      const store = useEntityStore.getState()
 
       // Verify store structure
       expect(store).toBeDefined()
@@ -166,13 +168,13 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
 
   describe('fetchEntities: No duplicates', () => {
     it('should not duplicate entities when same entity exists in Main and Branch overlay', async () => {
-      const mockAuthUser = { user: { id: 'user-1' } }
+      const mockAuthUser = { data: { user: { id: 'user-1' } } }
       ;(supabase.auth.getUser as any).mockResolvedValue(mockAuthUser)
 
       // If Leo (char-1) exists in Main and has a Branch overlay,
       // the effective display should show Leo exactly once, not twice
 
-      const store = useEntityStore()
+      const store = useEntityStore.getState()
 
       // After fetchEntities, verify no duplicates
       // Store should use Map<id, Entity> internally to prevent duplicates
@@ -182,7 +184,7 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
 
   describe('fetchEntities: Multiple extractions', () => {
     it('should preserve data from multiple extractions', async () => {
-      const mockAuthUser = { user: { id: 'user-1' } }
+      const mockAuthUser = { data: { user: { id: 'user-1' } } }
       ;(supabase.auth.getUser as any).mockResolvedValue(mockAuthUser)
 
       // Scenario:
@@ -193,7 +195,7 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
       // Expected result: Leo (Main) + Raven (Branch) + Castle (Branch) + Phoenix (Branch)
       // = 4 total entities, all visible
 
-      const store = useEntityStore()
+      const store = useEntityStore.getState()
 
       // Verify store can hold multiple extractions
       expect(store.entities).toBeDefined()
@@ -203,10 +205,10 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
 
   describe('fetchEntities: Type filtering', () => {
     it('should filter effective entities by type', async () => {
-      const mockAuthUser = { user: { id: 'user-1' } }
+      const mockAuthUser = { data: { user: { id: 'user-1' } } }
       ;(supabase.auth.getUser as any).mockResolvedValue(mockAuthUser)
 
-      const store = useEntityStore()
+      const store = useEntityStore.getState()
 
       // Filter should work on the merged effective entity set
       // After Main + Branch merge, filter by entity_type='character'
@@ -216,7 +218,7 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
 
   describe('fetchEntities: Main unchanged', () => {
     it('should preserve Main entities unchanged after Branch extraction', async () => {
-      const mockAuthUser = { user: { id: 'user-1' } }
+      const mockAuthUser = { data: { user: { id: 'user-1' } } }
       ;(supabase.auth.getUser as any).mockResolvedValue(mockAuthUser)
 
       // Scenario:
@@ -224,7 +226,7 @@ describe('entityStore: Effective Entity Display (Main + Branch)', () => {
       // - Doc 2: Leo updated to age: 26 in Branch
       // - Verify Main still has Leo with age: 25 (unchanged)
 
-      const store = useEntityStore()
+      const store = useEntityStore.getState()
 
       // Main entities should never be modified by Branch extraction
       expect(store.entities).toBeDefined()

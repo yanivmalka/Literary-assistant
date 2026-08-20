@@ -627,8 +627,7 @@ export async function findMatchingMainEntity(
   canonicalName: string,
   entityType: string
 ): Promise<{ id: string; canonical_name: string } | null> {
-  // Normalize search
-  const normalized = canonicalName.toLowerCase().trim()
+  const normalized = canonicalName.trim().toLowerCase()
 
   const { data, error } = await supabase
     .from('knowledge_entities')
@@ -636,15 +635,19 @@ export async function findMatchingMainEntity(
     .eq('project_id', projectId)
     .eq('layer', 'main')
     .eq('entity_type', entityType)
-    .ilike('canonical_name', normalized)
-    .maybeSingle()
 
   if (error) {
     console.error('Error finding matching Main entity:', error)
     return null
   }
 
-  return data
+  const matches = (data || []).filter(entity =>
+    entity.canonical_name.trim().toLowerCase() === normalized,
+  )
+
+  // A name is only a lookup hint. Never choose arbitrarily when duplicates
+  // exist; callers must provide stronger context or create a new entity.
+  return matches.length === 1 ? matches[0] : null
 }
 
 /**

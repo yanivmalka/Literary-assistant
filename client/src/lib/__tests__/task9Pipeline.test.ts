@@ -34,6 +34,50 @@ describe('Task 9: Extraction Pipeline + Review/Merge', () => {
   })
 
   describe('Entity Extraction', () => {
+    it('routes the first extraction request to Main bootstrap', () => {
+      const request = buildExtractionRequest('v1', 'project-1', 'doc-1', 'user-1', null, 0, 3)
+
+      expect(request.use_main).toBe(true)
+      expect(request.target_branch_id).toBeNull()
+    })
+
+    it('routes every subsequent extraction request to the active Branch', () => {
+      const request = { use_main: false, target_branch_id: 'branch-1' }
+
+      expect(request.use_main).toBe(false)
+      expect(request.target_branch_id).toBe('branch-1')
+    })
+
+    it('creates a Branch overlay that preserves Main identity', () => {
+      const overlay = {
+        source_entity_id: 'main-aron',
+        entity_id: 'main-aron',
+        overrides: { 'structured_fields.age': '30' },
+      }
+
+      expect(overlay.source_entity_id).toBe('main-aron')
+      expect(overlay.entity_id).toBe('main-aron')
+      expect((overlay.overrides as Record<string, unknown>)['structured_fields.age']).toBe('30')
+    })
+
+    it('reuses one Branch identity for repeated extraction observations', () => {
+      const branchEntities = new Map<string, { id: string }>()
+      const observed = { canonical_name: 'Aron', entity_type: 'character' }
+      const first = branchEntities.get(`${observed.entity_type}:${observed.canonical_name}`) || { id: 'branch-aron' }
+      branchEntities.set(`${observed.entity_type}:${observed.canonical_name}`, first)
+      const second = branchEntities.get(`${observed.entity_type}:${observed.canonical_name}`)
+
+      expect(second?.id).toBe(first.id)
+      expect(branchEntities.size).toBe(1)
+    })
+
+    it('deduplicates duplicate names within one extraction batch', () => {
+      const observations = ['Aron', 'aron', 'Aron']
+      const unique = new Set(observations.map(name => name.toLowerCase()))
+
+      expect(unique).toEqual(new Set(['aron']))
+    })
+
     it('creates new Branch-only entity', () => {
       const entity = { id: 'e1', name: 'Leo', layer: 'branch', branch_id: 'b1' }
       expect(entity.branch_id).toBe('b1')

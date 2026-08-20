@@ -4,6 +4,7 @@ import type { Entity } from '@/stores/entityStore'
 
 interface LocationTileProps {
   location: Entity
+  onEdit?: (location: Entity) => void
 }
 
 function getField(entity: Entity, field: string): string | null {
@@ -14,7 +15,7 @@ function getField(entity: Entity, field: string): string | null {
   return null
 }
 
-export default function LocationTile({ location }: LocationTileProps) {
+export default function LocationTile({ location, onEdit }: LocationTileProps) {
   const { t } = useTranslation()
 
   const locationType = getField(location, 'location_type')
@@ -26,13 +27,18 @@ export default function LocationTile({ location }: LocationTileProps) {
   return (
     <div className="border rounded-lg p-4 bg-card hover:shadow-md transition-all cursor-pointer relative group">
       {/* Edit button - appears on hover */}
-      <button
-        onClick={(e) => e.stopPropagation()}
-        className="absolute top-3 right-3 p-2 opacity-0 group-hover:opacity-100 bg-primary text-primary-foreground rounded-md transition-all hover:bg-primary/90 z-10"
-        title={t('common.edit')}
-      >
-        <Edit3 className="h-4 w-4" />
-      </button>
+      {onEdit && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onEdit(location)
+          }}
+          className="absolute top-3 right-3 p-2 opacity-0 group-hover:opacity-100 bg-primary text-primary-foreground rounded-md transition-all hover:bg-primary/90 z-10"
+          title={t('common.edit')}
+        >
+          <Edit3 className="h-4 w-4" />
+        </button>
+      )}
 
       {/* Location Name */}
       <h3 className="font-semibold text-lg mb-2 pr-10">{location.name}</h3>

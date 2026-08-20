@@ -69,13 +69,20 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
       ? value.toLowerCase().trim()
       : JSON.stringify(value).toLowerCase();
 
-    // Check if a value for this entity/field already exists
-    const { data: existingValues, error: checkError } = await supabase
+    // Check if a value for this entity/field already exists in the same
+    // Main/Branch scope. A Branch value must never supersede Main history.
+    let existingValuesQuery = supabase
       .from("knowledge_entity_values")
       .select("id, source_type, value_status")
       .eq("entity_id", entityId)
       .eq("field_path", fieldPath)
       .eq("value_status", "active");
+
+    existingValuesQuery = branchId
+      ? existingValuesQuery.eq("branch_id", branchId)
+      : existingValuesQuery.is("branch_id", null);
+
+    const { data: existingValues, error: checkError } = await existingValuesQuery;
 
     if (checkError) {
       errors.push(`Failed to check existing value for ${fieldPath}: ${checkError.message}`);
