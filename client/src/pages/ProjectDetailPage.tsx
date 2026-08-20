@@ -5,7 +5,6 @@ import { Plus, Map, ArrowLeft, Users, MapPin, Calendar, MessageSquare, AlertTria
 import { useProjectStore } from '@/stores/projectStore'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useEntityStore } from '@/stores/entityStore'
-import { useContradictionStore } from '@/stores/contradictionStore'
 import { getProjectEvents } from '@/lib/eventService'
 import KnowledgeOverview from '@/components/knowledge/KnowledgeOverview'
 
@@ -16,7 +15,6 @@ export default function ProjectDetailPage() {
   const { currentProject, projectMaps, fetchProject, fetchProjectMaps } = useProjectStore()
   const { documents, fetchDocuments } = useDocumentStore()
   const { entities, fetchEntities } = useEntityStore()
-  const { contradictions, fetchContradictions } = useContradictionStore()
   const [timelineEventCount, setTimelineEventCount] = useState(0)
 
   useEffect(() => {
@@ -25,12 +23,11 @@ export default function ProjectDetailPage() {
       fetchProjectMaps(projectId)
       fetchDocuments(projectId)
       fetchEntities(projectId)
-      fetchContradictions(projectId)
       getProjectEvents(projectId)
         .then(events => setTimelineEventCount(events.length))
         .catch(() => setTimelineEventCount(0))
     }
-  }, [projectId, fetchProject, fetchProjectMaps, fetchDocuments, fetchEntities, fetchContradictions])
+  }, [projectId, fetchProject, fetchProjectMaps, fetchDocuments, fetchEntities])
 
   if (!currentProject) {
     return (
@@ -91,7 +88,6 @@ export default function ProjectDetailPage() {
         <KnowledgeOverview
           projectId={projectId!}
           documents={documents}
-          contradictions={contradictions}
         />
       </section>
 
