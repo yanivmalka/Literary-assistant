@@ -1,0 +1,320 @@
+{
+  "demo_metadata": {
+    "source_text_lines": 20,
+    "extraction_timestamp": "2026-08-21T10:00:00Z",
+    "extraction_engine": "Claude Haiku (simulated)",
+    "language": "Hebrew",
+    "text_summary": "Three powerful characters arrive in the mystical city of Throneheim with unique abilities to stop a star curse"
+  },
+  
+  "extraction_results": {
+    "characters": [
+      {
+        "name": "ליאו פרוסט",
+        "aliases": ["ליאו"],
+        "age": "25",
+        "hair_color": "שחור",
+        "description": "קוסם בן עשרים וחמש, חזק בקוסמים",
+        "narrative_role": "הקוסם השלוח למשימה סודית",
+        "evidence": [
+          "ליאו פרוסט, קוסם בן עשרים וחמש עם שערו השחור וחזקתו בקוסמים",
+          "ליאו וקריאת השפתיים שלו היו הקשקשים היחידים להבין את כוונות האויב"
+        ],
+        "chunk_positions": [2, 15],
+        "field_evidence": {
+          "name": ["ליאו פרוסט"],
+          "age": ["בן עשרים וחמש"],
+          "hair_color": ["שערו השחור"],
+          "narrative_role": ["הקוסם השלוח למשימה סודית על מנת למצוא את הכמוהו רונת האש"]
+        }
+      },
+      {
+        "name": "אלינה",
+        "aliases": [],
+        "description": "לוחמת בת שלוש-עשרה שהגיעה בעקבות ליאו",
+        "narrative_role": "לוחמת ומרפאה",
+        "evidence": [
+          "אלינה הלוחמת ההיא בת שלוש-עשרה לחימה בשתי חרבות",
+          "היא הגיעה בעקבות ליאו כדי להבין מה קורה בעיר זו"
+        ],
+        "chunk_positions": [6, 7],
+        "field_evidence": {
+          "name": ["אלינה"],
+          "narrative_role": ["לוחמת ומרפאה שהגיעה בעקבות ליאו"]
+        }
+      },
+      {
+        "name": "צפוריה",
+        "aliases": [],
+        "description": "קוסמת גדולה עם יכולת נדירה של טלקינזיס",
+        "narrative_role": "קוסמת הגנה על העיר",
+        "evidence": [
+          "צפוריה הקוסמת הגדולה הגיעה לטרונהיים",
+          "צפוריה היתה יחידה בדור שלה בעלת כושר כזה"
+        ],
+        "chunk_positions": [10, 12],
+        "field_evidence": {
+          "name": ["צפוריה"],
+          "narrative_role": ["קוסמת הגדולה שאמורה הייתה להרים את החומה כדי להגן על העיר"]
+        }
+      }
+    ],
+
+    "abilities": [
+      {
+        "name": "קריאת שפתיים",
+        "entity_type": "ability",
+        "ability_type": "physical",
+        "description": "יכולת נדירה המאפשרת קריאה של מה שאדם מדבר בלי לשמוע את קולו - כישור חי חשוב לאבחון כוונות",
+        "mechanism": "קריאה בתנועות שפתיים של האדם המדבר",
+        "activation_conditions": "צורך בראיה ישירה לשפתיים של המדבר",
+        "limitations": "דורשת ראיה טובה ודיוק שיפותיות",
+        "power_level": "נדירה וחזקה - הקשקשים היחידים להבין את כוונות האויב",
+        "users": ["ליאו פרוסט"],
+        "narrative_impact": "הקשקשים היחידים להבין את כוונות האויב בעת החזקה על הממלכה",
+        "evidence": [
+          "ליאו בעל יכולת נדירה של קריאת שפתיים, שהעניקה לו יתרון מכריע בקרבות",
+          "ליאו וקריאת השפתיים שלו היו הקשקשים היחידים להבין את כוונות האויב"
+        ],
+        "chunk_positions": [4, 15],
+        "field_evidence": {
+          "name": ["קריאת שפתיים"],
+          "ability_type": ["כישור גופני"],
+          "mechanism": ["קריאה בתנועות שפתיים"],
+          "power_level": ["הקשקשים היחידים להבין את כוונות האויב"],
+          "users": ["ליאו פרוסט"],
+          "narrative_impact": ["היחידים להבין את כוונות האויב"]
+        }
+      },
+
+      {
+        "name": "לחימה בשתי חרבות",
+        "entity_type": "ability",
+        "ability_type": "physical",
+        "description": "מיומנות קרב משופעת המשתמשת בשתי חרבות בו-זמנית",
+        "mechanism": "טכניקת קרב המשתמשת בשתי חרבות בו-זמנית",
+        "activation_conditions": "נוכחות שתי חרבות ויריב לחימה",
+        "limitations": "דורשת הכשרה מיוחדת וחוזק גופני מעל לממוצע",
+        "power_level": "כישור לוחם בסיסי אך משופע",
+        "users": ["אלינה"],
+        "narrative_impact": "אחת ממיומנויות הלחימה הראשוניות של אלינה",
+        "evidence": [
+          "אלינה הלוחמת ההיא בת שלוש-עשרה לחימה בשתי חרבות"
+        ],
+        "chunk_positions": [6],
+        "field_evidence": {
+          "name": ["לחימה בשתי חרבות"],
+          "ability_type": ["מיומנות גופנית"],
+          "mechanism": ["טכניקת קרב בשתי חרבות בו-זמנית"],
+          "users": ["אלינה"]
+        }
+      },
+
+      {
+        "name": "ריפוי אנרגטי",
+        "entity_type": "ability",
+        "ability_type": "physical",
+        "description": "יכולת קדושה של ריפוי באמצעות העברת אנרגיה ריפויית",
+        "mechanism": "העברת אנרגיה ריפויית מהמרפא אל הפצוע",
+        "activation_conditions": "ממד פיזי קרוב וכוח אנרגטי מנטלי",
+        "limitations": "יכולה נדירה שדורשת הכשרה מיוחדת",
+        "power_level": "יכולה נדירה וחשמלית",
+        "users": ["אלינה"],
+        "narrative_impact": "אמורה לרפא את הנזקים הקדושים שיגרמו מהקללה",
+        "evidence": [
+          "אלינה בעלת יכולת קדושה של ריפוי אנרגטי, יכולת נדירה שלמדה מרבי הגדולה",
+          "אלינה וריפויה האנרגטי אמורים היו לרפא את הנזקים הקדושים"
+        ],
+        "chunk_positions": [8, 16],
+        "field_evidence": {
+          "name": ["ריפוי אנרגטי"],
+          "ability_type": ["יכולה קדושה"],
+          "mechanism": ["העברת אנרגיה ריפויית"],
+          "power_level": ["יכולה נדירה"],
+          "users": ["אלינה"],
+          "narrative_impact": ["רפא את הנזקים הקדושים"]
+        }
+      }
+    ],
+
+    "magic_abilities": [
+      {
+        "name": "רונת אש",
+        "entity_type": "magic_ability",
+        "ability_type": "magical",
+        "description": "יכולת קסומה נדירה היוצרת ומשלטת אש בעזרת כוח קסומי",
+        "mechanism": "הפעלת כוח קסומי לשליטה בחומר האש",
+        "activation_conditions": "ריכוז קסומי ובקרה על הכוח המנטלי",
+        "cost": "צריכה קסומי משמעותית",
+        "power_level": "יכולה קסומה נדירה היוצרת הבעיה שיש להעצור",
+        "narrative_impact": "המטרה העיקרית של המשימה - יש למצוא מישהו בעל יכולה זו",
+        "evidence": [
+          "המלך ארתור שלח אותו למשימה סודית על מנת למצוא את הכמוהו רונת האש"
+        ],
+        "chunk_positions": [5],
+        "field_evidence": {
+          "name": ["רונת האש"],
+          "ability_type": ["יכולה קסומה"],
+          "mechanism": ["שליטה בחומר האש בעזרת כוח קסומי"],
+          "narrative_impact": ["רונת האש היא המטרה העיקרית של המשימה"]
+        }
+      },
+
+      {
+        "name": "טלקינזיס",
+        "entity_type": "magic_ability",
+        "ability_type": "magical",
+        "description": "היכולת הנדירה ביותר לזוז עצמים בעזרת כוח המחשבה בלבד",
+        "mechanism": "כוח קסומי של השפעה מנטלית על עצמים חומריים ללא מגע פיזי",
+        "activation_conditions": "ריכוז קסומי עמוק וכוח קסומי ממוד גבוה מאוד",
+        "limitations": "יכולה חזקה וקשה מאוד לשליטה, דורשת ריכוז מלא",
+        "cost": "צריכה קסומי גבוהה מאוד",
+        "power_level": "היכולת החזקה ביותר בכל הממלכה",
+        "users": ["צפוריה"],
+        "narrative_impact": "אמורה להרים את החומה כדי להגן על העיר מפני קללת הכוכבים",
+        "evidence": [
+          "צפוריה יכולת טלקינזיס - היכולת לזוז עצמים בעזרת מחשבה בלבד",
+          "זו לא הייתה יכולת רגילה, כי צפוריה היתה יחידה בדור שלה בעלת כושר כזה",
+          "גם ליאו וגם אלינה ידעו שטלקינזיס זו היכולת החזקה ביותר בכל הממלכה"
+        ],
+        "chunk_positions": [10, 11, 12, 17],
+        "field_evidence": {
+          "name": ["יכולת טלקינזיס"],
+          "ability_type": ["יכולה קסומה"],
+          "description": ["היכולת לזוז עצמים בעזרת מחשבה בלבד"],
+          "mechanism": ["כוח קסומי של השפעה מנטלית על עצמים"],
+          "power_level": ["היכולת החזקה ביותר בכל הממלכה"],
+          "users": ["צפוריה"],
+          "narrative_impact": ["להרים את החומה שמסביב לעירה כדי להגן עליה"]
+        }
+      }
+    ],
+
+    "objects": [
+      {
+        "name": "החרב הקדושה של אזתור",
+        "aliases": ["החרב הקדושה"],
+        "object_type": "חרב קסומה",
+        "description": "פריט בעל כוחות קסומים עצומים",
+        "special_properties": "כוחות קסומים עצומים",
+        "narrative_importance": "ניקח בידו של ליאו למשימה הקרובה",
+        "evidence": [
+          "בידו החזיק את החרב הקדושה של אזתור, פריט בעל כוחות קסומים עצומים"
+        ],
+        "chunk_positions": [3],
+        "field_evidence": {
+          "name": ["החרב הקדושה של אזתור"],
+          "object_type": ["חרב קסומה"],
+          "special_properties": ["כוחות קסומים עצומים"]
+        }
+      }
+    ],
+
+    "locations": [
+      {
+        "name": "טרונהיים",
+        "aliases": [],
+        "location_type": "עיר קסומה",
+        "description": "עיר הקסום",
+        "narrative_importance": "נקודת מפגש המשימה העיקרית",
+        "evidence": [
+          "בערב זה הגיעו שלוש דמויות מרכזיות לעיר הקסום של טרונהיים",
+          "היא הגיעה בעקבות ליאו כדי להבין מה קורה בעיר זו הגדולה"
+        ],
+        "chunk_positions": [1, 7],
+        "field_evidence": {
+          "name": ["טרונהיים"],
+          "location_type": ["עיר קסומה"],
+          "narrative_importance": ["מקום המפגש למשימה להעצור את קללת הכוכבים"]
+        }
+      }
+    ],
+
+    "relationships": [
+      {
+        "character_a": "ליאו פרוסט",
+        "character_b": "אלינה",
+        "relationship_type": "mission_partners",
+        "evidence": ["היא הגיעה בעקבות ליאו כדי להבין מה קורה"],
+        "chunk_positions": [7]
+      },
+      {
+        "character_a": "ליאו פרוסט",
+        "character_b": "צפוריה",
+        "relationship_type": "mission_partners",
+        "evidence": ["בלא שלוש היכולות אלו, הממלכה אבודה"],
+        "chunk_positions": [18]
+      },
+      {
+        "character_a": "אלינה",
+        "character_b": "צפוריה",
+        "relationship_type": "mission_partners",
+        "evidence": ["בלא שלוש היכולות אלו, הממלכה אבודה"],
+        "chunk_positions": [18]
+      }
+    ]
+  },
+
+  "extraction_quality_metrics": {
+    "total_entities_extracted": 11,
+    "by_type": {
+      "characters": 3,
+      "abilities": 3,
+      "magic_abilities": 2,
+      "objects": 1,
+      "locations": 1,
+      "relationships": 3
+    },
+    "precision_score": 0.95,
+    "recall_score": 0.9,
+    "note": "High quality extraction with solid evidence backing for all abilities"
+  },
+
+  "key_extraction_decisions": {
+    "accepted_entities": [
+      {
+        "entity": "קריאת שפתיים",
+        "type": "ability",
+        "reason": "ספציפי, נדיר, עדויות ברורות מטקסט"
+      },
+      {
+        "entity": "טלקינזיס",
+        "type": "magic_ability",
+        "reason": "יכולה קסומה ספציפית, תיאור ברור של מנגנון, משמעות נרטיבית עמוקה"
+      },
+      {
+        "entity": "ריפוי אנרגטי",
+        "type": "ability",
+        "reason": "יכולה פיזית ממשית, מוזכרת בהקשר למשימה"
+      },
+      {
+        "entity": "לחימה בשתי חרבות",
+        "type": "ability",
+        "reason": "טכניקת קרב ספציפית, מיומנות לוחמת"
+      }
+    ],
+    
+    "rejected_entities": [
+      {
+        "text": "קוסמים",
+        "reason": "מושג כללי לא ספציפי - לא יכולה או תפקיד",
+        "rejection_type": "generic_concept"
+      },
+      {
+        "text": "כישוף",
+        "reason": "מערכת קסום כללית - לא יכולה ספציפית שמשתמש",
+        "rejection_type": "magic_system_not_ability"
+      },
+      {
+        "text": "קרבות",
+        "reason": "תיאור כללי לא יכולה - כל אחד יכול להילחם",
+        "rejection_type": "ordinary_action"
+      },
+      {
+        "text": "המלך ארתור",
+        "reason": "מנגנון תפקידי, לא שם עצם ספציפי חדש",
+        "rejection_type": "relationship_only"
+      }
+    ]
+  }
+}

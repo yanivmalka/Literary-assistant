@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>דוגמה אינטראקטיבית - חילוץ יכולות</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        @media (max-width: 1024px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .section.text-input {
+            border-left-color: #667eea;
+        }
+        
+        .section.abilities {
+            border-left-color: #f97316;
+        }
+        
+        .section.magic {
+            border-left-color: #a855f7;
+        }
+        
+        .section.rejected {
+            border-left-color: #ef4444;
+        }
+        
+        .section h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section h3 {
+            font-size: 14px;
+            color: #666;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 300px;
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-family: 'Arial', sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+        }
+        
+        .line-number {
+            color: #999;
+            font-weight: bold;
+            min-width: 30px;
+            display: inline-block;
+        }
+        
+        .entity-card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .entity-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+            transform: translateX(-5px);
+        }
+        
+        .entity-card.ability {
+            border-right: 4px solid #f97316;
+        }
+        
+        .entity-card.magic {
+            border-right: 4px solid #a855f7;
+        }
+        
+        .entity-card.rejected {
+            border-right: 4px solid #ef4444;
+            opacity: 0.7;
+        }
+        
+        .entity-name {
+            font-weight: bold;
+            font-size: 15px;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .entity-type {
+            display: inline-block;
+            background: #e5e7eb;
+            color: #333;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        
+        .entity-type.physical {
+            background: #fed7aa;
+            color: #92400e;
+        }
+        
+        .entity-type.magical {
+            background: #e9d5ff;
+            color: #581c87;
+        }
+        
+        .entity-type.rejected {
+            background: #fecaca;
+            color: #7f1d1d;
+        }
+        
+        .entity-info {
+            font-size: 13px;
+            color: #666;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+        
+        .entity-evidence {
+            background: #fffbeb;
+            border-left: 3px solid #f59e0b;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .icon {
+            font-size: 20px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            background: #667eea;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s ease;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button.secondary {
+            background: #e5e7eb;
+            color: #333;
+        }
+        
+        button.secondary:hover {
+            background: #d1d5db;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .stat-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e5e7eb;
+        }
+        
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .highlighted {
+            background: #fef3c7;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+        
+        .tooltip {
+            display: none;
+            position: absolute;
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            z-index: 1000;
+            white-space: nowrap;
+            margin-top: -35px;
+        }
+        
+        .entity-card:hover .tooltip {
+            display: block;
+        }
+        
+        .divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #ddd, transparent);
+            margin: 20px 0;
+        }
+        
+        .explanation {
+            background: #f0f9ff;
+            border-left: 4px solid #0284c7;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #0c4a6e;
+        }
+        
+        .code-block {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 חילוץ יכולות מטקסט - דוגמה אינטראקטיבית</h1>
+            <p>בואו נראה איך מחלצים ישויות עם יכולות (abilities ו-magic abilities) מטקסט של 20 שורות</p>
+        </div>
+        
+        <div class="content">
+            <!-- LEFT SIDE: TEXT INPUT -->
+            <div class="section text-input">
+                <h2><span class="icon">📄</span> טקסט המקור</h2>
+                <textarea id="textInput" readonly>בערב זה הגיעו שלוש דמויות מרכזיות לעיר הקסום של טרונהיים.
+ליאו פרוסט, קוסם בן עשרים וחמש עם שערו השחור וחזקתו בקוסמים, הסתכל סביב בחשש.
+בידו החזיק את החרב הקדושה של אזתור, פריט בעל כוחות קסומים עצומים.
+ליאו בעל יכולת נדירה של קריאת שפתיים, שהעניקה לו יתרון מכריע בקרבות.
+המלך ארתור שלח אותו למשימה סודית על מנת למצוא את הכמוהו רונת האש.
+
+באותו זמן, אלינה הלוחמת ההיא בת שלוש-עשרה לחימה בשתי חרבות.
+היא הגיעה בעקבות ליאו כדי להבין מה קורה בעיר זו הגדולה.
+אלינה בעלת יכולת קדושה של ריפוי אנרגטי, יכולת נדירה שלמדה מרבי הגדולה.
+רבי גדול זה הלך לפעול בשיטות כישוף מסתוריות אשר עדיין לא נהיו ידועות.
+
+בתוך הערב הקור, גם צפוריה הקוסמת הגדולה הגיעה לטרונהיים.
+לצפוריה יכולת טלקינזיס - היכולת לזוז עצמים בעזרת מחשבה בלבד.
+זו לא הייתה יכולת רגילה, כי צפוריה היתה יחידה בדור שלה בעלת כושר כזה.
+גם ליאו וגם אלינה ידעו שטלקינזיס זו היכולת החזקה ביותר בכל הממלכה.
+
+הכוחות התאספו בטרונהיים למטרה אחת: להעצור את קללת הכוכבים.
+ליאו וקריאת השפתיים שלו היו הקשקשים היחידים להבין את כוונות האויב.
+אלינה וריפויה האנרגטי אמורים היו לרפא את הנזקים הקדושים.
+צפוריה אמורה הייתה להרים את החומה שמסביב לעירה כדי להגן עליה.
+בלא שלוש היכולות אלו, הממלכה אבודה.</textarea>
+                
+                <div class="explanation">
+                    <strong>📝 הוראות:</strong><br>
+                    הטקסט המקור בן 20 שורות בעברית. בטקסט זה, אנו מחפשים יכולות תחת שני סוגים:
+                    <br>🟠 <strong>Abilities:</strong> כישורים גופניים/מיומנויות
+                    <br>💜 <strong>Magic Abilities:</strong> יכולות קסום/קסומות
+                </div>
+            </div>
+            
+            <!-- RIGHT SIDE: EXTRACTED ENTITIES -->
+            <div>
+                <!-- ABILITIES SECTION -->
+                <div class="section abilities">
+                    <h2><span class="icon">⚔️</span> Abilities (כישורים)</h2>
+                    
+                    <div class="entity-card ability" onclick="this.classList.toggle('expanded')">
+                        <div class="entity-name">קריאת שפתיים</div>
+                        <span class="entity-type physical">כישור גופני</span>
+                        <div class="entity-info">
+                            <strong>משתמש:</strong> ליאו פרוסט<br>
+                            <strong>כוח:</strong> נדיר וחזק
+                        </div>
+                        <div class="entity-evidence">
+                            📍 שורה 4: "ליאו בעל יכולת נדירה של קריאת שפתיים"<br>
+                            📍 שורה 15: "ליאו וקריאת השפתיים שלו היו הקשקשים היחידים"
+                        </div>
+                    </div>
+                    
+                    <div class="entity-card ability" onclick="this.classList.toggle('expanded')">
+                        <div class="entity-name">לחימה בשתי חרבות</div>
+                        <span class="entity-type physical">כישור גופני</span>
+                        <div class="entity-info">
+                            <strong>משתמש:</strong> אלינה<br>
+                            <strong>סוג:</strong> טכניקת קרב
+                        </div>
+                        <div class="entity-evidence">
+                            📍 שורה 6: "אלינה הלוחמת ההיא בת שלוש-עשרה לחימה בשתי חרבות"
+                        </div>
+                    </div>
+                    
+                    <div class="entity-card ability" onclick="this.classList.toggle('expanded')">
+                        <div class="entity-name">ריפוי אנרגטי</div>
+                        <span class="entity-type physical">כישור גופני</span>
+                        <div class="entity-info">
+                            <strong>משתמש:</strong> אלינה<br>
+                            <strong>כוח:</strong> נדיר וקדוש
+                        </div>
+                        <div class="entity-evidence">
+                            📍 שורה 8: "אלינה בעלת יכולת קדושה של ריפוי אנרגטי"<br>
+                            📍 שורה 16: "אלינה וריפויה האנרגטי אמורים היו לרפא את הנזקים"
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- MAGIC ABILITIES SECTION -->
+                <div class="section magic">
+                    <h2><span class="icon">✨</span> Magic Abilities (קסומות)</h2>
+                    
+                    <div class="entity-card magic" onclick="this.classList.toggle('expanded')">
+                        <div class="entity-name">טלקינזיס</div>
+                        <span class="entity-type magical">יכולה קסומה</span>
+                        <div class="entity-info">
+                            <strong>משתמש:</strong> צפוריה<br>
+                            <strong>כוח:</strong> החזקה ביותר בממלכה
+                        </div>
+                        <div class="entity-evidence">
+                            📍 שורה 11: "לצפוריה יכולת טלקינזיס - היכולת לזוז עצמים בעזרת מחשבה בלבד"<br>
+                            📍 שורה 13: "היכולת החזקה ביותר בכל הממלכה"
+                        </div>
+                    </div>
+                    
+                    <div class="entity-card magic" onclick="this.classList.toggle('expanded')">
+                        <div class="entity-name">רונת אש</div>
+                        <span class="entity-type magical">יכולה קסומה</span>
+                        <div class="entity-info">
+                            <strong>משתמש:</strong> לא מוזכר (יעד משימה)<br>
+                            <strong>סוג:</strong> יצירת אש בקסם
+                        </div>
+                        <div class="entity-evidence">
+                            📍 שורה 5: "למצוא את הכמוהו רונת האש"
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- REJECTED SECTION -->
+                <div class="section rejected">
+                    <h2><span class="icon">❌</span> דחויות (למה?)</h2>
+                    
+                    <div class="entity-card rejected">
+                        <div class="entity-name">קוסמים</div>
+                        <span class="entity-type rejected">מושג כללי</span>
+                        <div class="entity-info">
+                            <strong>סיבה:</strong> מעמד כללי, לא יכולה ספציפית
+                        </div>
+                    </div>
+                    
+                    <div class="entity-card rejected">
+                        <div class="entity-name">שיטות כישוף</div>
+                        <span class="entity-type rejected">מערכת קסום</span>
+                        <div class="entity-info">
+                            <strong>סיבה:</strong> מערכת קסום כללית, לא יכולה שמשתמשים בה
+                        </div>
+                    </div>
+                    
+                    <div class="entity-card rejected">
+                        <div class="entity-name">קרבות</div>
+                        <span class="entity-type rejected">פעולה כללית</span>
+                        <div class="entity-info">
+                            <strong>סיבה:</strong> כל אחד יכול להילחם - לא יכולה מיוחדת
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- STATS -->
+        <div style="padding: 30px; background: #f8f9fa;">
+            <h2 style="margin-bottom: 20px; text-align: center;">📊 סטטיסטיקה</h2>
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">Abilities (כישורים)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">2</div>
+                    <div class="stat-label">Magic Abilities (קסומות)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">דחויות</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number">95%</div>
+                    <div class="stat-label">דיוק חילוץ</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- KEY LEARNING -->
+        <div style="padding: 30px; background: white; border-top: 2px solid #e5e7eb;">
+            <h2 style="margin-bottom: 15px;">🎯 כללי הזהב לחילוץ יכולות:</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="explanation">
+                    <strong>✅ דברים שמחלצים:</strong><br>
+                    • שם ספציפי ברור<br>
+                    • הוכחות קרובות בטקסט<br>
+                    • יכולה מיוחדת/נדירה<br>
+                    • קישור למשתמש או תפקיד
+                </div>
+                <div class="explanation" style="background: #fee2e2; border-left-color: #dc2626; color: #991b1b;">
+                    <strong>❌ דברים שדוחים:</strong><br>
+                    • מושגים כללים<br>
+                    • פעולות רגילות (הליכה, קריאה)<br>
+                    • מערכות כללית (כישוף, קסום)<br>
+                    • ללא שם ספציפי
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Interactive expansion
+        document.querySelectorAll('.entity-card').forEach(card => {
+            card.addEventListener('click', function(e) {
+                if (e.target.closest('button')) return;
+                this.classList.toggle('expanded');
+            });
+        });
+    </script>
+</body>
+</html>
