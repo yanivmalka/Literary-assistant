@@ -407,6 +407,25 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
         console.log(`[Knowledge] Batch done: ${data.summary?.entities_saved || 0} entities, ${data.summary?.events_saved || 0} events saved`)
 
+        // CRITICAL FIX: Switch from Main to Branch after first successful batch
+        // This prevents "Main layer already exists" error on subsequent batches
+        if (useMainForExtraction && data.success && (data.summary?.entities_saved || 0) > 0) {
+          console.log('[Knowledge] Main bootstrap batch complete - switching to Branch mode')
+          useMainForExtraction = false
+          try {
+            activeBranch = await getOrCreateActiveBranch(projectId)
+            console.log('[Knowledge] Active branch created/fetched:', activeBranch.id)
+          } catch (branchError) {
+            console.error('[DIAGNOSTIC] triggerEntityExtraction() - Failed to create branch after Main bootstrap - error:', branchError)
+            console.error('[Knowledge] Failed to create branch after Main bootstrap:', branchError)
+            set({
+              extractionInProgress: false,
+              extractionError: 'ui.documents.extractionError',
+            })
+            break
+          }
+        }
+
         // Delay between batches to respect Gemini rate limits (15s)
         if (!done) {
           await new Promise(resolve => setTimeout(resolve, 15000))

@@ -173,6 +173,12 @@ interface NormalizedEntity {
   aliases: string[];
   evidence: string[];
   chunk_positions: number[];
+  // NEW: Provenance tracking for mentions
+  chunk_ids?: string[];        // UUIDs of document_chunks
+  page_numbers?: number[];     // Page numbers from chunks
+  // NEW: Field-specific evidence and confidence
+  field_evidence?: Record<string, string[]>;
+  field_confidence?: Record<string, number>;
 }
 
 /** Build structured_fields from the entity's flat fields based on its type */
@@ -242,7 +248,10 @@ function buildStructuredFields(type: string, entity: ExtractedEntity): Record<st
   return fields;
 }
 
-function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
+function normalizeEntities(
+  extraction: GeminiExtraction, 
+  chunkLookup: Map<number, { id: string; page: number | null }>
+): NormalizedEntity[] {
   const entityMap = new Map<string, NormalizedEntity>();
 
   function addEntity(name: string, type: string, entity: ExtractedEntity) {
@@ -326,6 +335,15 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
       if (entity.members && entity.members.length > 0) attrs.members = entity.members;
       if (entity.purpose) attrs.purpose = entity.purpose;
 
+      // Build chunk_ids and page_numbers from chunk_positions
+      const chunkIds: string[] = [];
+      const pageNumbers: number[] = [];
+      for (const pos of entity.chunk_positions || []) {
+        const chunkInfo = chunkLookup.get(pos);
+        if (chunkInfo?.id) chunkIds.push(chunkInfo.id);
+        if (chunkInfo?.page != null) pageNumbers.push(chunkInfo.page);
+      }
+
       entityMap.set(entityMapKey, {
         canonical_name: cleanName,
         entity_type: type,
@@ -336,6 +354,8 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
         aliases: (entity.aliases || []).map(a => stripNikud(a)).filter(Boolean),
         evidence: entity.evidence || [],
         chunk_positions: entity.chunk_positions || [],
+        chunk_ids: chunkIds.length > 0 ? chunkIds : undefined,
+        page_numbers: pageNumbers.length > 0 ? pageNumbers : undefined,
       });
     }
   }
@@ -429,10 +449,20 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
   }
 
   // Apply consolidations (merge them)
+  // CRITICAL FIX: Only merge when score >= AUTO threshold (100), not SUGGEST (70)
+  // This prevents false merges that would permanently contaminate the knowledge base
   for (const { keyA, keyB, score } of consolidationCandidates.sort((a, b) => b.score - a.score)) {
     const entityA = entityMap.get(keyA);
     const entityB = entityMap.get(keyB);
     if (!entityA || !entityB) continue;
+
+    // CRITICAL: Only auto-merge when score >= AUTO threshold
+    // Scores between SUGGEST (70) and AUTO (100-1) should be logged but NOT merged
+    if (score < CONSOLIDATION_THRESHOLDS.AUTO_CONSOLIDATE_THRESHOLD) {
+      console.log(`[extract-knowledge] Consolidation SUGGESTED (not auto-merged): "${entityA.canonical_name}" ↔ "${entityB.canonical_name}" (score: ${score}, need: ${CONSOLIDATION_THRESHOLDS.AUTO_CONSOLIDATE_THRESHOLD})`);
+      // TODO: Store as consolidation suggestion for user review
+      continue;
+    }
 
     // Merge: longer name wins as canonical
     const [keepKey, keep, removeKey, remove] = entityA.canonical_name.length >= entityB.canonical_name.length
@@ -471,7 +501,7 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
       }
     }
 
-    console.log(`[extract-knowledge] Consolidate: "${remove.canonical_name}" → "${keep.canonical_name}" (score: ${score}, evidence: ${score > CONSOLIDATION_THRESHOLDS.AUTO_CONSOLIDATE_THRESHOLD ? "AUTO" : "PREVIEW"})`);
+    console.log(`[extract-knowledge] Consolidation AUTO-MERGED: "${remove.canonical_name}" → "${keep.canonical_name}" (score: ${score})`);
 
     // Remove the other entity from the map
     entityMap.delete(removeKey);
@@ -846,7 +876,7 @@ Deno.serve(async (req) => {
     // ==============================
     const { data: chunks, error: chunksError } = await supabase
       .from("document_chunks")
-      .select("id, content, position")
+      .select("id, content, position, page")
       .eq("version_id", body.version_id)
       .order("position", { ascending: true })
       .range(offset, offset + limit - 1);
@@ -858,7 +888,13 @@ Deno.serve(async (req) => {
       );
     }
 
-    const chunkData = chunks.map((c: { position: number; content: string }) => ({
+    // Build chunk lookup map for mentions persistence
+    const chunkLookup = new Map<number, { id: string; page: number | null }>();
+    for (const c of chunks) {
+      chunkLookup.set(c.position, { id: c.id, page: c.page });
+    }
+
+    const chunkData = chunks.map((c: { position: number; content: string; page: number | null }) => ({
       position: c.position,
       content: c.content,
     }));
@@ -971,7 +1007,7 @@ Deno.serve(async (req) => {
     // Step 5: Normalize & upsert entities (incremental merge)
     // Priority: user data > existing extracted data > new extracted data > null
     // ==============================
-    const normalizedEntities = normalizeEntities(extraction);
+    const normalizedEntities = normalizeEntities(extraction, chunkLookup);
     const entityIdEntries: Array<{ entity: NormalizedEntity; id: string }> = [];
     let entitiesSaved = 0;
     let mentionsSaved = 0;
@@ -1183,19 +1219,45 @@ Deno.serve(async (req) => {
       valueSyncErrors.push(...syncErrors);
 
       // Mentions (saved for both Main and Branch)
-      for (const pos of entity.chunk_positions) {
-        const ev = entity.evidence.length > 0 ? entity.evidence[0]?.slice(0, 500) : null;
+      // IMPROVED: Include chunk_id and page_number for precise provenance
+      for (let i = 0; i < entity.chunk_positions.length; i++) {
+        const pos = entity.chunk_positions[i];
+        const ev = entity.evidence[i]?.slice(0, 500) || entity.evidence[0]?.slice(0, 500) || null;
+        
+        // Look up chunk_id and page_number from the chunk lookup map
+        const chunkInfo = chunkLookup.get(pos);
+        const chunkId = chunkInfo?.id || null;
+        const pageNumber = chunkInfo?.page || null;
+        
         await supabase.from("knowledge_entity_mentions").upsert(
-          { entity_id: entityId, branch_id: targetBranchId || null, chunk_position: pos, evidence: ev },
+          { 
+            entity_id: entityId, 
+            branch_id: targetBranchId || null, 
+            chunk_position: pos, 
+            evidence: ev,
+            chunk_id: chunkId,
+            page_number: pageNumber,
+          },
           { onConflict: "entity_id,chunk_position,evidence,branch_id" }
         );
         mentionsSaved++;
       }
 
-      if (entity.evidence.length > 1 && entity.chunk_positions.length > 0) {
-        for (let i = 1; i < entity.evidence.length; i++) {
+      // Handle additional evidence beyond chunk_positions
+      if (entity.evidence.length > entity.chunk_positions.length && entity.chunk_positions.length > 0) {
+        const firstPos = entity.chunk_positions[0];
+        const chunkInfo = chunkLookup.get(firstPos);
+        
+        for (let i = entity.chunk_positions.length; i < entity.evidence.length; i++) {
           await supabase.from("knowledge_entity_mentions").upsert(
-            { entity_id: entityId, branch_id: targetBranchId || null, chunk_position: entity.chunk_positions[0], evidence: entity.evidence[i]?.slice(0, 500) },
+            { 
+              entity_id: entityId, 
+              branch_id: targetBranchId || null, 
+              chunk_position: firstPos, 
+              evidence: entity.evidence[i]?.slice(0, 500),
+              chunk_id: chunkInfo?.id || null,
+              page_number: chunkInfo?.page || null,
+            },
             { onConflict: "entity_id,chunk_position,evidence,branch_id" }
           );
           mentionsSaved++;

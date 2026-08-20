@@ -21,6 +21,10 @@ export interface SyncValueRequest {
     attributes: Record<string, unknown>;
     evidence: string[];
     chunk_positions: number[];
+    // NEW: Field-specific evidence mapping
+    field_evidence?: Record<string, string[]>;
+    // NEW: Confidence scores per field (0-1)
+    field_confidence?: Record<string, number>;
   };
 }
 
@@ -104,6 +108,10 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
         .eq("id", existingAiValue.id);
     }
 
+    // CRITICAL FIX: Use field-specific confidence if available, otherwise calculate
+    const confidence = normalizedEntity.field_confidence?.[fieldPath] 
+      ?? calculateFieldConfidence(fieldPath, value, normalizedEntity);
+
     // Insert new AI value
     const { data: newValue, error: insertError } = await supabase
       .from("knowledge_entity_values")
@@ -116,7 +124,7 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
         normalized_value: normalized,
         source_type: "ai",
         value_status: "active",
-        confidence: 0.8, // Default confidence for AI values
+        confidence,
         raw_extraction_id: rawExtractionId,
         created_by: userId,
       })
@@ -131,16 +139,17 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
     valuesSynced++;
     const valueId = newValue.id;
 
-    // Link evidence to the value
-    // For now, attach all evidence from the extraction to this value
-    // In a more sophisticated implementation, we could parse which evidence applies to which field
-    if (normalizedEntity.evidence.length > 0) {
-      for (const quote of normalizedEntity.evidence) {
+    // CRITICAL FIX: Link field-specific evidence only
+    const fieldEvidence = normalizedEntity.field_evidence?.[fieldPath] || [];
+    
+    if (fieldEvidence.length > 0) {
+      // Use field-specific evidence
+      for (const quote of fieldEvidence) {
         const { error: evidenceError } = await supabase
           .from("knowledge_entity_value_evidence")
           .insert({
             value_id: valueId,
-            chunk_id: null, // Could be populated if we tracked chunk origins
+            chunk_id: null, // TODO: Populate from extraction context
             quote: quote.slice(0, 1000),
             raw_extraction_id: rawExtractionId,
           });
@@ -151,10 +160,28 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
           evidenceSynced++;
         }
       }
+    } else if (normalizedEntity.evidence.length > 0) {
+      // Fallback: Use first evidence as general support (less precise)
+      // This maintains backward compatibility when field_evidence is not provided
+      const quote = normalizedEntity.evidence[0];
+      if (quote) {
+        const { error: evidenceError } = await supabase
+          .from("knowledge_entity_value_evidence")
+          .insert({
+            value_id: valueId,
+            chunk_id: null,
+            quote: quote.slice(0, 1000),
+            raw_extraction_id: rawExtractionId,
+          });
+
+        if (!evidenceError) {
+          evidenceSynced++;
+        }
+      }
     }
 
     // If no evidence text but we have chunk positions, create minimal evidence
-    if (normalizedEntity.evidence.length === 0 && normalizedEntity.chunk_positions.length > 0) {
+    if (fieldEvidence.length === 0 && normalizedEntity.evidence.length === 0 && normalizedEntity.chunk_positions.length > 0) {
       const { error: evidenceError } = await supabase
         .from("knowledge_entity_value_evidence")
         .insert({
@@ -171,4 +198,64 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
   }
 
   return { valuesSynced, evidenceSynced, errors };
+}
+
+/**
+ * Calculate confidence score based on field type and value characteristics.
+ * Fields with specific, verifiable values get higher confidence.
+ * Fields with vague or subjective values get lower confidence.
+ */
+function calculateFieldConfidence(
+  fieldPath: string,
+  value: unknown,
+  entity: SyncValueRequest["normalizedEntity"]
+): number {
+  // Base confidence
+  let confidence = 0.7;
+
+  // High-confidence fields (objective, verifiable)
+  const highConfidenceFields = [
+    "age", "height", "weight", "birth_year", "death_year",
+    "location_type", "object_type", "ability_type",
+    "eye_color", "hair_color", "gender"
+  ];
+  
+  // Medium-confidence fields (somewhat subjective)
+  const mediumConfidenceFields = [
+    "occupation", "role", "status", "allegiance",
+    "power_level", "magic_system", "country", "city", "region"
+  ];
+  
+  // Lower-confidence fields (highly subjective or narrative-dependent)
+  const lowConfidenceFields = [
+    "personality", "motivation", "goals", "fears",
+    "narrative_impact", "narrative_importance", "significance"
+  ];
+
+  if (highConfidenceFields.includes(fieldPath)) {
+    confidence = 0.85;
+  } else if (mediumConfidenceFields.includes(fieldPath)) {
+    confidence = 0.75;
+  } else if (lowConfidenceFields.includes(fieldPath)) {
+    confidence = 0.6;
+  }
+
+  // Boost confidence if multiple evidence sources
+  const evidenceCount = entity.field_evidence?.[fieldPath]?.length || entity.evidence.length;
+  if (evidenceCount >= 3) {
+    confidence = Math.min(0.95, confidence + 0.1);
+  } else if (evidenceCount >= 2) {
+    confidence = Math.min(0.9, confidence + 0.05);
+  }
+
+  // Reduce confidence if value is null-like or generic
+  if (typeof value === "string") {
+    const lowerValue = value.toLowerCase().trim();
+    const genericTerms = ["unknown", "unclear", "various", "multiple", "n/a", "not specified"];
+    if (genericTerms.some(term => lowerValue.includes(term))) {
+      confidence *= 0.7;
+    }
+  }
+
+  return Math.round(confidence * 100) / 100; // Round to 2 decimal places
 }
