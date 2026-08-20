@@ -1,6 +1,19 @@
 -- Task 5: branch-scoped relationship proposals and independent review.
 -- Uses knowledge_entity_relationships; no parallel relationship table is required.
 
+-- CRITICAL: Add branch_id column FIRST before creating indexes on it
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+  ADD COLUMN IF NOT EXISTS branch_id UUID;
+
+-- Add foreign key constraint for branch_id
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+  DROP CONSTRAINT IF EXISTS fk_entity_relationships_branch_id;
+
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+  ADD CONSTRAINT fk_entity_relationships_branch_id 
+  FOREIGN KEY (branch_id) REFERENCES knowledge_branches(id) ON DELETE CASCADE;
+
+-- Now add the operation, review_status, and base_exists columns
 ALTER TABLE IF EXISTS knowledge_entity_relationships
   ADD COLUMN IF NOT EXISTS operation TEXT NOT NULL DEFAULT 'add',
   ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'approved',
