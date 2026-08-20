@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Edit3, Save } from 'lucide-react'
@@ -38,8 +38,17 @@ export default function CharacterProfilePage() {
 
   const entity = entities.find(e => e.id === entityId)
   const entityType = entity?.entity_type as any
-  const fieldGroups = entity ? getFieldGroupsForType(entityType) : []
-  const allFields = entity ? getFieldsForType(entityType) : []
+
+  // Memoize field lists so they only change when entity type actually changes,
+  // not on every render. This prevents form reinitialization while user is typing.
+  const fieldGroups = useMemo(
+    () => entity ? getFieldGroupsForType(entityType) : [],
+    [entityType]
+  )
+  const allFields = useMemo(
+    () => entity ? getFieldsForType(entityType) : [],
+    [entityType]
+  )
 
   // Initialize entity and branch state on mount
   useEffect(() => {
@@ -63,17 +72,21 @@ export default function CharacterProfilePage() {
   }, [projectId, entityId, currentBranch?.id])
 
   // Initialize form data from entity
+  // Depends only on entity itself, not on allFields.
+  // This ensures form is reinitialized only when a different entity is opened,
+  // not when user types (which would trigger a render but not change entity).
   useEffect(() => {
     if (!entity) return
 
     const data: FormData = {}
+    // Use allFields value that was memoized based on entityType
     for (const field of allFields) {
       const value = (entity.structured_fields as Record<string, unknown>)?.[field]
       data[field] = value != null ? String(value) : null
     }
     setFormData(data)
     setOriginalFormData(data)
-  }, [entity, allFields])
+  }, [entity])
 
   if (!projectId || !entityId) {
     return <div className="text-center py-12">{t('common.loading')}</div>

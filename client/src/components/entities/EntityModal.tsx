@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, Save, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
 import {
@@ -36,8 +36,17 @@ export default function EntityModal({
   const { currentBranch } = useBranchStore()
 
   const isEditMode = !!entity
-  const fieldGroups = getFieldGroupsForType(entityType)
-  const allFields = getFieldsForType(entityType)
+
+  // Memoize field lists so they only change when entityType changes,
+  // not on every render. This prevents form reinitialization while user is typing.
+  const fieldGroups = useMemo(
+    () => getFieldGroupsForType(entityType),
+    [entityType]
+  )
+  const allFields = useMemo(
+    () => getFieldsForType(entityType),
+    [entityType]
+  )
 
   // Form state: all fields as string | null
   const [formData, setFormData] = useState<Record<string, string | null>>({})
@@ -47,6 +56,9 @@ export default function EntityModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Initialize form data
+  // Depends only on isOpen and entity (the inputs), not on allFields.
+  // This ensures form is reinitialized only when modal is opened/closed or entity changes,
+  // not when user types (which would trigger render but not change entity).
   useEffect(() => {
     if (!isOpen) return
 
@@ -86,7 +98,7 @@ export default function EntityModal({
     setShowDeleteConfirm(false)
     // Initialize aliases
     setAliasesText(entity?.aliases?.join(', ') || '')
-  }, [isOpen, entity, entityType, allFields, fieldGroups])
+  }, [isOpen, entity, entityType])
 
   const handleFieldChange = useCallback((field: string, value: string) => {
     setFormData(prev => ({
