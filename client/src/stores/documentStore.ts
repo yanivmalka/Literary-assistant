@@ -193,7 +193,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         })
 
       if (uploadError) {
-        console.error('[DIAGNOSTIC] uploadDocument() - storage upload error - operation: POST Storage project-documents - path:', storagePath, 'error_code:', uploadError.code, 'error_message:', uploadError.message)
+        console.error('[DIAGNOSTIC] uploadDocument() - storage upload error - operation: POST Storage project-documents - path:', storagePath, 'error:', uploadError.message || uploadError)
         // Clean up if new document
         if (!documentId) {
           await supabase.from('documents').delete().eq('id', docId)
