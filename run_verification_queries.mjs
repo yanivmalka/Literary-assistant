@@ -7,16 +7,12 @@
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://lqfqfzqcrqluxanhnjwu.supabase.co';
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const PROJECT_ID = '6c4b7b92-214a-4785-ad66-e62527ee68d6';
+// Use anon key for read-only queries
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxZnFmenFjcnFsdXhhbmhuand1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NTgwODEsImV4cCI6MjEwMjUzNDA4MX0.D27T3yEG8rbp7eQMKxG-L7Z62PPaKzDYD3q4SCLjoww';
+// Use the actual project ID where extraction was completed
+const PROJECT_ID = process.env.TEST_PROJECT_ID || '39c5af73-9baa-460c-b823-eeeee0a27978';
 
-if (!SERVICE_ROLE_KEY) {
-  console.error('❌ SUPABASE_SERVICE_ROLE_KEY not set');
-  console.error('Export it: export SUPABASE_SERVICE_ROLE_KEY="your_key"');
-  process.exit(1);
-}
-
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+const supabase = createClient(SUPABASE_URL, ANON_KEY, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,

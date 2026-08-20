@@ -13,6 +13,7 @@
     "concurrently": "^9.1.0"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.3",
     "puppeteer": "^25.8.0"
   }
 }

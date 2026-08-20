@@ -1,0 +1,287 @@
+================================================================================
+CONTROLLED EXTRACTION TEST - QUICK REFERENCE CARD
+================================================================================
+
+PROJECT ID: 6c4b7b92-214a-4785-ad66-e62527ee68d6
+SUPABASE: https://lqfqfzqcrqluxanhnjwu.supabase.co
+
+================================================================================
+QUICK START (Choose One)
+================================================================================
+
+OPTION A: Manual - No Setup Required
+─────────────────────────────────────
+1. Open VERIFICATION_QUERIES_EXECUTABLE.md
+2. Go to Supabase dashboard
+3. Open SQL Editor
+4. Copy/paste queries and run
+5. Record results
+
+Time: ~15 min | Difficulty: Easy
+
+OPTION B: Python Script
+──────────────────────
+export SUPABASE_SERVICE_ROLE_KEY="your_key"
+python3 run_verification.py
+
+Time: ~2 min | Difficulty: Medium
+
+OPTION C: Node.js Script
+────────────────────────
+export SUPABASE_SERVICE_ROLE_KEY="your_key"
+node run_verification_queries.mjs
+
+Time: ~2 min | Difficulty: Medium
+
+================================================================================
+DIAGNOSTIC QUERY (Copy & Run This)
+================================================================================
+
+SELECT 'CHARACTER' as check, COUNT(*)::text as count, 'Exp: 1' as note 
+FROM knowledge_entities WHERE entity_type='character' 
+AND project_id='6c4b7b92-214a-4785-ad66-e62527ee68d6'
+UNION ALL SELECT 'ABILITY', COUNT(*)::text, 'Exp: 4' 
+FROM knowledge_entities WHERE entity_type='ability' 
+AND project_id='6c4b7b92-214a-4785-ad66-e62527ee68d6'
+UNION ALL SELECT 'CABINET', COUNT(*)::text, 'Exp: 2' 
+FROM knowledge_entities WHERE entity_type='object' AND canonical_name='Cabinet'
+AND project_id='6c4b7b92-214a-4785-ad66-e62527ee68d6'
+UNION ALL SELECT 'RELATIONSHIPS', COUNT(*)::text, 'Exp: 4' 
+FROM knowledge_entity_relationships WHERE relationship_type='has_ability'
+AND project_id='6c4b7b92-214a-4785-ad66-e62527ee68d6'
+UNION ALL SELECT 'MAIN_LAYER', COUNT(*)::text, 'Exp: 7' 
+FROM knowledge_entities WHERE layer='main'
+AND project_id='6c4b7b92-214a-4785-ad66-e62527ee68d6'
+ORDER BY check;
+
+EXPECTED OUTPUT:
+CHARACTER       | 1  | Exp: 1    ✅
+ABILITY         | 4  | Exp: 4    ✅
+CABINET         | 2  | Exp: 2    ✅
+RELATIONSHIPS   | 4  | Exp: 4    ✅
+MAIN_LAYER      | 7  | Exp: 7    ✅
+
+================================================================================
+TEST SCENARIOS
+================================================================================
+
+SCENARIO 1: CHARACTER FIELDS (Failure #1)
+─────────────────────────────────────────
+Expected: Leo Frostborne with height, hair_color, eye_color
+Queries: 1.1, 1.2
+Status: PASS ✅ / FAIL ❌
+
+SCENARIO 2: ABILITIES & OBJECTS (Failure #2 & #3)
+──────────────────────────────────────────────────
+Expected: 4 abilities, 4 relationships, 2 Cabinets
+Queries: 2.1, 2.2, 2.3, 2.4
+Status: PASS ✅ / FAIL ❌
+
+SCENARIO 3: CABINET IDENTITY (Failure #4 - CRITICAL)
+──────────────────────────────────────────────────────
+Expected: 2 Cabinet entities with different UUIDs
+Queries: 3.1, 3.2, 3.3
+⚠️ If Cabinet count = 1: FAILURE #4 NOT FIXED
+
+SCENARIO 4: MAIN/BRANCH ISOLATION
+──────────────────────────────────
+Expected: All layer='main', 7 total entities
+Queries: 4.1, 4.2, 4.3, 4.4
+Status: PASS ✅ / FAIL ❌
+
+================================================================================
+CRITICAL TEST (MUST PASS)
+================================================================================
+
+QUERY 3.2: Cabinet Identity Verification
+
+Expected:
+  Cabinet A:
+    ├─ ID: UUID_A (unique)
+    ├─ Materials: "wood"
+    └─ Mentions: 5
+
+  Cabinet B:
+    ├─ ID: UUID_B (unique, different from UUID_A)
+    ├─ Materials: "glass"
+    └─ Mentions: 1
+
+⚠️ If UUID_A = UUID_B: CRITICAL BUG
+⚠️ If only 1 row: Failure #4 NOT FIXED
+
+================================================================================
+PASS/FAIL CRITERIA
+================================================================================
+
+✅ ALL TESTS PASS if:
+   □ Character: 1 entity
+   □ Abilities: 4 entities
+   □ Cabinets: 2 entities with different UUIDs
+   □ Relationships: 4 has_ability links
+   □ Main Layer: 7 total entities
+   □ Overlays: 0
+
+❌ CRITICAL FAILURE if:
+   □ Cabinet count = 1 (Failure #4)
+   □ UUID_A = UUID_B (same ID for different entities)
+
+❌ MEDIUM FAILURE if:
+   □ Leo fields NULL (Failure #1)
+   □ No relationships (Failure #2)
+   □ Missing materials (Failure #3)
+
+❌ MEDIUM FAILURE if:
+   □ branch_id set on main layer
+   □ overlays present (first extraction only)
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+PROBLEM: "Project not found"
+SOLUTION: Verify ID: 6c4b7b92-214a-4785-ad66-e62527ee68d6
+
+PROBLEM: 1 Cabinet instead of 2
+SOLUTION: Failure #4 bug - two Cabinets merged
+ACTION: See FAILURE_ANALYSIS_AND_FIXES.md
+
+PROBLEM: 3+ Cabinets
+SOLUTION: Over-fragmentation
+ACTION: Check consolidation threshold
+
+PROBLEM: Leo fields NULL
+SOLUTION: Failure #1 - extraction issue
+ACTION: Check raw LLM response in raw_extractions table
+
+PROBLEM: No relationships (0)
+SOLUTION: Failure #2 - relationships not created
+ACTION: Verify has_ability relationship type
+
+PROBLEM: Permission errors
+SOLUTION: Using wrong API key
+ACTION: Use SUPABASE_SERVICE_ROLE_KEY, not anon key
+
+PROBLEM: No entities found
+SOLUTION: Extraction not run
+ACTION: Run extraction first
+
+================================================================================
+FILES INCLUDED
+================================================================================
+
+VERIFICATION_INDEX.md ........................ Navigation (read first)
+VERIFICATION_QUERIES_EXECUTABLE.md ......... SQL queries (main file)
+VERIFICATION_EXECUTION_GUIDE.md ........... How-to guide
+VERIFICATION_PACKAGE_SUMMARY.md ........... Executive summary
+CONTROLLED_TEST_DOCUMENT.md ............... Test input document
+run_verification_queries.mjs ............... Node.js automation
+run_verification.py ....................... Python automation
+VERIFICATION_QUICK_REFERENCE.txt .......... This file
+
+================================================================================
+PROCESS FLOWCHART
+================================================================================
+
+START
+  │
+  ├─→ Choose method (Manual/Python/Node)
+  │
+  ├─→ Run diagnostic query (see above)
+  │     └─→ If count != expected: Stop, check setup
+  │
+  ├─→ Run all 4 scenarios (queries 1.1-4.4)
+  │
+  ├─→ Compare results to expected
+  │
+  ├─→ All PASS?
+  │     ├─ YES → ✅ Test Complete, Archive Results
+  │     └─ NO  → See troubleshooting section
+  │
+  └─→ Document findings
+
+================================================================================
+KEY NUMBERS TO REMEMBER
+================================================================================
+
+CHARACTER:      Expected = 1
+ABILITY:        Expected = 4
+CABINET:        Expected = 2  ⚠️ CRITICAL
+RELATIONSHIPS:  Expected = 4
+MAIN_LAYER:     Expected = 7
+OVERLAYS:       Expected = 0
+
+Cabinet A Mentions: 5
+Cabinet B Mentions: 1
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+1. SCENARIO 3 IS MOST CRITICAL
+   - This tests Failure #4 (cabinet identity)
+   - If you see 1 Cabinet: Failure #4 NOT FIXED
+   - Must have 2 separate UUIDs
+
+2. CABINET MATERIALS MATTER
+   - Cabinet A: wood
+   - Cabinet B: glass
+   - Different materials = different UUIDs
+
+3. MAIN/BRANCH ISOLATION
+   - First extraction only: layer='main'
+   - Should have NO branch_id set
+   - Overlays come in second extraction
+
+4. RELATIONSHIPS NOT ATTRIBUTES
+   - Abilities are separate entities
+   - Linked via has_ability relationship
+   - NOT stored as character.attributes
+
+5. CONSOLIDATION LOGIC
+   - Same cabinet 5 times = 1 entity
+   - Two different cabinets = 2 entities
+   - Conflict detection critical
+
+================================================================================
+QUICK LINKS
+================================================================================
+
+Read This First:      VERIFICATION_INDEX.md
+Main SQL Queries:     VERIFICATION_QUERIES_EXECUTABLE.md
+How-To Guide:         VERIFICATION_EXECUTION_GUIDE.md
+Known Failures:       FAILURE_ANALYSIS_AND_FIXES.md
+Test Data:            CONTROLLED_TEST_DOCUMENT.md
+
+================================================================================
+CONTACT & NEXT STEPS
+================================================================================
+
+Before asking for help:
+  1. Run diagnostic query (see above)
+  2. Check troubleshooting section
+  3. Review FAILURE_ANALYSIS_AND_FIXES.md
+  4. Check raw extraction: SELECT raw_response FROM raw_extractions...
+
+For detailed info:
+  - SQL queries: See VERIFICATION_QUERIES_EXECUTABLE.md
+  - How to run: See VERIFICATION_EXECUTION_GUIDE.md
+  - Known issues: See FAILURE_ANALYSIS_AND_FIXES.md
+
+================================================================================
+VERSION INFO
+================================================================================
+
+Package Version: 1.0
+Test Version: Controlled Extraction v1
+Status: ✅ Ready for Execution
+Last Updated: 2024
+
+Project: Literary Assistant
+Database: Supabase PostgreSQL
+Test Project: 6c4b7b92-214a-4785-ad66-e62527ee68d6
+
+================================================================================
+END OF QUICK REFERENCE
+================================================================================
+
+Next Step: Open VERIFICATION_INDEX.md or VERIFICATION_QUERIES_EXECUTABLE.md
