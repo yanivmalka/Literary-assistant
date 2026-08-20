@@ -47,7 +47,8 @@ interface ExtractRequest {
   user_id: string;
   offset?: number;
   limit?: number;
-  target_branch_id: string;
+  target_branch_id?: string | null;
+  use_main?: boolean;
 }
 
 interface ExtractedEntity {
@@ -520,10 +521,31 @@ Deno.serve(async (req) => {
   try {
     const body = (await req.json()) as ExtractRequest;
 
-    if (!body.version_id || !body.project_id || !body.document_id || !body.user_id || !body.target_branch_id) {
-      return errorResponse("Missing version_id, project_id, document_id, user_id, or active target_branch_id. AI extraction cannot write directly to Main.", 400);
+    // ==============================
+    // Validation: Required base fields
+    // ==============================
+    if (!body.version_id || !body.project_id || !body.document_id || !body.user_id) {
+      return errorResponse("Missing required fields: version_id, project_id, document_id, user_id.", 400);
     }
 
+    // ==============================
+    // Validation: Main vs Branch extraction mode
+    // ==============================
+    const useMainForExtraction = body.use_main === true;
+    const hasBranchId = !!body.target_branch_id;
+
+    // Invalid combinations
+    if (useMainForExtraction && hasBranchId) {
+      return errorResponse("Invalid: cannot specify both use_main=true and target_branch_id. Choose one.", 400);
+    }
+
+    if (!useMainForExtraction && !hasBranchId) {
+      return errorResponse("Invalid: must specify either use_main=true or target_branch_id. One is required.", 400);
+    }
+
+    // ==============================
+    // Authenticate user
+    // ==============================
     const authHeader = req.headers.get("Authorization");
     const authClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -541,23 +563,59 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Service-role writes are allowed only after validating the requested branch.
-    // The branch must belong to the same user/project and be the active branch.
-    const { data: activeBranch, error: branchError } = await supabase
-      .from("knowledge_branches")
-      .select("id")
-      .eq("id", body.target_branch_id)
-      .eq("project_id", body.project_id)
-      .eq("user_id", authenticatedUser.id)
-      .eq("is_current", true)
-      .eq("status", "active")
-      .maybeSingle();
+    // ==============================
+    // Authorization: Main bootstrap flow
+    // ==============================
+    let targetLayer: "main" | "branch" = "branch";
+    let targetBranchId: string | null = null;
 
-    if (branchError) {
-      return errorResponse(`Failed to validate active branch: ${branchError.message}`, 500);
-    }
-    if (!activeBranch) {
-      return errorResponse("Extraction rejected: target_branch_id is not the active Branch for this project. AI cannot modify Main directly.", 400);
+    if (useMainForExtraction) {
+      // Main bootstrap: verify Main doesn't already have entities (beyond bootstrap marker)
+      const { data: mainEntities, error: mainCheckError } = await supabase
+        .from("knowledge_entities")
+        .select("id")
+        .eq("project_id", body.project_id)
+        .eq("user_id", authenticatedUser.id)
+        .eq("layer", "main")
+        .neq("canonical_name", "__bootstrap__")  // Exclude bootstrap marker itself
+        .limit(1);
+
+      if (mainCheckError) {
+        return errorResponse(`Failed to check Main layer state: ${mainCheckError.message}`, 500);
+      }
+
+      // If Main already has real entities, reject extraction to Main
+      if (mainEntities && mainEntities.length > 0) {
+        return errorResponse("Main layer already exists with entities. AI extraction cannot write to Main. Use active Branch instead.", 400);
+      }
+
+      // Allow extraction to Main only during bootstrap
+      targetLayer = "main";
+      targetBranchId = null;
+      console.log(`[extract-knowledge] Main bootstrap extraction mode enabled for project ${body.project_id}`);
+    } else {
+      // Normal extraction: validate active Branch
+      const { data: activeBranch, error: branchError } = await supabase
+        .from("knowledge_branches")
+        .select("id")
+        .eq("id", body.target_branch_id)
+        .eq("project_id", body.project_id)
+        .eq("user_id", authenticatedUser.id)
+        .eq("is_current", true)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (branchError) {
+        return errorResponse(`Failed to validate active branch: ${branchError.message}`, 500);
+      }
+
+      if (!activeBranch) {
+        return errorResponse("Extraction rejected: target_branch_id is not the active Branch for this project.", 400);
+      }
+
+      targetLayer = "branch";
+      targetBranchId = activeBranch.id;
+      console.log(`[extract-knowledge] Branch extraction mode: ${activeBranch.id}`);
     }
 
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
@@ -565,7 +623,7 @@ Deno.serve(async (req) => {
       return errorResponse("GEMINI_API_KEY not configured", 500);
     }
 
-    console.log(`[extract-knowledge] Version: 2.5.0 | Branch: ${activeBranch.id} | Main writes disabled`);
+    console.log(`[extract-knowledge] Version: 2.5.0 | Layer: ${targetLayer} | Auth: OK`);
 
     const offset = body.offset ?? 0;
     const limit = body.limit ?? BATCH_SIZE;
@@ -676,7 +734,7 @@ Deno.serve(async (req) => {
         document_id: body.document_id,
         version_id: body.version_id,
         user_id: body.user_id,
-        branch_id: activeBranch.id,
+        branch_id: targetBranchId || null,  // null for Main bootstrap, branchId for Branch
         model: modelUsed,
         raw_response: extraction,
         input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
@@ -709,42 +767,47 @@ Deno.serve(async (req) => {
 
     for (const entity of normalizedEntities) {
       // Check if entity already exists — exact match or name-prefix match
+      // NOTE: In Main bootstrap mode, we're writing fresh entities to Main
+      // In Branch mode, we check against Main layer to create overlays
       let existing: { id: string; structured_fields: unknown; attributes: unknown; source: string; description: string | null; entity_type: string; entity_types: string[]; canonical_name: string } | null = null;
 
-      // 1. Try exact match (case-insensitive)
-      const { data: exactMatch } = await supabase
-        .from("knowledge_entities")
-        .select("id, canonical_name, entity_type, structured_fields, attributes, source, description, entity_types")
-        .eq("project_id", body.project_id)
-        .eq("user_id", body.user_id)
-        .eq("layer", "main")
-        .ilike("canonical_name", entity.canonical_name)
-        .maybeSingle();
-
-      if (exactMatch) {
-        existing = exactMatch;
-      } else {
-        // 2. Try prefix match: find existing entity whose name starts with new name or vice versa
-        //    e.g., existing "ליאו" matches new "ליאו פרוסט" → update existing to full name
-        const { data: prefixMatches } = await supabase
+      // Only check for existing entities if we're in Branch extraction mode
+      if (targetLayer === "branch") {
+        // 1. Try exact match (case-insensitive) in Main
+        const { data: exactMatch } = await supabase
           .from("knowledge_entities")
           .select("id, canonical_name, entity_type, structured_fields, attributes, source, description, entity_types")
           .eq("project_id", body.project_id)
           .eq("user_id", body.user_id)
           .eq("layer", "main")
-          .eq("entity_type", entity.entity_type)
-          .or(`canonical_name.ilike.${entity.canonical_name}%,canonical_name.ilike.%${entity.canonical_name}`)
-          .limit(1);
+          .ilike("canonical_name", entity.canonical_name)
+          .maybeSingle();
 
-        if (prefixMatches && prefixMatches.length > 0) {
-          // Verify it's actually a name-prefix relationship (not just substring coincidence)
-          const match = prefixMatches[0];
-          const matchName = (match.canonical_name || "").toLowerCase();
-          const newName = entity.canonical_name.toLowerCase();
-          if (matchName.startsWith(newName + " ") || newName.startsWith(matchName + " ") ||
-              matchName.startsWith(newName + "'") || newName.startsWith(matchName + "'") ||
-              matchName === newName) {
-            existing = match;
+        if (exactMatch) {
+          existing = exactMatch;
+        } else {
+          // 2. Try prefix match: find existing entity whose name starts with new name or vice versa
+          //    e.g., existing "ליאו" matches new "ליאו פרוסט" → update existing to full name
+          const { data: prefixMatches } = await supabase
+            .from("knowledge_entities")
+            .select("id, canonical_name, entity_type, structured_fields, attributes, source, description, entity_types")
+            .eq("project_id", body.project_id)
+            .eq("user_id", body.user_id)
+            .eq("layer", "main")
+            .eq("entity_type", entity.entity_type)
+            .or(`canonical_name.ilike.${entity.canonical_name}%,canonical_name.ilike.%${entity.canonical_name}`)
+            .limit(1);
+
+          if (prefixMatches && prefixMatches.length > 0) {
+            // Verify it's actually a name-prefix relationship (not just substring coincidence)
+            const match = prefixMatches[0];
+            const matchName = (match.canonical_name || "").toLowerCase();
+            const newName = entity.canonical_name.toLowerCase();
+            if (matchName.startsWith(newName + " ") || newName.startsWith(matchName + " ") ||
+                matchName.startsWith(newName + "'") || newName.startsWith(matchName + "'") ||
+                matchName === newName) {
+              existing = match;
+            }
           }
         }
       }
@@ -752,12 +815,13 @@ Deno.serve(async (req) => {
       let entityId: string;
 
       if (existing) {
+        // Branch mode: entity exists in Main → create overlay
         const { overrides, baseValues } = buildOverlayChanges(existing, entity);
         const { error: overlayError } = await supabase
           .from("knowledge_branch_entities")
           .upsert(
             {
-              branch_id: activeBranch.id,
+              branch_id: targetBranchId!,
               source_entity_id: existing.id,
               entity_id: existing.id,
               project_id: body.project_id,
@@ -777,6 +841,7 @@ Deno.serve(async (req) => {
         entityId = existing.id;
         branchEntitiesSaved++;
       } else {
+        // New entity: insert based on target layer
         const { data: inserted, error: insertError } = await supabase
           .from("knowledge_entities")
           .insert({
@@ -784,7 +849,7 @@ Deno.serve(async (req) => {
             document_id: body.document_id,
             version_id: body.version_id,
             user_id: body.user_id,
-            branch_id: activeBranch.id,
+            branch_id: targetBranchId || null,  // null for Main, branchId for Branch
             canonical_name: entity.canonical_name,
             entity_type: entity.entity_type,
             entity_types: entity.entity_types,
@@ -792,7 +857,7 @@ Deno.serve(async (req) => {
             attributes: entity.attributes,
             raw_extraction_id: rawExtractionId,
             updated_at: new Date().toISOString(),
-            layer: "branch",
+            layer: targetLayer,  // 'main' or 'branch'
             structured_fields: entity.structured_fields,
             source: "ai",
           })
@@ -800,49 +865,55 @@ Deno.serve(async (req) => {
           .single();
 
         if (insertError || !inserted) {
-          console.error(`Failed to insert branch entity '${entity.canonical_name}':`, insertError?.message);
+          console.error(`Failed to insert ${targetLayer} entity '${entity.canonical_name}':`, insertError?.message);
           continue;
         }
         entityId = inserted.id;
 
-        const { error: branchMappingError } = await supabase
-          .from("knowledge_branch_entities")
-          .upsert(
-            {
-              branch_id: activeBranch.id,
-              source_entity_id: null,
-              entity_id: entityId,
-              project_id: body.project_id,
-              user_id: body.user_id,
-              overrides: {
-                canonical_name: entity.canonical_name,
-                entity_type: entity.entity_type,
-                description: entity.description,
-                attributes: entity.attributes,
-                structured_fields: entity.structured_fields,
+        // If Branch mode: also create knowledge_branch_entities mapping
+        if (targetLayer === "branch") {
+          const { error: branchMappingError } = await supabase
+            .from("knowledge_branch_entities")
+            .upsert(
+              {
+                branch_id: targetBranchId!,
+                source_entity_id: null,
+                entity_id: entityId,
+                project_id: body.project_id,
+                user_id: body.user_id,
+                overrides: {
+                  canonical_name: entity.canonical_name,
+                  entity_type: entity.entity_type,
+                  description: entity.description,
+                  attributes: entity.attributes,
+                  structured_fields: entity.structured_fields,
+                },
+                base_values: {},
+                is_modified: true,
+                modified_fields: ["canonical_name", "entity_type", "description", "attributes", "structured_fields"],
               },
-              base_values: {},
-              is_modified: true,
-              modified_fields: ["canonical_name", "entity_type", "description", "attributes", "structured_fields"],
-            },
-            { onConflict: "branch_id,entity_id" }
-          );
+              { onConflict: "branch_id,entity_id" }
+            );
 
-        if (branchMappingError) {
-          console.error(`Failed to map branch-only entity '${entity.canonical_name}':`, branchMappingError.message);
-          continue;
+          if (branchMappingError) {
+            console.error(`Failed to map branch-only entity '${entity.canonical_name}':`, branchMappingError.message);
+            continue;
+          }
+          branchEntitiesSaved++;
+        } else {
+          // Main bootstrap: count entity directly
+          entitiesSaved++;
         }
-        branchEntitiesSaved++;
       }
 
       entityIdMap.set(entity.canonical_name.toLowerCase(), entityId);
       entitiesSaved++;
 
-      // Mentions
+      // Mentions (saved for both Main and Branch)
       for (const pos of entity.chunk_positions) {
         const ev = entity.evidence.length > 0 ? entity.evidence[0]?.slice(0, 500) : null;
         await supabase.from("knowledge_entity_mentions").upsert(
-          { entity_id: entityId, branch_id: activeBranch.id, chunk_position: pos, evidence: ev },
+          { entity_id: entityId, branch_id: targetBranchId || null, chunk_position: pos, evidence: ev },
           { onConflict: "entity_id,chunk_position,evidence,branch_id" }
         );
         mentionsSaved++;
@@ -851,18 +922,18 @@ Deno.serve(async (req) => {
       if (entity.evidence.length > 1 && entity.chunk_positions.length > 0) {
         for (let i = 1; i < entity.evidence.length; i++) {
           await supabase.from("knowledge_entity_mentions").upsert(
-            { entity_id: entityId, branch_id: activeBranch.id, chunk_position: entity.chunk_positions[0], evidence: entity.evidence[i]?.slice(0, 500) },
+            { entity_id: entityId, branch_id: targetBranchId || null, chunk_position: entity.chunk_positions[0], evidence: entity.evidence[i]?.slice(0, 500) },
             { onConflict: "entity_id,chunk_position,evidence,branch_id" }
           );
           mentionsSaved++;
         }
       }
 
-      // Aliases
+      // Aliases (saved for both Main and Branch)
       for (const alias of entity.aliases) {
         if (!alias) continue;
         await supabase.from("knowledge_entity_aliases").upsert(
-          { entity_id: entityId, alias, branch_id: activeBranch.id },
+          { entity_id: entityId, alias, branch_id: targetBranchId || null },
           { onConflict: "entity_id,alias,branch_id" }
         );
         aliasesSaved++;
@@ -870,113 +941,118 @@ Deno.serve(async (req) => {
     }
 
     // ==============================
-    // Step 6: Save relationships
+    // Step 6: Save relationships (Branch mode only)
     // ==============================
+    // In Main bootstrap mode, relationships are not saved yet (only entities)
     let relationshipsSaved = 0;
-    for (const rel of extraction.relationships || []) {
-      const relationshipType = rel.relationship_type?.trim();
-      if (!relationshipType || !INITIAL_RELATIONSHIP_TYPES.has(relationshipType)) continue;
+    if (targetLayer === "branch") {
+      for (const rel of extraction.relationships || []) {
+        const relationshipType = rel.relationship_type?.trim();
+        if (!relationshipType || !INITIAL_RELATIONSHIP_TYPES.has(relationshipType)) continue;
 
-      const sourceId = entityIdMap.get(rel.character_a?.trim().toLowerCase());
-      const targetId = entityIdMap.get(rel.character_b?.trim().toLowerCase());
-      if (!sourceId || !targetId) continue;
+        const sourceId = entityIdMap.get(rel.character_a?.trim().toLowerCase());
+        const targetId = entityIdMap.get(rel.character_b?.trim().toLowerCase());
+        if (!sourceId || !targetId) continue;
 
-      // A Branch proposal records whether the same edge existed in Main at the
-      // time of extraction. Main is queried only; it is never updated here.
-      const { data: baseRelationship, error: baseError } = await supabase
-        .from("knowledge_entity_relationships")
-        .select("id")
-        .eq("project_id", body.project_id)
-        .is("branch_id", null)
-        .eq("source_entity_id", sourceId)
-        .eq("target_entity_id", targetId)
-        .eq("relationship_type", relationshipType)
-        .limit(1)
-        .maybeSingle();
+        // A Branch proposal records whether the same edge existed in Main at the
+        // time of extraction. Main is queried only; it is never updated here.
+        const { data: baseRelationship, error: baseError } = await supabase
+          .from("knowledge_entity_relationships")
+          .select("id")
+          .eq("project_id", body.project_id)
+          .is("branch_id", null)
+          .eq("source_entity_id", sourceId)
+          .eq("target_entity_id", targetId)
+          .eq("relationship_type", relationshipType)
+          .limit(1)
+          .maybeSingle();
 
-      if (baseError) {
-        console.error(`Failed to inspect Main relationship '${relationshipType}':`, baseError.message);
-        continue;
+        if (baseError) {
+          console.error(`Failed to inspect Main relationship '${relationshipType}':`, baseError.message);
+          continue;
+        }
+
+        const { error: relationshipError } = await supabase
+          .from("knowledge_entity_relationships")
+          .upsert(
+            {
+              project_id: body.project_id,
+              document_id: body.document_id,
+              version_id: body.version_id,
+              source_entity_id: sourceId,
+              target_entity_id: targetId,
+              relationship_type: relationshipType,
+              evidence: rel.evidence?.join(" | ")?.slice(0, 1000) || null,
+              chunk_position: rel.chunk_positions?.[0] || null,
+              raw_extraction_id: rawExtractionId,
+              branch_id: targetBranchId!,
+              operation: "add",
+              review_status: "pending",
+              base_exists: Boolean(baseRelationship),
+            },
+            { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" }
+          );
+
+        if (relationshipError) {
+          console.error(`Failed to save Branch relationship '${relationshipType}':`, relationshipError.message);
+          continue;
+        }
+        relationshipsSaved++;
       }
-
-      const { error: relationshipError } = await supabase
-        .from("knowledge_entity_relationships")
-        .upsert(
-          {
-            project_id: body.project_id,
-            document_id: body.document_id,
-            version_id: body.version_id,
-            source_entity_id: sourceId,
-            target_entity_id: targetId,
-            relationship_type: relationshipType,
-            evidence: rel.evidence?.join(" | ")?.slice(0, 1000) || null,
-            chunk_position: rel.chunk_positions?.[0] || null,
-            raw_extraction_id: rawExtractionId,
-            branch_id: activeBranch.id,
-            operation: "add",
-            review_status: "pending",
-            base_exists: Boolean(baseRelationship),
-          },
-          { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" }
-        );
-
-      if (relationshipError) {
-        console.error(`Failed to save Branch relationship '${relationshipType}':`, relationshipError.message);
-        continue;
-      }
-      relationshipsSaved++;
     }
 
     // ==============================
-    // Step 7: Save events
+    // Step 7: Save events (Branch mode only)
     // ==============================
+    // In Main bootstrap mode, events are not saved (relationships aren't either)
     let eventsSaved = 0;
     let eventMentionsSaved = 0;
     let eventParticipantsSaved = 0;
+    if (targetLayer === "branch") {
+      for (const event of extraction.events || []) {
+        const eventName = (event.description || event.name || "unnamed event").slice(0, 200);
 
-    for (const event of extraction.events || []) {
-      const eventName = (event.description || event.name || "unnamed event").slice(0, 200);
+        const { data: upsertedEvent, error: eventError } = await supabase
+          .from("knowledge_events")
+          .upsert(
+            {
+              project_id: body.project_id,
+              document_id: body.document_id,
+              version_id: body.version_id,
+              user_id: body.user_id,
+              name: eventName,
+              description: event.what_happened || event.description || null,
+              attributes: { location: event.location || null, participants: event.participants || [] },
+              raw_extraction_id: rawExtractionId,
+              branch_id: targetBranchId!,
+            },
+            { onConflict: "version_id,name,branch_id" }
+          )
+          .select("id")
+          .single();
 
-      const { data: upsertedEvent, error: eventError } = await supabase
-        .from("knowledge_events")
-        .upsert(
-          {
-            project_id: body.project_id,
-            document_id: body.document_id,
-            version_id: body.version_id,
-            user_id: body.user_id,
-            name: eventName,
-            description: event.what_happened || event.description || null,
-            attributes: { location: event.location || null, participants: event.participants || [] },
-            raw_extraction_id: rawExtractionId,
-            branch_id: activeBranch.id,
-          },
-          { onConflict: "version_id,name,branch_id" }
-        )
-        .select("id")
-        .single();
+        if (eventError || !upsertedEvent) continue;
+        eventsSaved++;
+        const eventId = upsertedEvent.id;
 
-      if (eventError || !upsertedEvent) continue;
-      eventsSaved++;
-      const eventId = upsertedEvent.id;
+        for (const pos of event.chunk_positions || []) {
+          const ev = event.evidence?.length ? event.evidence[0]?.slice(0, 500) : null;
+          await supabase.from("knowledge_event_mentions").upsert(
+            { event_id: eventId, branch_id: targetBranchId!, chunk_position: pos, evidence: ev },
+            { onConflict: "event_id,chunk_position,evidence,branch_id" }
+          );
+          eventMentionsSaved++;
+        }
 
-      for (const pos of event.chunk_positions || []) {
-        const ev = event.evidence?.length ? event.evidence[0]?.slice(0, 500) : null;
-        await supabase.from("knowledge_event_mentions").upsert(
-          { event_id: eventId, branch_id: activeBranch.id, chunk_position: pos, evidence: ev },
-          { onConflict: "event_id,chunk_position,evidence,branch_id" }
-        );
-        eventMentionsSaved++;
-      }
-
-      for (const participantName of event.participants || []) {
-        const participantId = entityIdMap.get(participantName.trim().toLowerCase());
-        if (!participantId) continue;
-        await supabase.from("knowledge_event_participants").upsert(
-          { event_id: eventId, entity_id: participantId, role: null },
-          { onConflict: "event_id,entity_id" }
-        );
-        eventParticipantsSaved++;
+        for (const participantName of event.participants || []) {
+          const participantId = entityIdMap.get(participantName.trim().toLowerCase());
+          if (!participantId) continue;
+          await supabase.from("knowledge_event_participants").upsert(
+            { event_id: eventId, entity_id: participantId, role: null },
+            { onConflict: "event_id,entity_id" }
+          );
+          eventParticipantsSaved++;
+        }
       }
     }
 
@@ -1009,7 +1085,8 @@ Deno.serve(async (req) => {
           event_participants_saved: eventParticipantsSaved,
           branch_entities_saved: branchEntitiesSaved,
           raw_extraction_id: rawExtractionId,
-          branch_id: activeBranch.id,
+          branch_id: targetBranchId || null,
+        layer: targetLayer,
           normalized_entity_count: normalizedEntities.length,
         },
       }),
