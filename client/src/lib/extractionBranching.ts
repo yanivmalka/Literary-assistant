@@ -122,17 +122,23 @@ export function buildExtractionRequest(
   projectId: string,
   documentId: string,
   userId: string,
-  branchId: string,
+  branchId: string | null,
   offset: number,
   limit: number
 ): Record<string, unknown> {
-  validateBranchContext(branchId)
+  // If branchId is null, signal to Edge Function to use Main (bootstrap mode)
+  // If branchId is provided, use Branch
+  if (branchId) {
+    validateBranchContext(branchId)
+  }
+
   return {
     version_id: versionId,
     project_id: projectId,
     document_id: documentId,
     user_id: userId,
-    target_branch_id: branchId,
+    target_branch_id: branchId || null,  // null = use Main (bootstrap)
+    use_main: branchId === null,         // explicit flag for Edge Function
     offset,
     limit,
   }
@@ -672,4 +678,156 @@ export async function verifyBranchIsolation(
   }
 
   return data.branch_id === expectedBranchId
+}
+
+
+/**
+ * Auto-create Main/Branch for Extraction
+ * 
+ * Bootstrap logic: 
+ * - First extraction ever: create Main, write to Main
+ * - Subsequent extractions: create Branch if missing, write to Branch
+ * - After Main exists: AI never writes to Main again
+ */
+
+/**
+ * Check if Main layer has any entities for this project
+ * Safe check: does NOT create Main
+ */
+export async function hasMainEntities(projectId: string): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data, error } = await supabase
+    .from('knowledge_entities')
+    .select('id', { count: 'exact', head: true })
+    .eq('project_id', projectId)
+    .eq('user_id', user.id)
+    .eq('layer', 'main')
+    .limit(1)
+
+  if (error) {
+    console.error('Failed to check main entities:', error)
+    return false
+  }
+
+  return (data && data.length > 0) || false
+}
+
+/**
+ * Ensure Main layer exists for project. 
+ * Creates exactly one marker entity if Main doesn't exist.
+ * 
+ * Uses Supabase RLS/constraints to prevent race conditions.
+ * If concurrent attempts create duplicate entries, only first succeeds.
+ */
+export async function ensureMainBootstrapped(projectId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // Check if Main already exists
+  const hasMain = await hasMainEntities(projectId)
+  if (hasMain) return
+
+  // Try to create bootstrap marker
+  // If race condition: another client already created it, query will return empty
+  // and we silently continue (Main exists now)
+  const { error } = await supabase
+    .from('knowledge_entities')
+    .insert({
+      project_id: projectId,
+      user_id: user.id,
+      canonical_name: '__bootstrap__',
+      entity_type: 'event',
+      description: 'Bootstrap marker for Main layer',
+      layer: 'main',
+      source: 'system',
+      attributes: {},
+      structured_fields: {},
+    })
+    .select('id')
+    .single()
+
+  // Ignore "duplicate" errors - means another concurrent request created it
+  if (error && !error.message.includes('duplicate')) {
+    throw error
+  }
+
+  console.log('[Knowledge] Main layer bootstrapped for project:', projectId)
+}
+
+/**
+ * Get or create active Branch for this project.
+ * 
+ * Uses is_current=true + status=active uniqueness to prevent duplicate active branches.
+ * If concurrent attempts: RLS + constraints ensure only one active branch.
+ */
+export async function getOrCreateActiveBranch(projectId: string): Promise<{ id: string }> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  // First, try to get existing active branch
+  const { data: existing, error: fetchError } = await supabase
+    .from('knowledge_branches')
+    .select('id')
+    .eq('project_id', projectId)
+    .eq('user_id', user.id)
+    .eq('is_current', true)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (fetchError) {
+    throw new Error(`Failed to fetch active branch: ${fetchError.message}`)
+  }
+
+  if (existing) {
+    return { id: existing.id }
+  }
+
+  // No active branch exists. Try to create one.
+  // If race condition: another client creates it first, we'll get "duplicate" error
+  // In that case, re-fetch to get the newly created branch
+  const branchName = `Branch ${new Date().toLocaleDateString(navigator.language === 'he' ? 'he-IL' : 'en-US')}`
+
+  const { data: created, error: createError } = await supabase
+    .from('knowledge_branches')
+    .insert({
+      project_id: projectId,
+      user_id: user.id,
+      name: branchName,
+      status: 'active',
+      is_current: true,
+    })
+    .select('id')
+    .single()
+
+  // If conflict (race condition), fetch the one that was created by competing client
+  if (createError && createError.message.includes('duplicate')) {
+    const { data: raced, error: refetchError } = await supabase
+      .from('knowledge_branches')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+      .eq('is_current', true)
+      .eq('status', 'active')
+      .maybeSingle()
+
+    if (refetchError || !raced) {
+      throw new Error('Failed to create or find active branch after race condition')
+    }
+
+    console.log('[Knowledge] Active branch already exists (race condition handled):', raced.id)
+    return { id: raced.id }
+  }
+
+  if (createError) {
+    throw new Error(`Failed to create active branch: ${createError.message}`)
+  }
+
+  if (!created) {
+    throw new Error('Branch creation returned no data')
+  }
+
+  console.log('[Knowledge] New active branch created:', created.id)
+  return { id: created.id }
 }

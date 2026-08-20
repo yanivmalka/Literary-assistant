@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import { buildExtractionRequest, getActiveBranch } from '@/lib/extractionBranching'
+import { buildExtractionRequest, hasMainEntities, ensureMainBootstrapped, getOrCreateActiveBranch } from '@/lib/extractionBranching'
 
 export interface DocumentVersion {
   id: string
@@ -258,14 +258,29 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    let activeBranch: { id: string }
+    let activeBranch: { id: string } | null = null
+    let useMainForExtraction = false
+
     try {
-      activeBranch = await getActiveBranch(projectId)
+      // Check if Main exists
+      const mainExists = await hasMainEntities(projectId)
+
+      if (!mainExists) {
+        // Bootstrap: first extraction goes to Main
+        console.log('[Knowledge] First extraction - bootstrapping Main layer')
+        await ensureMainBootstrapped(projectId)
+        useMainForExtraction = true
+        activeBranch = null
+      } else {
+        // Main exists: get or create active Branch
+        console.log('[Knowledge] Main exists - using Branch')
+        activeBranch = await getOrCreateActiveBranch(projectId)
+      }
     } catch (error) {
-      console.error('[Knowledge] Extraction rejected: no active branch', error)
+      console.error('[Knowledge] Extraction setup failed:', error)
       set({
         extractionInProgress: false,
-        extractionError: 'ui.documents.noBranchForExtraction',
+        extractionError: 'ui.documents.extractionError',
         extractionDocumentId: documentId,
       })
       return
@@ -327,7 +342,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             projectId,
             documentId,
             user.id,
-            activeBranch.id,
+            useMainForExtraction ? null : activeBranch?.id || null,
             offset,
             BATCH_SIZE,
           ),

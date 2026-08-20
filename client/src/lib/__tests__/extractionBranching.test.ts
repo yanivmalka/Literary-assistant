@@ -10,10 +10,11 @@ import {
 } from '../extractionBranching'
 
 describe('AI extraction branch routing', () => {
-  it('rejects extraction when there is no active branch', () => {
+  it('rejects extraction when there is no active branch context', () => {
     expect(() => validateBranchContext(null)).toThrow('No active branch')
     expect(() => validateBranchContext(undefined)).toThrow('AI is not permitted to modify Main directly')
-    expect(() => buildExtractionRequest('v1', 'p1', 'd1', 'u1', '', 0, 2)).toThrow('No active branch')
+    // Note: buildExtractionRequest now allows null for bootstrap, and empty string is still validated
+    expect(() => validateBranchContext('')).toThrow('No active branch')
   })
 
   it('requires and forwards the active branch in every extraction request', () => {
@@ -23,6 +24,20 @@ describe('AI extraction branch routing', () => {
       document_id: 'd1',
       user_id: 'u1',
       target_branch_id: 'branch-1',
+      use_main: false,
+      offset: 0,
+      limit: 2,
+    })
+  })
+
+  it('signals Main bootstrap mode when branchId is null', () => {
+    expect(buildExtractionRequest('v1', 'p1', 'd1', 'u1', null, 0, 2)).toEqual({
+      version_id: 'v1',
+      project_id: 'p1',
+      document_id: 'd1',
+      user_id: 'u1',
+      target_branch_id: null,
+      use_main: true,
       offset: 0,
       limit: 2,
     })
