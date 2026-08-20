@@ -4,14 +4,14 @@
 
 /**
  * Pipeline stages in execution order.
+ * Note: AI-dependent stages (entity/attribute extraction, contradiction detection)
+ * are now handled by Edge Functions, not this server pipeline.
+ * This pipeline handles document ingestion only.
  */
 export const PIPELINE_STAGES = [
   'extraction',
   'chunking',
   'indexing',
-  'entity_extraction',
-  'attribute_extraction',
-  'contradiction_detection',
 ] as const
 
 export type PipelineStage = typeof PIPELINE_STAGES[number]
@@ -23,9 +23,6 @@ export const STAGE_TO_STATUS: Record<PipelineStage, string> = {
   extraction: 'extracted',
   chunking: 'chunked',
   indexing: 'indexed',
-  entity_extraction: 'analyzing',
-  attribute_extraction: 'analyzing',
-  contradiction_detection: 'ready',
 }
 
 /**
@@ -35,9 +32,6 @@ export const STAGE_START_STATUS: Record<PipelineStage, string> = {
   extraction: 'extracting',
   chunking: 'chunking',
   indexing: 'indexing',
-  entity_extraction: 'analyzing',
-  attribute_extraction: 'analyzing',
-  contradiction_detection: 'analyzing',
 }
 
 /**

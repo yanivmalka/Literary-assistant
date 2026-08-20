@@ -11,7 +11,6 @@ import { extractDocument } from '../documents/extractors/index.js'
 import { detectStructure } from '../documents/structure-detector.js'
 import { chunkDocument, mergeSmallChunks, loadChunkerConfig } from '../documents/chunker.js'
 import { generateEmbeddingsForVersion } from '../documents/embeddings.js'
-import { detectContradictions } from '../entities/contradictions.js'
 import type { PipelineStage, StageResult, ErrorCategory } from './types.js'
 import { PIPELINE_STAGES, STAGE_START_STATUS, STAGE_TO_STATUS } from './types.js'
 
@@ -19,6 +18,8 @@ const MAX_RETRIES = 3
 
 /**
  * Determine which stage to resume from based on current version status.
+ * Note: AI stages (entity extraction, contradiction detection) are handled by Edge Functions.
+ * This pipeline only handles: extraction → chunking → indexing.
  */
 function getResumeStage(status: string): PipelineStage | null {
   switch (status) {
@@ -35,9 +36,9 @@ function getResumeStage(status: string): PipelineStage | null {
     case 'indexing':
       return 'indexing' // retry
     case 'indexed':
-      return 'entity_extraction'
+      return null // server pipeline complete; AI extraction handled by Edge Functions
     case 'analyzing':
-      return 'entity_extraction' // might need to check which sub-stage
+      return null // AI extraction in progress or complete; don't retry server pipeline
     case 'ready':
       return null // already done
     case 'error':
@@ -110,20 +111,8 @@ export async function runPipeline(
     const result = await executeStage(stage, versionId, projectId, userId, documentId, version.storage_path)
 
     if (result.skipped) {
-      // Stage was skipped (e.g., no AI provider) — mark as skipped and continue
-      // For AI-dependent stages, the document is still usable for search
-      if (stage === 'entity_extraction') {
-        // If entity extraction is skipped, attribute and contradiction stages also skip
-        await supabase
-          .from('document_versions')
-          .update({
-            status: 'skipped_no_provider',
-            error_message: result.skipReason,
-            processing_completed_at: new Date().toISOString(),
-          })
-          .eq('id', versionId)
-        return { success: true, finalStatus: 'skipped_no_provider' }
-      }
+      // Stage was skipped (e.g., no embedding provider) — mark as skipped and continue
+      // Document is still usable for full-text search
       continue
     }
 
@@ -152,12 +141,12 @@ export async function runPipeline(
   await supabase
     .from('document_versions')
     .update({
-      status: 'ready',
+      status: 'indexed',
       processing_completed_at: new Date().toISOString(),
     })
     .eq('id', versionId)
 
-  return { success: true, finalStatus: 'ready' }
+  return { success: true, finalStatus: 'indexed' }
 }
 
 /**
@@ -179,9 +168,8 @@ async function executeStage(
         return await runChunking(versionId)
       case 'indexing':
         return await runIndexing(versionId)
-      case 'contradiction_detection':
-        return await runContradictionDetection(projectId)
       default:
+        // TypeScript exhaustiveness check; should never reach here
         return { success: false, error: `Unknown stage: ${stage}`, errorCategory: 'unknown_error' }
     }
   } catch (error) {
@@ -331,20 +319,6 @@ async function runIndexing(versionId: string): Promise<StageResult> {
       return { success: false, error: result.error, errorCategory: 'ai_provider_error' }
     }
     return { success: false, error: result.error, errorCategory: 'ai_provider_error' }
-  }
-
-  return { success: true }
-}
-
-/**
- * Stage: Detect contradictions in entity attributes.
- * This is local logic — no AI provider needed.
- */
-async function runContradictionDetection(projectId: string): Promise<StageResult> {
-  const result = await detectContradictions(projectId)
-
-  if (result.error) {
-    return { success: false, error: result.error, errorCategory: 'database_error' }
   }
 
   return { success: true }
