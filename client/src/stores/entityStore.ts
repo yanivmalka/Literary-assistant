@@ -71,62 +71,174 @@ export const useEntityStore = create<EntityState>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { set({ loading: false }); return }
 
-      // Query from knowledge_entities (Gemini-based knowledge layer)
-      let query = supabase
+      // Import branchView utilities for overlay merging
+      const { getEffectiveBranchView, getEffectiveBranchOnlyView } = await import('@/lib/branchView')
+
+      // Step 1: Fetch Main layer entities
+      let mainQuery = supabase
         .from('knowledge_entities')
-        .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, created_at, updated_at')
+        .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, created_at, updated_at, project_id, user_id')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
         .eq('layer', 'main')
         .order('canonical_name')
 
-      if (filters?.type) {
-        query = query.eq('entity_type', filters.type)
+      const { data: mainEntities, error: mainError } = await mainQuery
+
+      if (mainError) {
+        console.error('Failed to fetch main entities:', mainError)
+        set({ entities: [] })
+        return
       }
 
-      const { data, error } = await query
+      // Step 2: Get active branch for this project
+      const { data: activeBranch } = await supabase
+        .from('knowledge_branches')
+        .select('id')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id)
+        .eq('is_current', true)
+        .eq('status', 'active')
+        .maybeSingle()
 
-      if (error) {
-        console.error('Failed to fetch entities:', error)
-        set({ entities: [] })
-      } else {
-        // Fetch aliases for all retrieved entities
-        const entityIds = (data || []).map((e: Record<string, unknown>) => e.id as string)
-        let aliasMap = new Map<string, string[]>()
-        if (entityIds.length > 0) {
-          const { data: aliasData } = await supabase
-            .from('knowledge_entity_aliases')
-            .select('entity_id, alias')
-            .in('entity_id', entityIds)
-          if (aliasData) {
-            for (const row of aliasData) {
-              const list = aliasMap.get(row.entity_id) || []
-              list.push(row.alias)
-              aliasMap.set(row.entity_id, list)
-            }
-          }
+      // Step 3: Fetch branch overlays if active branch exists
+      let branchOverlays: Array<any> = []
+      let branchOnlyEntities: Array<any> = []
+      
+      if (activeBranch?.id) {
+        // Fetch overlays (Main entities with Branch modifications)
+        const { data: overlays } = await supabase
+          .from('knowledge_branch_entities')
+          .select('id, branch_id, source_entity_id, entity_id, overrides, base_values, is_modified, modified_fields, created_at, updated_at')
+          .eq('branch_id', activeBranch.id)
+
+        if (overlays) {
+          branchOverlays = overlays
         }
 
-        // Map knowledge_entities format to Entity interface
-        const mapped: Entity[] = (data || []).map((e: Record<string, unknown>) => ({
-          id: e.id as string,
-          name: e.canonical_name as string,
-          entity_type: e.entity_type as string,
-          status: 'confirmed',
-          aliases: aliasMap.get(e.id as string) || [],
-          metadata: (e.attributes as Record<string, unknown>) || {},
-          created_at: e.created_at as string,
-          updated_at: e.updated_at as string,
-          entity_types: e.entity_types as string[],
-          description: e.description as string | null,
-          attributes: (e.attributes as Record<string, unknown>) || {},
-          structured_fields: (e.structured_fields as Record<string, unknown>) || {},
-          source: (e.source as string) || 'ai',
-        }))
-        set({ entities: mapped })
+        // Fetch branch-only entities (layer='branch', no Main parent)
+        const { data: branchOnly } = await supabase
+          .from('knowledge_entities')
+          .select('id, canonical_name, entity_type, entity_types, description, attributes, structured_fields, source, created_at, updated_at, project_id, user_id, branch_id')
+          .eq('project_id', projectId)
+          .eq('user_id', user.id)
+          .eq('layer', 'branch')
+          .eq('branch_id', activeBranch.id)
+          .order('canonical_name')
+
+        if (branchOnly) {
+          branchOnlyEntities = branchOnly
+        }
       }
+
+      // Step 4: Fetch aliases for all entities
+      const allEntityIds = new Set<string>()
+      mainEntities?.forEach(e => allEntityIds.add(e.id as string))
+      branchOnlyEntities.forEach(e => allEntityIds.add(e.id as string))
+      
+      let aliasMap = new Map<string, string[]>()
+      if (allEntityIds.size > 0) {
+        const { data: aliasData } = await supabase
+          .from('knowledge_entity_aliases')
+          .select('entity_id, alias')
+          .in('entity_id', Array.from(allEntityIds))
+        if (aliasData) {
+          for (const row of aliasData) {
+            const list = aliasMap.get(row.entity_id) || []
+            list.push(row.alias)
+            aliasMap.set(row.entity_id, list)
+          }
+        }
+      }
+
+      // Step 5: Build effective entity view (Main + Branch merged)
+      const effectiveEntities = new Map<string, Entity>()
+
+      // Add Main entities with Branch overlays applied
+      if (mainEntities) {
+        for (const mainEntity of mainEntities) {
+          const mainId = mainEntity.id as string
+          const overlay = branchOverlays.find(o => o.entity_id === mainId || o.source_entity_id === mainId)
+
+          let effectiveData
+          if (overlay && activeBranch?.id) {
+            // Apply Branch overrides to Main entity
+            effectiveData = getEffectiveBranchView(
+              mainEntity as any,
+              overlay as any,
+              activeBranch.id
+            )
+          } else {
+            // No Branch modifications, use Main as-is
+            effectiveData = {
+              id: mainId,
+              canonical_name: mainEntity.canonical_name as string,
+              entity_type: mainEntity.entity_type as string,
+              description: mainEntity.description as string | null,
+              attributes: mainEntity.attributes as Record<string, unknown> || {},
+              structured_fields: mainEntity.structured_fields as Record<string, unknown> || {},
+              created_at: mainEntity.created_at as string,
+              updated_at: mainEntity.updated_at as string,
+            }
+          }
+
+          const entity: Entity = {
+            id: effectiveData.id,
+            name: effectiveData.canonical_name,
+            entity_type: effectiveData.entity_type,
+            status: 'confirmed',
+            aliases: aliasMap.get(mainId) || [],
+            metadata: effectiveData.attributes,
+            created_at: effectiveData.created_at,
+            updated_at: effectiveData.updated_at,
+            entity_types: (mainEntity.entity_types as string[]) || [mainEntity.entity_type as string],
+            description: effectiveData.description,
+            attributes: effectiveData.attributes,
+            structured_fields: effectiveData.structured_fields,
+            source: (mainEntity.source as string) || 'ai',
+          }
+
+          effectiveEntities.set(mainId, entity)
+        }
+      }
+
+      // Add branch-only entities
+      for (const branchEntity of branchOnlyEntities) {
+        const branchId = branchEntity.id as string
+        const effectiveData = getEffectiveBranchOnlyView(
+          branchEntity as any,
+          activeBranch?.id || branchEntity.branch_id as string
+        )
+
+        const entity: Entity = {
+          id: effectiveData.id,
+          name: effectiveData.canonical_name,
+          entity_type: effectiveData.entity_type,
+          status: 'confirmed',
+          aliases: aliasMap.get(branchId) || [],
+          metadata: effectiveData.attributes,
+          created_at: effectiveData.created_at,
+          updated_at: effectiveData.updated_at,
+          entity_types: (branchEntity.entity_types as string[]) || [branchEntity.entity_type as string],
+          description: effectiveData.description,
+          attributes: effectiveData.attributes,
+          structured_fields: effectiveData.structured_fields,
+          source: (branchEntity.source as string) || 'ai',
+        }
+
+        effectiveEntities.set(branchId, entity)
+      }
+
+      // Step 6: Apply type filter if provided
+      let filtered = Array.from(effectiveEntities.values())
+      if (filters?.type) {
+        filtered = filtered.filter(e => e.entity_type === filters.type)
+      }
+
+      set({ entities: filtered })
     } catch (error) {
       console.error('Failed to fetch entities:', error)
+      set({ entities: [] })
     } finally {
       set({ loading: false })
     }
