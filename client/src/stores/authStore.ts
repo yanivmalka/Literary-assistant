@@ -32,26 +32,35 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   initialize: async () => {
     try {
+      // First, get the current session from Supabase
       const { data: { session } } = await supabase.auth.getSession()
 
       if (session) {
+        // Session exists - set user and fetch profile
         set({ user: session.user, session, initialized: true })
         await get().fetchProfile()
       } else {
+        // No session yet - just mark as initialized
+        // The auth listener below will pick up the session when it's established
         set({ initialized: true })
       }
 
-      // Listen for auth changes
-      supabase.auth.onAuthStateChange(async (_event, session) => {
-        set({ user: session?.user ?? null, session })
-        if (session?.user) {
-          await get().fetchProfile()
-        } else {
-          set({ profile: null })
+      // Set up a persistent listener for auth state changes
+      // This will handle login, logout, and token refresh
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          // User signed in or token was refreshed - update state and fetch profile
+          set({ user: session?.user ?? null, session })
+          if (session?.user) {
+            await get().fetchProfile()
+          }
+        } else if (event === 'SIGNED_OUT') {
+          // User signed out - clear state
+          set({ user: null, session: null, profile: null })
         }
       })
     } catch (error) {
-      console.warn('Auth initialization failed:', error)
+      console.error('Auth initialization failed:', error)
       set({ initialized: true })
     }
   },
@@ -80,14 +89,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ loading: true })
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      set({ loading: false })
       
-      // If sign in fails and user exists but not confirmed, provide helpful message
-      if (error?.message?.includes('Email not confirmed')) {
-        return { error: 'Please check your email to confirm your account before logging in.' }
+      if (error) {
+        set({ loading: false })
+        // If sign in fails and user exists but not confirmed, provide helpful message
+        if (error?.message?.includes('Email not confirmed')) {
+          return { error: 'Please check your email to confirm your account before logging in.' }
+        }
+        return { error: error.message }
       }
-      
-      return { error: error?.message ?? null }
+
+      // Wait for the auth session to be established and listener to fire
+      // This ensures the user state is updated before returning
+      await new Promise(resolve => {
+        const timeout = setTimeout(resolve, 500) // 500ms to allow listener to fire
+        
+        // Listen for the next auth state change
+        const unsubscribe = supabase.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_IN' && session?.user) {
+            clearTimeout(timeout)
+            unsubscribe()
+            resolve(null)
+          }
+        })
+      })
+
+      set({ loading: false })
+      return { error: null }
     } catch (err) {
       set({ loading: false })
       const message = err instanceof Error ? err.message : 'Sign in failed'
