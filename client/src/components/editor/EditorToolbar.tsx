@@ -145,6 +145,8 @@ export default function EditorToolbar() {
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground whitespace-nowrap">{t('editor.toolbar.strokeWidth')}</span>
                 <input
+                  id="stroke-width"
+                  name="stroke-width"
                   type="range"
                   min="1"
                   max="12"

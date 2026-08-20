@@ -89,18 +89,24 @@ export default function DebugAuthPage() {
               <div className="border rounded-lg p-4 bg-card">
                 <h2 className="text-xl font-semibold mb-4">Test Credentials</h2>
                 <input
+                  id="test-email"
+                  name="test-email"
                   type="email"
                   placeholder="test@example.com (NEW EMAIL)"
                   value={testEmail}
                   onChange={(e) => setTestEmail(e.target.value)}
                   className="w-full px-3 py-2 border rounded mb-3 bg-background"
+                  autoComplete="email"
                 />
                 <input
+                  id="test-password"
+                  name="test-password"
                   type="password"
                   placeholder="Test password"
                   value={testPassword}
                   onChange={(e) => setTestPassword(e.target.value)}
                   className="w-full px-3 py-2 border rounded mb-4 bg-background"
+                  autoComplete="password"
                 />
               </div>
 

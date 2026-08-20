@@ -62,9 +62,12 @@ export default function NamingPanel() {
                 <span className="font-medium">{getMarkerLabel(region.type)}</span>
               </div>
               <input
+                id={`region-name-${region.id}`}
+                name={`region-name-${region.id}`}
                 type="text"
                 placeholder={t('editor.naming.enterName')}
                 className="w-full px-2 py-1 text-xs border rounded bg-background"
+                autoComplete="off"
                 onBlur={(e) => {
                   if (e.target.value.trim()) {
                     applyNameToRegion(region.id, e.target.value.trim())
@@ -103,9 +106,12 @@ export default function NamingPanel() {
                   <span className="font-medium">{getMarkerLabel(marker.type)}</span>
                 </div>
                 <input
+                  id={`marker-name-${marker.id}`}
+                  name={`marker-name-${marker.id}`}
                   type="text"
                   placeholder={t('editor.naming.enterName')}
                   className="w-full px-2 py-1 text-xs border rounded bg-background"
+                  autoComplete="off"
                   onBlur={(e) => {
                     if (e.target.value.trim()) {
                       applyNameToMarker(marker.id, e.target.value.trim())

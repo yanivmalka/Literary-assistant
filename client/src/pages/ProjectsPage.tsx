@@ -114,6 +114,8 @@ export default function ProjectsPage() {
                   {t('projects.title')}
                 </label>
                 <input
+                  id="project-name"
+                  name="project-name"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
@@ -121,6 +123,7 @@ export default function ProjectsPage() {
                   placeholder={t('ui.projects.namePlaceholder')}
                   autoFocus
                   required
+                  autoComplete="off"
                 />
               </div>
               <div>
@@ -128,11 +131,14 @@ export default function ProjectsPage() {
                   {t('projects.description')}
                 </label>
                 <textarea
+                  id="project-description"
+                  name="project-description"
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                   rows={3}
                   placeholder={t('ui.projects.descriptionPlaceholder')}
+                  autoComplete="off"
                 />
               </div>
               <div className="flex justify-end gap-3">

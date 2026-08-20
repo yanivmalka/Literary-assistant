@@ -87,8 +87,11 @@ export default function QAPanel({ projectId }: QAPanelProps) {
       {/* Input */}
       <form onSubmit={handleSubmit} className="p-3 border-t flex gap-2">
         <input
+          id="qa-input"
+          name="qa-input"
           type="text"
           value={input}
+          autoComplete="off"
           onChange={e => setInput(e.target.value)}
           placeholder={t('qa.inputPlaceholder')}
           className="flex-1 px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"

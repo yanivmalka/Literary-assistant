@@ -161,12 +161,12 @@ export default function MarkerPalette() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium mb-1">{t('editor.markers.markerName')}</label>
-                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full px-2 py-1.5 text-sm border rounded bg-background" autoFocus />
+                <input id="marker-name" name="marker-name" type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full px-2 py-1.5 text-sm border rounded bg-background" autoFocus autoComplete="off" />
               </div>
               <div>
                 <label className="block text-xs font-medium mb-1">{t('editor.markers.markerColor')}</label>
                 <div className="flex items-center gap-2">
-                  <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)} className="h-8 w-8 rounded border cursor-pointer" />
+                  <input id="marker-color" name="marker-color" type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)} className="h-8 w-8 rounded border cursor-pointer" />
                   <span className="text-xs text-muted-foreground">{newColor}</span>
                 </div>
               </div>

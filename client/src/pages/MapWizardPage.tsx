@@ -148,21 +148,27 @@ export default function MapWizardPage() {
             <div>
               <label className="block text-sm font-medium mb-1">{t('ui.maps.mapName')}</label>
               <input
+                id="map-name"
+                name="map-name"
                 type="text"
                 value={mapName}
                 onChange={(e) => setMapName(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                 placeholder={t('ui.maps.mapNamePlaceholder')}
+                autoComplete="off"
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">{t('ui.maps.description')}</label>
               <textarea
+                id="map-description"
+                name="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
                 rows={6}
                 placeholder={t('ui.maps.descriptionPlaceholder')}
+                autoComplete="off"
               />
             </div>
           </div>

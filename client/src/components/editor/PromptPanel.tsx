@@ -69,8 +69,11 @@ export default function PromptPanel() {
       {prompt && (
         <div className="space-y-2">
           <textarea
+            id="prompt-textarea"
+            name="prompt"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            autoComplete="off"
             className="w-full px-2 py-2 text-xs border rounded bg-background resize-none font-mono"
             rows={8}
           />

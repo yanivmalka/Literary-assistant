@@ -137,6 +137,8 @@ export default function UploadPanel() {
       </div>
 
       <input
+        id="file-upload"
+        name="file-upload"
         ref={fileInputRef}
         type="file"
         accept="image/*"

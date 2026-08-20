@@ -72,8 +72,11 @@ export default function DevTestPage() {
       <div className="mb-4">
         <label className="block text-sm font-medium mb-2">Prompt</label>
         <textarea
+          id="dev-test-prompt"
+          name="prompt"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
+          autoComplete="off"
           rows={4}
           className="w-full rounded-lg border bg-background p-3 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
           placeholder="Enter a prompt to send to Gemini..."

@@ -200,6 +200,8 @@ export default function AccountSettingsPage() {
                   ) : (
                     <form onSubmit={handleAddPassword} className="space-y-3">
                       <input
+                        id="new-password"
+                        name="new-password"
                         type="password"
                         placeholder="New password"
                         value={newPassword}
@@ -207,8 +209,11 @@ export default function AccountSettingsPage() {
                         className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
                         required
                         minLength={6}
+                        autoComplete="new-password"
                       />
                       <input
+                        id="confirm-password"
+                        name="confirm-password"
                         type="password"
                         placeholder="Confirm password"
                         value={confirmPassword}
@@ -216,6 +221,7 @@ export default function AccountSettingsPage() {
                         className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
                         required
                         minLength={6}
+                        autoComplete="new-password"
                       />
                       <div className="flex gap-2">
                         <button

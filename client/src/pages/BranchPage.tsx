@@ -219,29 +219,38 @@ export default function BranchPage() {
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">{t('branch.fields.name')}</label>
                     <input
+                      id="edit-canonical-name"
+                      name="canonical-name"
                       type="text"
                       value={editForm.canonical_name}
                       onChange={e => setEditForm(prev => ({ ...prev, canonical_name: e.target.value }))}
                       className="w-full mt-1 px-3 py-1.5 border rounded-md text-sm"
+                      autoComplete="off"
                     />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-muted-foreground">{t('branch.fields.description')}</label>
                     <textarea
+                      id="edit-description"
+                      name="description"
                       value={editForm.description}
                       onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
                       className="w-full mt-1 px-3 py-1.5 border rounded-md text-sm"
                       rows={2}
+                      autoComplete="off"
                     />
                   </div>
                   {Object.entries(editForm.attributes).map(([key, val]) => (
                     <div key={key}>
                       <label className="text-xs font-medium text-muted-foreground">{key}</label>
                       <input
+                        id={`edit-attr-${key}`}
+                        name={`attribute-${key}`}
                         type="text"
                         value={formatValue(val)}
                         onChange={e => handleAttributeChange(key, e.target.value)}
                         className="w-full mt-1 px-3 py-1.5 border rounded-md text-sm"
+                        autoComplete="off"
                       />
                     </div>
                   ))}
@@ -409,11 +418,14 @@ export default function BranchPage() {
         <div className="mb-6 p-4 border-2 border-primary/20 rounded-lg bg-card">
           <h4 className="font-medium mb-3">{t('branch.createBranch')}</h4>
           <input
+            id="new-branch-name"
+            name="branch-name"
             type="text"
             placeholder={t('branch.branchNamePlaceholder')}
             value={newBranchName}
             onChange={e => setNewBranchName(e.target.value)}
             className="w-full px-3 py-2 border rounded-md text-sm mb-3"
+            autoComplete="off"
             autoFocus
           />
           <div className="flex gap-2">
