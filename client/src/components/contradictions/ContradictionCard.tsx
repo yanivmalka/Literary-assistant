@@ -11,6 +11,17 @@ export default function ContradictionCard({ contradiction, onResolve }: Contradi
   const { t } = useTranslation()
   const isOpen = contradiction.status === 'open'
 
+  // Get entity name if available from joined data
+  const entityName = contradiction.entity?.name || contradiction.entity_id?.slice(0, 8) || t('contradictions.unknownEntity')
+
+  // Get attribute names if available from joined data
+  const attributeNameA = contradiction.attribute_a?.attribute_name || t('contradictions.unknownAttribute')
+  const attributeNameB = contradiction.attribute_b?.attribute_name || t('contradictions.unknownAttribute')
+
+  // Get attribute values if available from joined data
+  const attributeValueA = contradiction.attribute_a?.attribute_value || contradiction.attribute_a_id?.slice(0, 8) || 'N/A'
+  const attributeValueB = contradiction.attribute_b?.attribute_value || contradiction.attribute_b_id?.slice(0, 8) || 'N/A'
+
   return (
     <div className={`border rounded-lg p-4 ${isOpen ? 'border-amber-200 bg-amber-50/30' : 'opacity-60'}`}>
       {/* Header */}
@@ -18,24 +29,26 @@ export default function ContradictionCard({ contradiction, onResolve }: Contradi
         <AlertTriangle className={`h-4 w-4 flex-shrink-0 mt-0.5 ${isOpen ? 'text-amber-600' : 'text-muted-foreground'}`} />
         <div>
           <p className="text-sm font-medium">
-            {contradiction.entity_id ? `Entity: ${contradiction.entity_id.slice(0, 8)}` : t('contradictions.unknownEntity')}
+            {entityName}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">{contradiction.field_path}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t('contradictions.comparing')} {attributeNameA} {t('contradictions.and')} {attributeNameB}
+          </p>
           {contradiction.contradiction_type && (
             <p className="text-xs text-muted-foreground">{contradiction.contradiction_type}</p>
           )}
         </div>
       </div>
 
-      {/* Values (placeholder: will be enhanced in v1.5) */}
+      {/* Values */}
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div className="bg-red-50 border border-red-100 rounded p-2">
-          <p className="text-xs text-muted-foreground">Value A</p>
-          <p className="text-sm font-medium text-red-800 truncate">{contradiction.value_a_id?.slice(0, 8) || 'N/A'}</p>
+          <p className="text-xs text-muted-foreground">{t('contradictions.valueA')}</p>
+          <p className="text-sm font-medium text-red-800 truncate">{attributeValueA}</p>
         </div>
         <div className="bg-blue-50 border border-blue-100 rounded p-2">
-          <p className="text-xs text-muted-foreground">Value B</p>
-          <p className="text-sm font-medium text-blue-800 truncate">{contradiction.value_b_id?.slice(0, 8) || 'N/A'}</p>
+          <p className="text-xs text-muted-foreground">{t('contradictions.valueB')}</p>
+          <p className="text-sm font-medium text-blue-800 truncate">{attributeValueB}</p>
         </div>
       </div>
 
