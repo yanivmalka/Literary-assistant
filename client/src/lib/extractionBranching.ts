@@ -738,15 +738,13 @@ export async function ensureMainBootstrapped(projectId: string): Promise<void> {
       project_id: projectId,
       user_id: user.id,
       canonical_name: '__bootstrap__',
-      entity_type: 'event',
+      entity_type: 'character',
       description: 'Bootstrap marker for Main layer',
       layer: 'main',
       source: 'system',
       attributes: {},
       structured_fields: {},
     })
-    .select('id')
-    .single()
 
   // Ignore "duplicate" errors - means another concurrent request created it
   if (error && !error.message.includes('duplicate')) {
