@@ -145,13 +145,17 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
       if (docId) {
         // New version of existing document
-        const { data: latestVersion } = await supabase
+        const { data: latestVersion, error: versionFetchError } = await supabase
           .from('document_versions')
           .select('version_number')
           .eq('document_id', docId)
           .order('version_number', { ascending: false })
           .limit(1)
           .single()
+
+        if (versionFetchError) {
+          console.error('[DIAGNOSTIC] uploadDocument() - get latest version error - operation: GET /rest/v1/document_versions - documentId:', docId, 'error_code:', versionFetchError.code, 'error_message:', versionFetchError.message)
+        }
 
         versionNumber = (latestVersion?.version_number ?? 0) + 1
       } else {
@@ -168,6 +172,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           .single()
 
         if (createError || !newDoc) {
+          console.error('[DIAGNOSTIC] uploadDocument() - create document error - operation: POST /rest/v1/documents - projectId:', projectId, 'error_code:', createError?.code, 'error_message:', createError?.message)
           set({ uploading: false })
           return { success: false, error: 'ui.documents.uploadFailed' }
         }
@@ -188,6 +193,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         })
 
       if (uploadError) {
+        console.error('[DIAGNOSTIC] uploadDocument() - storage upload error - operation: POST Storage project-documents - path:', storagePath, 'error_code:', uploadError.code, 'error_message:', uploadError.message)
         // Clean up if new document
         if (!documentId) {
           await supabase.from('documents').delete().eq('id', docId)
@@ -210,6 +216,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         .single()
 
       if (versionError || !versionData) {
+        console.error('[DIAGNOSTIC] uploadDocument() - create version error - operation: POST /rest/v1/document_versions - documentId:', docId, 'version:', versionNumber, 'error_code:', versionError?.code, 'error_message:', versionError?.message, 'UNIQUE_CONSTRAINT: (document_id, version_number)')
         set({ uploading: false })
         return { success: false, error: 'ui.documents.uploadFailed' }
       }
@@ -228,6 +235,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         await new Promise(resolve => setTimeout(resolve, 5000))
         console.log('[Knowledge] Document processing complete. Use Extract Knowledge button to start extraction.')
       }).catch((err) => {
+        console.error('[DIAGNOSTIC] uploadDocument() - process-document edge function error - operation: POST /functions/v1/process-document - error:', err)
         console.warn('Edge function trigger failed:', err)
       })
 
@@ -235,6 +243,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       await get().fetchDocuments(projectId)
       return { success: true }
     } catch (error) {
+      console.error('[DIAGNOSTIC] uploadDocument() - catch error - error:', error)
       set({ uploading: false })
       return { success: false, error: 'ui.common.unexpectedError' }
     }
@@ -283,6 +292,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         activeBranch = await getOrCreateActiveBranch(projectId)
       }
     } catch (error) {
+      console.error('[DIAGNOSTIC] triggerEntityExtraction() - Extraction setup failed - error:', error)
       console.error('[Knowledge] Extraction setup failed:', error)
       set({
         extractionInProgress: false,
@@ -310,10 +320,14 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     console.log('[Knowledge] Starting extraction for version', versionId)
 
     // Get total chunk count for progress calculation
-    const { count: totalChunks } = await supabase
+    const { count: totalChunks, error: countError } = await supabase
       .from('document_chunks')
       .select('id', { count: 'exact', head: true })
       .eq('version_id', versionId)
+
+    if (countError) {
+      console.error('[DIAGNOSTIC] triggerEntityExtraction() - document_chunks count error - operation: GET /rest/v1/document_chunks - table: document_chunks - versionId:', versionId, 'error_code:', countError.code, 'error_message:', countError.message)
+    }
 
     const total = totalChunks || 0
 
@@ -355,6 +369,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         })
 
         if (error) {
+          console.error('[DIAGNOSTIC] triggerEntityExtraction() - Edge Function error - operation: POST /functions/v1/extract-knowledge - error_code:', error.code, 'error_message:', error.message)
           console.error('[Knowledge] Batch error:', error.message)
           set({
             extractionInProgress: false,
@@ -365,6 +380,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
         if (!data || !data.success) {
           const errorMsg = data?.error ? 'ui.documents.extractionError' : 'ui.documents.extractionError'
+          console.error('[DIAGNOSTIC] triggerEntityExtraction() - Extraction failed - operation: POST /functions/v1/extract-knowledge - success: false - error:', data?.error, 'details:', data?.details?.slice(0, 300) || 'none')
           console.error('[Knowledge] Extraction failed:', errorMsg, 'Details:', data?.details?.slice(0, 300) || 'none')
           set({
             extractionInProgress: false,
@@ -397,6 +413,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           await new Promise(resolve => setTimeout(resolve, 15000))
         }
       } catch (err) {
+        console.error('[DIAGNOSTIC] triggerEntityExtraction() - Catch error during extraction - error:', err)
         console.error('[Knowledge] Extraction failed:', err)
         set({
           extractionInProgress: false,
