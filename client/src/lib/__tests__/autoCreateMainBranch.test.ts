@@ -18,7 +18,6 @@ describe('Auto-create Main/Branch for Extraction', () => {
 
   describe('STATE 1: No Main exists', () => {
     it('should detect that Main does not exist', () => {
-      const projectId = 'test-project-1'
       const hasMain = false  // Simulated: query returns no Main entities
 
       expect(hasMain).toBe(false)
