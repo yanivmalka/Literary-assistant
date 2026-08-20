@@ -10,6 +10,7 @@ import {
   ENTITY_TYPE_META,
 } from '@/lib/entityTypes'
 import { useEntityStore, type Entity } from '@/stores/entityStore'
+import { useBranchStore } from '@/stores/branchStore'
 import { supabase } from '@/lib/supabase'
 
 interface EntityModalProps {
@@ -32,6 +33,7 @@ export default function EntityModal({
 }: EntityModalProps) {
   const { t } = useTranslation()
   const { createEntity, updateEntity, deleteEntity } = useEntityStore()
+  const { currentBranch } = useBranchStore()
 
   const isEditMode = !!entity
   const fieldGroups = getFieldGroupsForType(entityType)
@@ -137,18 +139,28 @@ export default function EntityModal({
       if (isEditMode && entity) {
         // Update existing entity
         const name = (structuredFields.name as string) || entity.name
+        // Pass branch context if editing and branch is active
+        const branchContext = currentBranch
+          ? { branchId: currentBranch.id, sourceEntityId: entity.id }
+          : undefined
+        
         await updateEntity(entity.id, {
           canonical_name: name,
           description: (structuredFields.description as string) || null,
           structured_fields: structuredFields,
-        })
+        }, branchContext)
         // Sync aliases
         await syncAliases(entity.id)
       } else {
         // Create new entity
         const name = (structuredFields.name as string) || 'ישות חדשה'
         structuredFields.name = name
-        const created = await createEntity(projectId, entityType, structuredFields)
+        // Pass branch context for creates if branch is active
+        const branchContext = currentBranch
+          ? { branchId: currentBranch.id, layer: 'branch' as const }
+          : undefined
+        
+        const created = await createEntity(projectId, entityType, structuredFields, branchContext)
         // Sync aliases for new entity
         if (created) {
           await syncAliases(created.id)
