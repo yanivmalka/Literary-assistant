@@ -22,6 +22,9 @@ ADD COLUMN IF NOT EXISTS branch_id UUID;
 
 -- Add foreign key constraint
 ALTER TABLE IF EXISTS raw_extractions
+DROP CONSTRAINT IF EXISTS fk_raw_extractions_branch_id;
+
+ALTER TABLE IF EXISTS raw_extractions
 ADD CONSTRAINT fk_raw_extractions_branch_id 
 FOREIGN KEY (branch_id) REFERENCES knowledge_branches(id) ON DELETE CASCADE;
 
@@ -41,6 +44,9 @@ ALTER TABLE IF EXISTS knowledge_entity_aliases
 ADD COLUMN IF NOT EXISTS branch_id UUID;
 
 -- Add foreign key constraint
+ALTER TABLE IF EXISTS knowledge_entity_aliases
+DROP CONSTRAINT IF EXISTS fk_entity_aliases_branch_id;
+
 ALTER TABLE IF EXISTS knowledge_entity_aliases
 ADD CONSTRAINT fk_entity_aliases_branch_id 
 FOREIGN KEY (branch_id) REFERENCES knowledge_branches(id) ON DELETE CASCADE;
@@ -62,6 +68,9 @@ ADD COLUMN IF NOT EXISTS branch_id UUID;
 
 -- Add foreign key constraint
 ALTER TABLE IF EXISTS knowledge_entity_mentions
+DROP CONSTRAINT IF EXISTS fk_entity_mentions_branch_id;
+
+ALTER TABLE IF EXISTS knowledge_entity_mentions
 ADD CONSTRAINT fk_entity_mentions_branch_id 
 FOREIGN KEY (branch_id) REFERENCES knowledge_branches(id) ON DELETE CASCADE;
 
@@ -81,6 +90,9 @@ ALTER TABLE IF EXISTS knowledge_entity_relationships
 ADD COLUMN IF NOT EXISTS branch_id UUID;
 
 -- Add foreign key constraint
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+DROP CONSTRAINT IF EXISTS fk_entity_relationships_branch_id;
+
 ALTER TABLE IF EXISTS knowledge_entity_relationships
 ADD CONSTRAINT fk_entity_relationships_branch_id 
 FOREIGN KEY (branch_id) REFERENCES knowledge_branches(id) ON DELETE CASCADE;
@@ -102,6 +114,9 @@ ADD COLUMN IF NOT EXISTS branch_id UUID;
 
 -- Add foreign key constraint
 ALTER TABLE IF EXISTS knowledge_events
+DROP CONSTRAINT IF EXISTS fk_events_branch_id;
+
+ALTER TABLE IF EXISTS knowledge_events
 ADD CONSTRAINT fk_events_branch_id 
 FOREIGN KEY (branch_id) REFERENCES knowledge_branches(id) ON DELETE CASCADE;
 
@@ -121,6 +136,9 @@ ALTER TABLE IF EXISTS knowledge_event_mentions
 ADD COLUMN IF NOT EXISTS branch_id UUID;
 
 -- Add foreign key constraint
+ALTER TABLE IF EXISTS knowledge_event_mentions
+DROP CONSTRAINT IF EXISTS fk_event_mentions_branch_id;
+
 ALTER TABLE IF EXISTS knowledge_event_mentions
 ADD CONSTRAINT fk_event_mentions_branch_id 
 FOREIGN KEY (branch_id) REFERENCES knowledge_branches(id) ON DELETE CASCADE;

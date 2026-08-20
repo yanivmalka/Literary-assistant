@@ -18,9 +18,11 @@ ALTER TABLE IF EXISTS knowledge_entity_relationships
   ADD CONSTRAINT knowledge_entity_relationships_review_status_check
     CHECK (review_status IN ('pending', 'approved', 'rejected'));
 
+DROP INDEX IF EXISTS idx_entity_relationships_branch_review;
 CREATE INDEX IF NOT EXISTS idx_entity_relationships_branch_review
   ON knowledge_entity_relationships(project_id, branch_id, review_status);
 
+DROP INDEX IF EXISTS idx_entity_relationships_branch_endpoints;
 CREATE INDEX IF NOT EXISTS idx_entity_relationships_branch_endpoints
   ON knowledge_entity_relationships(branch_id, source_entity_id, target_entity_id);
 
