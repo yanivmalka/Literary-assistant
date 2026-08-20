@@ -58,7 +58,7 @@ interface EntityState {
   fetchEntityDetail: (projectId: string, entityId: string) => Promise<void>
   createEntity: (projectId: string, entityType: EntityType, structuredFields: Record<string, unknown>, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => Promise<Entity | null>
   updateEntity: (entityId: string, updates: { canonical_name?: string; description?: string | null; structured_fields?: Record<string, unknown>; attributes?: Record<string, unknown> }, branchContext?: { branchId: string; sourceEntityId: string }) => Promise<boolean>
-  deleteEntity: (entityId: string, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => Promise<boolean>
+  deleteEntity: (entityId: string, branchContext?: { branchId: string; layer: 'branch' } | { layer: 'main' }) => Promise<boolean>
   getMainOnlyEntities: (filters?: { type?: string; status?: string }) => Entity[]
   getEffectiveBranchEntities: (filters?: { type?: string; status?: string }) => Entity[]
 }
@@ -641,8 +641,8 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   // Only allow delete if:
   // - branchContext provided with layer='branch' (delete branch-only or overlay), OR
   // - Entity is branch-only and no reference from Main
-  // Prevent hard delete of Main entities
-  deleteEntity: async (entityId, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => {
+  // - branchContext provided with layer='main' (delete a canonical Main entity)
+  deleteEntity: async (entityId, branchContext?: { branchId: string; layer: 'branch' } | { layer: 'main' }) => {
     try {
       if (branchContext?.layer === 'branch') {
         // Branch deletion allowed
@@ -684,9 +684,26 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           selectedEntity: get().selectedEntity?.id === entityId ? null : get().selectedEntity,
         })
         return true
+      } else if (branchContext?.layer === 'main') {
+        const { error } = await supabase
+          .from('knowledge_entities')
+          .delete()
+          .eq('id', entityId)
+          .eq('layer', 'main')
+
+        if (error) {
+          console.error('Failed to delete Main entity:', error)
+          return false
+        }
+
+        set({
+          entities: get().entities.filter(e => e.id !== entityId),
+          selectedEntity: get().selectedEntity?.id === entityId ? null : get().selectedEntity,
+        })
+        return true
       } else {
-        // Main deletion: blocked for safety
-        console.warn('Cannot hard-delete Main entity. Use archive or branch deletion instead.')
+        // Main deletion requires explicit layer context for safety
+        console.warn('Cannot delete entity without an explicit layer context.')
         return false
       }
     } catch (error) {
