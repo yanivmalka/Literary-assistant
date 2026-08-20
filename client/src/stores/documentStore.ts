@@ -274,22 +274,29 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     if (!user) return
 
     let activeBranch: { id: string } | null = null
-    let useMainForExtraction = false
+    let extractionMode: 'bootstrap' | 'branch' | null = null
+    let extractionRunId: string | null = null
 
     try {
-      // Check if Main exists
+      // CRITICAL FIX: Determine extraction mode ONCE for the entire extraction run
+      // NOT per batch. This ensures all batches participate in the same bootstrap
+      // or all go to the same branch.
       const mainExists = await hasMainEntities(projectId)
 
       if (!mainExists) {
-        // Bootstrap: first extraction goes to Main (implicit initialization)
-        console.log('[Knowledge] First extraction - initializing Main layer with real entities')
-        useMainForExtraction = true
-        activeBranch = null
+        // Bootstrap mode: first extraction will initialize Main with all batches
+        extractionMode = 'bootstrap'
+        console.log('[Knowledge] Extraction mode: BOOTSTRAP - initializing Main layer with complete extraction')
       } else {
-        // Main exists: get or create active Branch
-        console.log('[Knowledge] Main exists - using Branch')
+        // Branch mode: all batches go to active branch/overlay
+        extractionMode = 'branch'
+        console.log('[Knowledge] Extraction mode: BRANCH')
         activeBranch = await getOrCreateActiveBranch(projectId)
       }
+
+      // Generate extraction run ID for cross-batch resolution
+      extractionRunId = crypto.randomUUID()
+      console.log('[Knowledge] Extraction run:', extractionRunId, 'mode:', extractionMode)
     } catch (error) {
       console.error('[DIAGNOSTIC] triggerEntityExtraction() - Extraction setup failed - error:', error)
       console.error('[Knowledge] Extraction setup failed:', error)
@@ -355,16 +362,25 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       }
 
       try {
+        // Send extraction request with:
+        // - extraction_mode: 'bootstrap' or 'branch' (constant for all batches in run)
+        // - extraction_run_id: shared identifier for cross-batch resolution
+        // - target_branch_id: only set if mode is 'branch'
         const { data, error } = await supabase.functions.invoke('extract-knowledge', {
-          body: buildExtractionRequest(
-            versionId,
-            projectId,
-            documentId,
-            user.id,
-            useMainForExtraction ? null : activeBranch?.id || null,
-            offset,
-            BATCH_SIZE,
-          ),
+          body: {
+            ...buildExtractionRequest(
+              versionId,
+              projectId,
+              documentId,
+              user.id,
+              extractionMode === 'branch' ? activeBranch?.id || null : null,
+              offset,
+              BATCH_SIZE,
+            ),
+            // CRITICAL: Add extraction-level context
+            extraction_mode: extractionMode,
+            extraction_run_id: extractionRunId,
+          },
         })
 
         if (error) {
@@ -406,25 +422,6 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         })
 
         console.log(`[Knowledge] Batch done: ${data.summary?.entities_saved || 0} entities, ${data.summary?.events_saved || 0} events saved`)
-
-        // CRITICAL FIX: Switch from Main to Branch after first successful batch
-        // This prevents "Main layer already exists" error on subsequent batches
-        if (useMainForExtraction && data.success && (data.summary?.entities_saved || 0) > 0) {
-          console.log('[Knowledge] Main bootstrap batch complete - switching to Branch mode')
-          useMainForExtraction = false
-          try {
-            activeBranch = await getOrCreateActiveBranch(projectId)
-            console.log('[Knowledge] Active branch created/fetched:', activeBranch.id)
-          } catch (branchError) {
-            console.error('[DIAGNOSTIC] triggerEntityExtraction() - Failed to create branch after Main bootstrap - error:', branchError)
-            console.error('[Knowledge] Failed to create branch after Main bootstrap:', branchError)
-            set({
-              extractionInProgress: false,
-              extractionError: 'ui.documents.extractionError',
-            })
-            break
-          }
-        }
 
         // Delay between batches to respect Gemini rate limits (15s)
         if (!done) {

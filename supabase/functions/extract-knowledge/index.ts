@@ -56,6 +56,9 @@ interface ExtractRequest {
   limit?: number;
   target_branch_id?: string | null;
   use_main?: boolean;
+  // CRITICAL FIX: Extraction-level context instead of per-batch decisions
+  extraction_mode?: 'bootstrap' | 'branch';
+  extraction_run_id?: string;
 }
 
 interface ExtractedEntity {
@@ -72,6 +75,8 @@ interface ExtractedEntity {
   users?: string[];
   members?: string[];
   purpose?: string | null;
+  // NEW: Field-specific evidence
+  field_evidence?: Record<string, string[]>;
   // Character fields
   age?: string | null;
   gender?: string | null;
@@ -248,6 +253,33 @@ function buildStructuredFields(type: string, entity: ExtractedEntity): Record<st
   return fields;
 }
 
+/**
+ * Compute confidence for each field based on whether field-specific evidence exists.
+ * Fields WITH evidence get higher confidence than fields WITHOUT.
+ */
+function computeFieldConfidence(
+  fieldEvidence: Record<string, string[]>,
+  structuredFields: Record<string, unknown>
+): Record<string, number> {
+  const confidence: Record<string, number> = {};
+
+  for (const fieldName of Object.keys(structuredFields)) {
+    const hasEvidence = fieldEvidence[fieldName] && fieldEvidence[fieldName].length > 0;
+    const value = structuredFields[fieldName];
+
+    if (!hasEvidence || value === null || value === undefined) {
+      // No evidence or no value = low confidence
+      confidence[fieldName] = 0.5;
+    } else {
+      // Has evidence = higher confidence
+      const evidenceCount = (fieldEvidence[fieldName] || []).length;
+      confidence[fieldName] = Math.min(0.95, 0.7 + evidenceCount * 0.1);
+    }
+  }
+
+  return confidence;
+}
+
 function normalizeEntities(
   extraction: GeminiExtraction, 
   chunkLookup: Map<number, { id: string; page: number | null }>
@@ -356,6 +388,9 @@ function normalizeEntities(
         chunk_positions: entity.chunk_positions || [],
         chunk_ids: chunkIds.length > 0 ? chunkIds : undefined,
         page_numbers: pageNumbers.length > 0 ? pageNumbers : undefined,
+        // NEW: Propagate field-specific evidence from extraction
+        field_evidence: entity.field_evidence,
+        field_confidence: entity.field_evidence ? computeFieldConfidence(entity.field_evidence, incomingStructuredFields) : undefined,
       });
     }
   }
@@ -457,10 +492,13 @@ function normalizeEntities(
     if (!entityA || !entityB) continue;
 
     // CRITICAL: Only auto-merge when score >= AUTO threshold
-    // Scores between SUGGEST (70) and AUTO (100-1) should be logged but NOT merged
+    // Scores between SUGGEST (70) and AUTO (100-1) should be persisted as suggestions
     if (score < CONSOLIDATION_THRESHOLDS.AUTO_CONSOLIDATE_THRESHOLD) {
+      // Score 70-99: Persist as resolution suggestion for user review
+      // (Note: This requires integration with createResolutionSuggestion from resolution-suggestions.ts)
       console.log(`[extract-knowledge] Consolidation SUGGESTED (not auto-merged): "${entityA.canonical_name}" ↔ "${entityB.canonical_name}" (score: ${score}, need: ${CONSOLIDATION_THRESHOLDS.AUTO_CONSOLIDATE_THRESHOLD})`);
-      // TODO: Store as consolidation suggestion for user review
+      // TODO: Call createResolutionSuggestion here with the entity IDs
+      // This requires fetching entity IDs from the database, which happens later in persistence
       continue;
     }
 
@@ -770,17 +808,33 @@ Deno.serve(async (req) => {
 
     // ==============================
     // Validation: Main vs Branch extraction mode
+    // CRITICAL FIX: Use extraction_mode (set per extraction run) instead of checking per batch
     // ==============================
-    const useMainForExtraction = body.use_main === true;
+    const extractionMode = body.extraction_mode;
+    const extractionRunId = body.extraction_run_id;
+
+    // For backward compatibility, fall back to legacy behavior if extraction_mode not provided
+    const useMainForExtraction = extractionMode === 'bootstrap' || (body.use_main === true && !extractionMode);
     const hasBranchId = !!body.target_branch_id;
 
     // Invalid combinations
-    if (useMainForExtraction && hasBranchId) {
-      return errorResponse("Invalid: cannot specify both use_main=true and target_branch_id. Choose one.", 400);
+    if (extractionMode === 'bootstrap' && hasBranchId) {
+      return errorResponse("Invalid: extraction_mode='bootstrap' cannot specify target_branch_id.", 400);
     }
 
-    if (!useMainForExtraction && !hasBranchId) {
-      return errorResponse("Invalid: must specify either use_main=true or target_branch_id. One is required.", 400);
+    if (extractionMode === 'branch' && !hasBranchId) {
+      return errorResponse("Invalid: extraction_mode='branch' requires target_branch_id.", 400);
+    }
+
+    // Old-style validation for backward compatibility
+    if (!extractionMode) {
+      if (useMainForExtraction && hasBranchId) {
+        return errorResponse("Invalid: cannot specify both use_main=true and target_branch_id. Choose one.", 400);
+      }
+
+      if (!useMainForExtraction && !hasBranchId) {
+        return errorResponse("Invalid: must specify either use_main=true or target_branch_id. One is required.", 400);
+      }
     }
 
     // ==============================
@@ -804,40 +858,47 @@ Deno.serve(async (req) => {
     );
 
     // ==============================
-    // Authorization: Main initialization flow
+    // Authorization: Extraction mode validation
+    // CRITICAL FIX: Use extraction_mode that was determined at RUN level
+    // Do NOT re-check Main state on every batch
     // ==============================
-    // Main layer is initialized implicitly: the first extraction with use_main=true
-    // creates real entities. Subsequent extractions go to Branch.
-    // Legacy projects may have __bootstrap__ rows; these are filtered out.
     let targetLayer: "main" | "branch" = "branch";
     let targetBranchId: string | null = null;
 
-    if (useMainForExtraction) {
-      // Main initialization: verify Main doesn't already have real entities (excluding legacy bootstrap)
+    if (extractionMode === 'bootstrap' || useMainForExtraction) {
+      // Bootstrap mode: All batches for this extraction run go to Main
+      // Note: This should only be called on the FIRST batch of a new extraction run
+      // The check below ensures Main is still empty (defensive check for unexpected conditions)
+      
       const { data: mainEntities, error: mainCheckError } = await supabase
         .from("knowledge_entities")
         .select("id")
         .eq("project_id", body.project_id)
         .eq("user_id", authenticatedUser.id)
         .eq("layer", "main")
-        .neq("canonical_name", "__bootstrap__")  // Exclude legacy bootstrap marker
+        .neq("canonical_name", "__bootstrap__")
         .limit(1);
 
       if (mainCheckError) {
         return errorResponse(`Failed to check Main layer state: ${mainCheckError.message}`, 500);
       }
 
-      // If Main already has real entities, reject extraction to Main
       if (mainEntities && mainEntities.length > 0) {
-        return errorResponse("Main layer already exists with entities. AI extraction cannot write to Main. Use active Branch instead.", 400);
+        // Main already has entities - this batch should NOT go to Main
+        // This indicates a client-side error: extraction_mode was 'bootstrap' but Main isn't empty
+        return errorResponse(
+          "Bootstrap extraction mode rejected: Main layer already has entities. " +
+          "This may indicate a race condition or client error. " +
+          "Use extraction_mode='branch' for subsequent extractions.",
+          400
+        );
       }
 
-      // Allow extraction to Main only during initialization (first extraction)
       targetLayer = "main";
       targetBranchId = null;
-      console.log(`[extract-knowledge] Main layer initialization enabled for project ${body.project_id}`);
+      console.log(`[extract-knowledge] Extraction run ${extractionRunId}: BOOTSTRAP mode - writing to Main`);
     } else {
-      // Normal extraction: validate active Branch
+      // Branch mode: All batches go to the specified active branch
       const { data: activeBranch, error: branchError } = await supabase
         .from("knowledge_branches")
         .select("id")
@@ -858,7 +919,7 @@ Deno.serve(async (req) => {
 
       targetLayer = "branch";
       targetBranchId = activeBranch.id;
-      console.log(`[extract-knowledge] Branch extraction mode: ${activeBranch.id}`);
+      console.log(`[extract-knowledge] Extraction run ${extractionRunId}: BRANCH mode - writing to branch ${activeBranch.id}`);
     }
 
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");

@@ -201,61 +201,167 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
 }
 
 /**
- * Calculate confidence score based on field type and value characteristics.
- * Fields with specific, verifiable values get higher confidence.
- * Fields with vague or subjective values get lower confidence.
+ * Calculate confidence score based on meaningful signals of extraction quality.
+ * 
+ * Signals considered:
+ * 1. Field type objectivity (objective fields get higher confidence)
+ * 2. Evidence existence and quality (supported by text > inferred)
+ * 3. Evidence count (multiple sources > single source)
+ * 4. Value specificity (concrete > vague)
+ * 5. Contradiction detection (conflicting evidence = lower confidence)
+ * 6. Field completeness (fields with many populated values = higher confidence)
+ * 
+ * IMPORTANT: Confidence must reflect EXTRACTION QUALITY, not user preference.
+ * A value is only confident if there's real textual evidence for it.
  */
 function calculateFieldConfidence(
   fieldPath: string,
   value: unknown,
   entity: SyncValueRequest["normalizedEntity"]
 ): number {
-  // Base confidence
-  let confidence = 0.7;
+  // Early return: null/undefined values have minimal confidence
+  if (value === null || value === undefined || value === "") {
+    return 0.3;
+  }
 
-  // High-confidence fields (objective, verifiable)
-  const highConfidenceFields = [
+  let confidence = 0.5; // Base confidence
+  let signals: string[] = [];
+
+  // SIGNAL 1: Field type objectivity
+  // Objective, verifiable fields get higher base confidence
+  const objectiveFields = new Set([
     "age", "height", "weight", "birth_year", "death_year",
     "location_type", "object_type", "ability_type",
-    "eye_color", "hair_color", "gender"
-  ];
-  
-  // Medium-confidence fields (somewhat subjective)
-  const mediumConfidenceFields = [
-    "occupation", "role", "status", "allegiance",
-    "power_level", "magic_system", "country", "city", "region"
-  ];
-  
-  // Lower-confidence fields (highly subjective or narrative-dependent)
-  const lowConfidenceFields = [
+    "eye_color", "hair_color", "gender", "name"
+  ]);
+
+  const subjectiveFields = new Set([
     "personality", "motivation", "goals", "fears",
-    "narrative_impact", "narrative_importance", "significance"
-  ];
+    "narrative_impact", "narrative_importance", "significance",
+    "description", "appearance"
+  ]);
 
-  if (highConfidenceFields.includes(fieldPath)) {
-    confidence = 0.85;
-  } else if (mediumConfidenceFields.includes(fieldPath)) {
+  if (objectiveFields.has(fieldPath)) {
     confidence = 0.75;
-  } else if (lowConfidenceFields.includes(fieldPath)) {
-    confidence = 0.6;
+    signals.push("objective_field");
+  } else if (subjectiveFields.has(fieldPath)) {
+    confidence = 0.55;
+    signals.push("subjective_field");
+  } else {
+    confidence = 0.65;
+    signals.push("neutral_field");
   }
 
-  // Boost confidence if multiple evidence sources
-  const evidenceCount = entity.field_evidence?.[fieldPath]?.length || entity.evidence.length;
-  if (evidenceCount >= 3) {
+  // SIGNAL 2: Evidence existence
+  // Field-specific evidence is stronger than generic evidence
+  const hasFieldEvidence = entity.field_evidence?.[fieldPath] && entity.field_evidence[fieldPath].length > 0;
+  const hasGenericEvidence = entity.evidence && entity.evidence.length > 0;
+
+  if (hasFieldEvidence) {
+    confidence += 0.15;
+    signals.push("field_evidence");
+  } else if (!hasGenericEvidence && !objectiveFields.has(fieldPath)) {
+    // No evidence and not objective = low confidence
+    confidence -= 0.15;
+    signals.push("no_evidence");
+  }
+
+  // SIGNAL 3: Evidence count
+  // Multiple independent sources increase confidence
+  const fieldEvidenceCount = entity.field_evidence?.[fieldPath]?.length || 0;
+  const genericEvidenceCount = entity.evidence?.length || 0;
+  const totalEvidenceCount = Math.max(fieldEvidenceCount, genericEvidenceCount);
+
+  if (totalEvidenceCount >= 3) {
     confidence = Math.min(0.95, confidence + 0.1);
-  } else if (evidenceCount >= 2) {
+    signals.push("multiple_evidence");
+  } else if (totalEvidenceCount >= 2) {
     confidence = Math.min(0.9, confidence + 0.05);
+    signals.push("dual_evidence");
+  } else if (totalEvidenceCount === 0 && !objectiveFields.has(fieldPath)) {
+    confidence = Math.max(0.3, confidence - 0.1);
+    signals.push("single_source");
   }
 
-  // Reduce confidence if value is null-like or generic
+  // SIGNAL 4: Value specificity
+  // Concrete values > vague values
   if (typeof value === "string") {
     const lowerValue = value.toLowerCase().trim();
-    const genericTerms = ["unknown", "unclear", "various", "multiple", "n/a", "not specified"];
-    if (genericTerms.some(term => lowerValue.includes(term))) {
+
+    // Generic/vague indicators
+    const genericTerms = [
+      "unknown", "unclear", "various", "multiple", "n/a", "not specified",
+      "presumably", "possibly", "maybe", "seems", "appears", "?", "..."
+    ];
+    const isGeneric = genericTerms.some(term => lowerValue.includes(term));
+
+    if (isGeneric) {
       confidence *= 0.7;
+      signals.push("generic_value");
+    } else if (lowerValue.length > 15) {
+      // Long, specific descriptions suggest more careful extraction
+      confidence = Math.min(0.95, confidence + 0.05);
+      signals.push("specific_value");
+    }
+
+    // Single words for descriptive fields = suspicious
+    if (subjectiveFields.has(fieldPath) && lowerValue.split(" ").length === 1) {
+      confidence *= 0.85;
+      signals.push("single_word_subjective");
     }
   }
 
-  return Math.round(confidence * 100) / 100; // Round to 2 decimal places
+  // SIGNAL 5: Contradiction detection
+  // If description contains contradictory terms, lower confidence
+  if (fieldPath === "description" || fieldPath === "narrative_role") {
+    if (typeof value === "string") {
+      const contradictionMarkers = [
+        ["good", "evil"],
+        ["kind", "cruel"],
+        ["brave", "coward"],
+        ["light", "dark"],
+        ["begins", "ends"],
+        ["young", "old"],
+        ["strong", "weak"]
+      ];
+
+      let hasContradiction = false;
+      for (const [term1, term2] of contradictionMarkers) {
+        if (value.toLowerCase().includes(term1) && value.toLowerCase().includes(term2)) {
+          hasContradiction = true;
+          break;
+        }
+      }
+
+      if (hasContradiction) {
+        confidence *= 0.8;
+        signals.push("contradictory_terms");
+      }
+    }
+  }
+
+  // SIGNAL 6: Field completeness
+  // Entities with many populated fields suggest more reliable extraction overall
+  const populatedFields = Object.values(entity.structured_fields).filter(v => v != null && v !== "").length;
+  const totalFields = Object.keys(entity.structured_fields).length;
+
+  if (totalFields > 0) {
+    const completeness = populatedFields / totalFields;
+    if (completeness > 0.7) {
+      confidence = Math.min(0.95, confidence + 0.05);
+      signals.push("high_entity_completeness");
+    } else if (completeness < 0.3) {
+      confidence = Math.max(0.3, confidence - 0.1);
+      signals.push("low_entity_completeness");
+    }
+  }
+
+  // Ensure confidence is in valid range [0.1, 0.95]
+  confidence = Math.max(0.1, Math.min(0.95, confidence));
+
+  // Round to 2 decimal places
+  const finalConfidence = Math.round(confidence * 100) / 100;
+
+  console.log(`[confidence] Field "${fieldPath}": ${finalConfidence} (${signals.join(", ")})`);
+  return finalConfidence;
 }

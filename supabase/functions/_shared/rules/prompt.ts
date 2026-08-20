@@ -22,20 +22,71 @@ export function buildExtractionPrompt(chunks: { position: number; content: strin
 === OUTPUT FORMAT ===
 Return JSON with these arrays (omit empty arrays):
 
-- characters: [{name, aliases[], age, gender, height, hair_color, eye_color, face_structure, common_clothing, scars, tattoos, description, narrative_role, evidence[], chunk_positions[]}]
-- locations: [{name, aliases[], location_type, parent_location, description, continent, country, region, city, narrative_importance, related_characters, evidence[], chunk_positions[]}]
-- objects: [{name, aliases[], object_type, description, appearance, materials, special_properties, origin, current_location, owners, narrative_importance, evidence[], chunk_positions[]}]
-- abilities: [{name, aliases[], ability_type, description, mechanism, activation_conditions, limitations, cost, power_level, users, evidence[], chunk_positions[]}]
-- magic_abilities: [{name, aliases[], ability_type, description, mechanism, activation_conditions, limitations, cost, power_level, users, evidence[], chunk_positions[]}]
-- events: [{description, name, participants[], location, what_happened, evidence[], chunk_positions[]}]
-- relationships: [{character_a, character_b, relationship_type, evidence[], chunk_positions[]}]
+- characters: [{name, aliases[], age, gender, height, hair_color, eye_color, face_structure, common_clothing, scars, tattoos, description, narrative_role, evidence[], chunk_positions[], field_evidence: {field_name: ["quote supporting this field"], ...}}]
+- locations: [{name, aliases[], location_type, parent_location, description, continent, country, region, city, narrative_importance, related_characters, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
+- objects: [{name, aliases[], object_type, description, appearance, materials, special_properties, origin, current_location, owners, narrative_importance, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
+- abilities: [{name, aliases[], ability_type, description, mechanism, activation_conditions, limitations, cost, power_level, users, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
+- magic_abilities: [{name, aliases[], ability_type, description, mechanism, activation_conditions, limitations, cost, power_level, users, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
+- events: [{description, name, participants[], location, what_happened, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
+- relationships: [{character_a, character_b, relationship_type, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
+
+=== FIELD-SPECIFIC EVIDENCE REQUIREMENT ===
+**CRITICAL: For important fields, you MUST provide supporting evidence from the text.**
+
+For each field you extract, if the field is one of these key fields, include the exact quote that supports it in field_evidence:
+
+CHARACTERS - key fields requiring evidence:
+- name: The exact textual mention of the character's name
+- age: If mentioned (e.g., "בן 18", "בת 25"), include the quote
+- gender: If explicitly stated, include the quote
+- physical attributes (hair_color, eye_color, height, scars, tattoos): Include the exact description
+- narrative_role: The quote showing the character's role or importance
+- relationships: Who they're connected to and how
+
+LOCATIONS - key fields:
+- name: How the location is named/referenced
+- location_type: What type of place it is (city, forest, castle, etc.) with supporting quote
+- related_characters: Which characters are mentioned at this location
+
+OBJECTS - key fields:
+- name: Exact textual reference
+- special_properties: Any magical or unique characteristics with supporting quote
+- owners: Who owns/uses the object with quote
+- narrative_importance: Why it matters in the story
+
+ABILITIES - key fields:
+- name: The ability name as mentioned
+- mechanism: How it works, with quote
+- power_level: If mentioned, with quote
+- users: Who uses it, with quote
+
+Example - CHARACTER with field_evidence:
+{
+  "name": "ליאו פרוסט",
+  "aliases": ["ליאו"],
+  "age": 25,
+  "hair_color": "שחור",
+  "eye_color": "כחול",
+  "description": "A brooding sorcerer...",
+  "evidence": ["...מחשבותיו על הזעם הקדום..."],
+  "chunk_positions": [5, 17, 42],
+  "field_evidence": {
+    "name": ["אני ליאו פרוסט, הקוסם החקור של אירויין"],
+    "age": ["ליאו הציע את יד ימינו לבת עשרים וחמש, זעום אל עצמו שהוא בן חמש ועשרים"],
+    "hair_color": ["שערו השחור נפל על עיניו"],
+    "eye_color": ["על עיניו הכחולות"],
+    "narrative_role": ["ליאו היה הקוסם היחיד שיכול לעצור את קללתה"]
+  }
+}
 
 === GENERAL RULES ===
 - Return names in Hebrew exactly as written, WITHOUT nikud (vocalization marks).
 - Do NOT invent information. Only extract what appears in the text.
 - Fields without information = null or omit entirely.
 - Keep evidence SHORT (max 10 words each, max 2 per entity).
+- field_evidence quotes can be longer (max 15 words) if needed for clarity.
 - An alias is NOT a new entity. If the same entity has multiple names/references, use ONE entity with aliases[].
+- If you cannot find supporting evidence for a field, do NOT include it in field_evidence (it's optional for fields with null values).
 
 === CHARACTERS ===
 
