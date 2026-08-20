@@ -19,7 +19,7 @@ export default function CharactersHub({ projectId, entities }: CharactersHubProp
   const { t } = useTranslation()
 
   const { currentBranch } = useBranchStore()
-  const { createEntity, fetchEntities } = useEntityStore()
+  const { createEntity, fetchEntities: fetchEntitiesStore } = useEntityStore()
 
   const [selectedVersion, setSelectedVersion] = useState<VersionType>('main')
   const [detailModalOpen, setDetailModalOpen] = useState(false)
@@ -182,7 +182,7 @@ export default function CharactersHub({ projectId, entities }: CharactersHubProp
           onClose={handleCloseEditModal}
           onCharacterUpdated={() => {
             handleCloseEditModal()
-            fetchEntities(projectId)
+            fetchEntitiesStore(projectId)
           }}
         />
       )}

@@ -13,7 +13,7 @@ type TabType = 'characters' | 'locations' | 'timeline'
 export default function KnowledgeHubPage() {
   const { t } = useTranslation()
   const { projectId } = useParams<{ projectId: string }>()
-  const navigate = useNavigate()
+  const navigateToProject = useNavigate()
 
   const { entities, fetchEntities } = useEntityStore()
   const { fetchCurrentBranch } = useBranchStore()
@@ -46,7 +46,7 @@ export default function KnowledgeHubPage() {
         {/* Header */}
         <div className="mb-6 flex items-center gap-4">
           <button
-            onClick={() => navigate(`/projects/${projectId}`)}
+            onClick={() => navigateToProject(`/projects/${projectId}`)}
             className="p-2 rounded-md hover:bg-accent transition-colors"
           >
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
