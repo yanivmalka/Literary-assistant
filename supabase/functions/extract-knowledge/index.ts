@@ -298,9 +298,10 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
       }
       if (entity.description && !existing.description) existing.description = entity.description;
       if (entity.significance && !existing.description) existing.description = entity.significance;
-      if (entity.abilities && entity.abilities.length > 0) {
-        existing.attributes.abilities = [...((existing.attributes.abilities as string[]) || []), ...entity.abilities];
-      }
+      // NOTE: Abilities are now extracted as separate entities (see below at line ~352).
+      // They should NOT be stored in character.attributes.abilities.
+      // Instead, create relationship records linking character → ability after normalization.
+      // This preserves the line for backwards compatibility but does not accumulate abilities here.
       if (entity.relationships && entity.relationships.length > 0) {
         existing.attributes.relationships = [...((existing.attributes.relationships as string[]) || []), ...entity.relationships];
       }
@@ -542,6 +543,29 @@ type ExtractionEntityCandidate = EntityResolutionRecord & {
   overlayBaseValues?: Record<string, unknown>;
 };
 
+/**
+ * Find an entity ID in the current batch by name.
+ * Used to resolve relationships and links between entities within the same extraction.
+ * Returns the entity's UUID if found, null otherwise.
+ */
+function findBatchEntityId(
+  name: string,
+  entries: Array<{ entity: NormalizedEntity; id: string }>,
+): string | null {
+  if (!name || !name.trim()) return null;
+  const key = normalizeKey(stripNikud(name.trim()));
+  if (!key) return null;
+
+  for (const { entity, id } of entries) {
+    const entityKey = normalizeKey(entity.canonical_name);
+    if (entityKey === key) return id;
+    for (const alias of entity.aliases || []) {
+      if (normalizeKey(alias) === key) return id;
+    }
+  }
+
+  return null;
+}
 async function loadEntityAliases(
   supabase: any,
   entityIds: string[],
@@ -1186,6 +1210,48 @@ Deno.serve(async (req) => {
           { onConflict: "entity_id,alias,branch_id" }
         );
         aliasesSaved++;
+      }
+
+      // Create character → ability relationships (for characters extracted with abilities)
+      // This converts abilities from embedded data (in attributes) to first-class entities with relationships
+      if (entity.entity_type === "character" && Array.isArray(entity.attributes?.abilities) && entity.attributes.abilities.length > 0) {
+        for (const abilityName of entity.attributes.abilities) {
+          if (!abilityName || typeof abilityName !== "string") continue;
+
+          // Find the ability entity that was normalized from this extraction
+          const abilityId = findBatchEntityId(abilityName.trim(), entityIdEntries);
+          if (!abilityId) {
+            // Ability not in current batch (may be from prior extraction)
+            // Skip relationship creation; it may already exist
+            continue;
+          }
+
+          // Create or update the character → ability relationship
+          const { error: relError } = await supabase
+            .from("knowledge_entity_relationships")
+            .upsert(
+              {
+                project_id: body.project_id,
+                document_id: body.document_id,
+                version_id: body.version_id,
+                source_entity_id: entityId,
+                target_entity_id: abilityId,
+                relationship_type: "has_ability",
+                evidence: null,
+                chunk_position: entity.chunk_positions?.[0] || null,
+                raw_extraction_id: rawExtractionId,
+                branch_id: targetBranchId || null,
+                operation: targetLayer === "main" ? null : "add",
+                review_status: targetLayer === "main" ? null : "pending",
+                base_exists: false,
+              },
+              { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" }
+            );
+
+          if (relError) {
+            console.warn(`Failed to create character→ability relationship for '${entity.canonical_name}' → '${abilityName}':`, relError.message);
+          }
+        }
       }
     }
 

@@ -136,13 +136,55 @@ function fieldValues(record: EntityResolutionRecord): Map<string, string> {
 }
 
 /**
+ * Count how many fields (both attributes and structured_fields) have populated values.
+ * Returns { populated: number, total: number, coverage: 0-1 }
+ * Used to determine if an entity has sparse data, which affects consolidation confidence.
+ */
+function entityFieldCoverage(record: EntityResolutionRecord): {
+  populated: number;
+  total: number;
+  coverage: number;
+} {
+  const fields = new Map<string, unknown>();
+  
+  // Collect all field names
+  Object.entries(record.attributes || {}).forEach(([key, value]) => {
+    if (key !== "name") fields.set(key, value);
+  });
+  Object.entries(record.structured_fields || {}).forEach(([key, value]) => {
+    if (key !== "name") fields.set(key, value);
+  });
+
+  const total = fields.size;
+  const populated = Array.from(fields.values()).filter(v => v != null && v !== "").length;
+  
+  return {
+    populated,
+    total: Math.max(total, 1), // Avoid division by zero
+    coverage: total > 0 ? populated / total : 0,
+  };
+}
+
+/**
  * Returns true when the available descriptions/attributes contradict one
  * another strongly enough that a name-only match would be unsafe.
+ * 
+ * IMPORTANT: When comparing sparse entities (both with low field coverage),
+ * we require STRONGER evidence of conflict. A lack of data is not evidence
+ * of compatibility.
+ * 
+ * Conflict signals (in order of strength):
+ * 1. Both have descriptions with zero shared tokens → CONFLICTING
+ * 2. Both have same field with different values → CONFLICTING
+ * 3. Both have rich context (>50% field coverage) with zero shared tokens → CONFLICTING
+ * 4. At least one entity is sparse (<30% coverage) → NOT CONFLICTING (insufficient data)
+ * 5. Both sparse → NOT CONFLICTING (insufficient data to decide)
  */
 export function hasConflictingEntityContext(
   left: EntityResolutionRecord,
   right: EntityResolutionRecord,
 ): boolean {
+  // Signal 1: Both have descriptions with no token overlap → STRONG conflict
   const leftDescription = left.description?.trim();
   const rightDescription = right.description?.trim();
   if (leftDescription && rightDescription) {
@@ -150,6 +192,7 @@ export function hasConflictingEntityContext(
     if (sharedDescriptionTokens.length === 0) return true;
   }
 
+  // Signal 2: Both have same field with different values → STRONG conflict
   const leftFields = fieldValues(left);
   const rightFields = fieldValues(right);
   for (const [key, leftValue] of leftFields) {
@@ -157,6 +200,20 @@ export function hasConflictingEntityContext(
     if (rightValue && leftValue !== rightValue) return true;
   }
 
+  // Signal 3: Check field coverage to determine confidence in context comparison
+  const leftCoverage = entityFieldCoverage(left);
+  const rightCoverage = entityFieldCoverage(right);
+  const isLeftSparse = leftCoverage.coverage < 0.3;
+  const isRightSparse = rightCoverage.coverage < 0.3;
+
+  // If either entity is sparse, we don't have enough data to reliably detect conflict.
+  // Require explicit conflicting evidence (description mismatch or field value mismatch).
+  // Sparse entities are often newly extracted with incomplete LLM output.
+  if (isLeftSparse || isRightSparse) {
+    return false; // Insufficient data for conflict detection
+  }
+
+  // Signal 4: Both entities are rich (>30% coverage) with no shared context tokens → MEDIUM conflict
   const leftContext = contextTokens(left);
   const rightContext = contextTokens(right);
   return leftContext.size > 0 && rightContext.size > 0 &&
