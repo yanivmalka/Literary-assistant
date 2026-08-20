@@ -25,9 +25,6 @@ describe('Auto-create Main/Branch for Extraction', () => {
     })
 
     it('should initialize Main layer implicitly when first extraction is triggered', () => {
-      const projectId = 'test-project-1'
-      const userId = 'user-1'
-
       // Main initialization is implicit: no bootstrap entity is created.
       // Instead, the first extraction directly writes real entities to the Main layer.
       // The Main layer is considered initialized once it contains any real entities.

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { isLegacyBootstrapEntity, filterLegacyBootstrapEntities, LEGACY_BOOTSTRAP_CANONICAL_NAME } from '@/lib/mainLayer'
 
 /**
@@ -269,7 +269,6 @@ describe('Bootstrap Sentinel Fix', () => {
 
     it('should be idempotent if bootstrap rows already cleaned', () => {
       // Running migration 111 twice should have no adverse effects
-      const beforeFirstRun = { bootstrapCount: 1 }
       const afterFirstRun = { bootstrapCount: 0 }
       const afterSecondRun = { bootstrapCount: 0 }
 
