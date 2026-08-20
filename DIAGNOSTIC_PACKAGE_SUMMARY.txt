@@ -1,0 +1,305 @@
+════════════════════════════════════════════════════════════════════════════════
+                     EXTRACTION DIAGNOSTIC PACKAGE
+════════════════════════════════════════════════════════════════════════════════
+
+PURPOSE
+───────
+Diagnose why ability extraction is failing by analyzing raw Gemini API responses.
+
+KEY QUESTION: Is Gemini returning empty arrays, or is the response being lost?
+
+THREE HYPOTHESES TESTED
+───────────────────────
+A) EMPTY ARRAYS - Gemini isn't extracting abilities even though prompted
+B) PARSE FAILURES - Gemini extracts but response gets corrupted during parsing
+C) WRONG FORMAT - Response structure doesn't match what code expects
+
+════════════════════════════════════════════════════════════════════════════════
+QUICK START
+════════════════════════════════════════════════════════════════════════════════
+
+1. Run extraction via web app (http://localhost:5173)
+   - Create project
+   - Upload document
+   - Click Extract
+
+2. Run diagnostic
+   node diagnostic_extraction_analysis.mjs
+
+3. Read results (especially DIAGNOSTIC SUMMARY section)
+
+4. Follow recommendations
+
+════════════════════════════════════════════════════════════════════════════════
+PACKAGE CONTENTS
+════════════════════════════════════════════════════════════════════════════════
+
+📄 DIAGNOSTIC_README.md
+   └─ Quick reference guide
+   └─ Usage instructions
+   └─ Interpretation guide
+   └─ Common issues
+
+📖 DIAGNOSTIC_GUIDE.md
+   └─ Detailed documentation
+   └─ Example outputs (good vs bad)
+   └─ Troubleshooting guide
+   └─ What the prompt expects
+
+🔧 diagnostic_extraction_analysis.mjs
+   └─ Main diagnostic script
+   └─ Automated analysis
+   └─ Generates JSON report
+   └─ Clear recommendations
+   └─ Run: node diagnostic_extraction_analysis.mjs
+
+💾 DIAGNOSTIC_SQL_QUERIES.sql
+   └─ 15 manual SQL queries
+   └─ For Supabase SQL editor
+   └─ Alternative to Node.js script
+   └─ Deep inspection queries
+
+🚀 run_extraction_for_diagnostic.mjs
+   └─ Setup helper script
+   └─ Shows how to create test data
+   └─ Guides user through process
+
+════════════════════════════════════════════════════════════════════════════════
+OUTPUT INTERPRETATION
+════════════════════════════════════════════════════════════════════════════════
+
+The diagnostic output clearly shows which hypothesis is confirmed:
+
+GOOD SIGNS (Everything works)
+─────────────────────────────
+✓ characters array: 5 items
+✓ abilities array: 8 items
+✓ magic_abilities array: 3 items
+✓ A) GEMINI RETURNING EMPTY ARRAYS: NO
+✓ B) RESPONSE NOT PARSED CORRECTLY: NO
+✓ C) WRONG RESPONSE FORMAT: NO
+→ All checks passed! Extraction is working correctly.
+
+BAD SIGNS (Array is empty)
+──────────────────────────
+⚠️  abilities array is EMPTY
+❌ A) GEMINI RETURNING EMPTY ARRAYS: YES (3/3)
+→ Gemini is not extracting abilities
+→ Check the prompt
+
+BAD SIGNS (Parse error)
+───────────────────────
+❌ JSON parse failed: Unexpected token
+❌ B) RESPONSE NOT PARSED CORRECTLY: YES
+→ Check JSON parsing logic
+
+BAD SIGNS (Missing field)
+─────────────────────────
+❌ abilities is NOT an array (type: null)
+❌ C) WRONG RESPONSE FORMAT: YES
+→ Check response schema
+
+════════════════════════════════════════════════════════════════════════════════
+DIAGNOSTIC WORKFLOW
+════════════════════════════════════════════════════════════════════════════════
+
+1. CHECK EXISTING DATA
+   What: Do we have extractions in the database?
+   How: diagnostic shows "Found N extraction(s)"
+   If yes: Continue to step 2
+   If no: Run extraction via web app first
+
+2. FETCH RAW RESPONSES
+   What: Get the last 3 Gemini responses from database
+   How: diagnostic_extraction_analysis.mjs fetches from raw_extractions table
+   View: Terminal output shows response structure
+
+3. ANALYZE STRUCTURE
+   What: Is the JSON formatted correctly?
+   How: Check top-level keys, array types, field names
+   View: Shows "Keys: characters, abilities, magic_abilities..."
+
+4. TEST HYPOTHESES
+   What: Which scenario explains what we see?
+   How: Three hypothesis checks (A, B, C)
+   View: "DIAGNOSTIC SUMMARY" section clearly states which is confirmed
+
+5. GET RECOMMENDATIONS
+   What: What to fix based on the diagnosis?
+   How: Diagnostic generates specific action items
+   View: "RECOMMENDATIONS" section with exact next steps
+
+6. TAKE ACTION
+   What: Fix the identified issue
+   How: Follow recommendations (check prompt, check parsing, check schema)
+   View: After fix, rerun diagnostic to verify
+
+════════════════════════════════════════════════════════════════════════════════
+KEY METRICS SHOWN
+════════════════════════════════════════════════════════════════════════════════
+
+For each extraction:
+  ✓ Timestamp (when it ran)
+  ✓ Model (e.g., gemini-2.0-flash)
+  ✓ Chunks processed
+  ✓ Total tokens used
+  ✓ Character count in response
+  ✓ Abilities count in response
+  ✓ Magic abilities count in response
+
+Summary statistics:
+  ✓ Total extractions analyzed (usually 3)
+  ✓ With characters array: N
+  ✓ With abilities array: N
+  ✓ With magic_abilities array: N
+  ✓ Total characters extracted: N
+  ✓ Total abilities extracted: N
+  ✓ Total magic abilities extracted: N
+
+════════════════════════════════════════════════════════════════════════════════
+WHERE TO LOOK IN CODE (Based on diagnosis)
+════════════════════════════════════════════════════════════════════════════════
+
+If Hypothesis A (Empty Arrays):
+  File: supabase/functions/extract-knowledge/index.ts
+  Look for: Gemini prompt construction
+  Check: Are abilities explicitly requested?
+  Fix: Add more explicit prompt instructions
+
+If Hypothesis B (Parse Failures):
+  File: supabase/functions/extract-knowledge/index.ts
+  Look for: JSON.parse() calls
+  Check: Is response valid JSON?
+  Fix: Add better error handling and validation
+
+If Hypothesis C (Wrong Format):
+  File: supabase/functions/extract-knowledge/index.ts
+  Look for: Field name mapping
+  Check: Do response field names match code expectations?
+  Fix: Map field names or update schema
+
+════════════════════════════════════════════════════════════════════════════════
+EXAMPLE: RUNNING THE DIAGNOSTIC
+════════════════════════════════════════════════════════════════════════════════
+
+$ node diagnostic_extraction_analysis.mjs
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    EXTRACTION DIAGNOSTIC TOOL                              ║
+║          Analyzing raw Gemini responses for ability extraction              ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 Checking existing projects and documents...
+  Found 1 recent project(s):
+    - Test Project (uuid)
+  Found 1 recent document(s):
+    - Hebrew Test
+
+📥 Fetching last 3 extractions from raw_extractions table...
+✓ Found 1 extraction(s)
+
+📋 EXTRACTION METADATA:
+1. Created: 2024-12-16T18:45:23Z
+   Model: gemini-2.0-flash
+   Chunks: 5
+
+[... analysis output ...]
+
+════════════════════════════════════════════════════════════════════════════════
+📊 DIAGNOSTIC SUMMARY
+════════════════════════════════════════════════════════════════════════════════
+
+❌ A) GEMINI RETURNING EMPTY ARRAYS: YES (1/1)
+   → Gemini IS receiving the prompt but choosing not to extract
+
+✓ B) RESPONSE NOT PARSED CORRECTLY: NO
+✓ C) WRONG RESPONSE FORMAT: NO
+
+💡 RECOMMENDATIONS:
+
+1. CHECK GEMINI PROMPT
+   → Add explicit instructions for abilities extraction
+   → Verify prompt includes examples of ability objects
+   → Check if prompt is actually being sent
+
+💾 Detailed report saved to: diagnostic_extraction_report_2024-12-16-18-45-23.json
+
+════════════════════════════════════════════════════════════════════════════════
+TROUBLESHOOTING
+════════════════════════════════════════════════════════════════════════════════
+
+Q: "No extractions found in raw_extractions table"
+A: Run extraction via web app first (Create project → Upload doc → Extract)
+
+Q: "Invalid API key"
+A: Script uses hardcoded anon key. If failing, check Supabase connection
+
+Q: "No projects found"
+A: Create a project via web app before running extraction
+
+Q: "raw_response is NULL"
+A: Extraction failed. Check server logs or browser network tab
+
+Q: What if I can't run Node.js?
+A: Use DIAGNOSTIC_SQL_QUERIES.sql in Supabase SQL Editor instead
+
+Q: How do I save the diagnostic output?
+A: Diagnostic automatically saves JSON report:
+   diagnostic_extraction_report_YYYY-MM-DD-HH-MM-SS.json
+
+════════════════════════════════════════════════════════════════════════════════
+FILES REFERENCE
+════════════════════════════════════════════════════════════════════════════════
+
+DIAGNOSTIC_README.md
+  - Quick reference
+  - Typical output examples
+  - Step-by-step usage
+  START HERE if you just want quick overview
+
+DIAGNOSTIC_GUIDE.md
+  - Detailed documentation
+  - Example outputs explained
+  - Full troubleshooting guide
+  START HERE if you want deep understanding
+
+diagnostic_extraction_analysis.mjs
+  - The actual diagnostic script
+  - Automated analysis engine
+  - Generates recommendations
+  RUN THIS to diagnose issues
+
+DIAGNOSTIC_SQL_QUERIES.sql
+  - 15 SQL queries for manual inspection
+  - Copy-paste into Supabase SQL editor
+  - For alternative analysis
+  USE THIS if Node.js is unavailable
+
+run_extraction_for_diagnostic.mjs
+  - Setup helper
+  - Shows how to create test data
+  - Guides user through process
+  RUN THIS on first setup if needed
+
+════════════════════════════════════════════════════════════════════════════════
+NEXT STEPS AFTER DIAGNOSIS
+════════════════════════════════════════════════════════════════════════════════
+
+1. Read the DIAGNOSTIC SUMMARY section of output
+2. Identify which hypothesis is confirmed (A, B, or C)
+3. Check the RECOMMENDATIONS section for specific actions
+4. Find the relevant code file mentioned in "WHERE TO LOOK IN CODE" above
+5. Make the fix
+6. Rerun diagnostic to verify: node diagnostic_extraction_analysis.mjs
+7. Confirm the issue is resolved
+
+════════════════════════════════════════════════════════════════════════════════
+
+🎯 GOAL: Turn "Why aren't abilities extracting?" into a clear, actionable answer.
+
+This diagnostic package answers:
+✓ What is being returned by Gemini?
+✓ Where is it being lost?
+✓ What needs to be fixed?
+
+════════════════════════════════════════════════════════════════════════════════
