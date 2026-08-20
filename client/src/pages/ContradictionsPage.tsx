@@ -9,7 +9,7 @@ import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
 export default function ContradictionsPage() {
   const { t } = useTranslation()
   const { projectId } = useParams<{ projectId: string }>()
-  const { contradictions, loading, fetchContradictions, resolveContradiction } = useContradictionStore()
+  const { contradictions, loading, available, fetchContradictions, resolveContradiction } = useContradictionStore()
 
   useEffect(() => {
     if (projectId) {
@@ -23,7 +23,7 @@ export default function ContradictionsPage() {
   const resolvedContradictions = contradictions.filter(c => c.status !== 'open')
 
   const handleResolve = (contradictionId: string, status: string) => {
-    resolveContradiction(projectId, contradictionId, status)
+    resolveContradiction(contradictionId, status)
   }
 
   return (
@@ -43,7 +43,9 @@ export default function ContradictionsPage() {
       ) : contradictions.length === 0 ? (
         <div className="text-center py-12 border-2 border-dashed rounded-lg">
           <AlertTriangle className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
-          <p className="text-muted-foreground">{t('contradictions.empty')}</p>
+          <p className="text-muted-foreground">
+            {available ? t('contradictions.empty') : t('contradictions.unavailable')}
+          </p>
         </div>
       ) : (
         <div className="space-y-6">

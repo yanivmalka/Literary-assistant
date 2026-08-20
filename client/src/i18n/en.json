@@ -300,6 +300,7 @@
     "title": "Contradictions",
     "subtitle": "Potential inconsistencies found in your text",
     "empty": "No contradictions found. Your text appears consistent!",
+    "unavailable": "Contradiction detection is not available until the knowledge schema is deployed.",
     "open": "Open",
     "resolved": "Resolved",
     "unknownEntity": "Unknown entity",
