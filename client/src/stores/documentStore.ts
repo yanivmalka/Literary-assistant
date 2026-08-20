@@ -96,6 +96,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         .order('updated_at', { ascending: false })
 
       if (error || !documents) {
+        // DIAGNOSTIC: Log any error response for 404 debugging
+        if (error) {
+          console.error('[DIAGNOSTIC] fetchDocuments() - SELECT error - operation: GET /rest/v1/documents - table: documents - projectId:', projectId, 'error_code:', error.code, 'error_message:', error.message, 'error_details:', error.details)
+        } else {
+          console.log('[DIAGNOSTIC] fetchDocuments() - No documents returned but no error - operation: GET /rest/v1/documents - projectId:', projectId)
+        }
         set({ documents: [], loading: false })
         return
       }
@@ -118,7 +124,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
       set({ documents: result })
     } catch (error) {
-      console.error('Failed to fetch documents:', error)
+      console.error('[DIAGNOSTIC] fetchDocuments() - Catch error - operation: GET /rest/v1/documents - projectId:', projectId, 'error:', error)
     } finally {
       set({ loading: false })
     }

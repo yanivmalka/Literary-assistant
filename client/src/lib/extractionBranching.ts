@@ -698,7 +698,7 @@ export async function hasMainEntities(projectId: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from('knowledge_entities')
     .select('id', { count: 'exact', head: true })
     .eq('project_id', projectId)
@@ -706,12 +706,17 @@ export async function hasMainEntities(projectId: string): Promise<boolean> {
     .eq('layer', 'main')
     .limit(1)
 
+  // DIAGNOSTIC: Log the query result for 409 debugging
+  const resultCount = count ?? (data && data.length > 0 ? 1 : 0)
+  const hasMain = (data && data.length > 0) || false
+  console.log('[DIAGNOSTIC] hasMainEntities() - projectId:', projectId, 'returned_count:', resultCount, 'data_empty:', !data || data.length === 0, 'final_result:', hasMain)
+
   if (error) {
-    console.error('Failed to check main entities:', error)
+    console.error('[DIAGNOSTIC] hasMainEntities() - Query error - status:', error.code, 'message:', error.message, 'details:', error.details)
     return false
   }
 
-  return (data && data.length > 0) || false
+  return hasMain
 }
 
 /**
@@ -746,9 +751,16 @@ export async function ensureMainBootstrapped(projectId: string): Promise<void> {
       structured_fields: {},
     })
 
-  // Ignore "duplicate" errors - means another concurrent request created it
-  if (error && !error.message.includes('duplicate')) {
-    throw error
+  // DIAGNOSTIC: Log any error response for 409 debugging
+  if (error) {
+    console.error('[DIAGNOSTIC] ensureMainBootstrapped() - INSERT error - operation: POST /rest/v1/knowledge_entities - table: knowledge_entities - projectId:', projectId, 'payload: {canonical_name: __bootstrap__, layer: main} - error_code:', error.code, 'error_message:', error.message, 'error_hint:', error.hint, 'error_details:', error.details)
+    
+    // Ignore "duplicate" errors - means another concurrent request created it
+    if (!error.message.includes('duplicate')) {
+      throw error
+    }
+    console.log('[DIAGNOSTIC] Duplicate error ignored, Main likely exists from concurrent request')
+    return
   }
 
   console.log('[Knowledge] Main layer bootstrapped for project:', projectId)
@@ -775,6 +787,7 @@ export async function getOrCreateActiveBranch(projectId: string): Promise<{ id: 
     .maybeSingle()
 
   if (fetchError) {
+    console.error('[DIAGNOSTIC] getOrCreateActiveBranch() - SELECT error - operation: GET /rest/v1/knowledge_branches - table: knowledge_branches - projectId:', projectId, 'error_code:', fetchError.code, 'error_message:', fetchError.message, 'error_details:', fetchError.details)
     throw new Error(`Failed to fetch active branch: ${fetchError.message}`)
   }
 
@@ -801,6 +814,8 @@ export async function getOrCreateActiveBranch(projectId: string): Promise<{ id: 
 
   // If conflict (race condition), fetch the one that was created by competing client
   if (createError && createError.message.includes('duplicate')) {
+    console.log('[DIAGNOSTIC] getOrCreateActiveBranch() - INSERT conflict (race) - operation: POST /rest/v1/knowledge_branches - table: knowledge_branches - projectId:', projectId, 'error_code:', createError.code, 'error_message:', createError.message)
+    
     const { data: raced, error: refetchError } = await supabase
       .from('knowledge_branches')
       .select('id')
@@ -819,6 +834,7 @@ export async function getOrCreateActiveBranch(projectId: string): Promise<{ id: 
   }
 
   if (createError) {
+    console.error('[DIAGNOSTIC] getOrCreateActiveBranch() - INSERT error - operation: POST /rest/v1/knowledge_branches - table: knowledge_branches - projectId:', projectId, 'error_code:', createError.code, 'error_message:', createError.message, 'error_details:', createError.details)
     throw new Error(`Failed to create active branch: ${createError.message}`)
   }
 
