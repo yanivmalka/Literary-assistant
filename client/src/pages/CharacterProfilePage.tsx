@@ -96,7 +96,7 @@ export default function CharacterProfilePage() {
     return (
       <div className="max-w-3xl mx-auto p-6">
         <button
-          onClick={() => navigate(`/projects/${projectId}/entities?type=character`)}
+          onClick={() => navigate(`/projects/${projectId}/knowledge`)}
           className="p-2 rounded-md hover:bg-accent transition-colors mb-4"
         >
           <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
@@ -166,7 +166,7 @@ export default function CharacterProfilePage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate(`/projects/${projectId}/entities?type=character`)}
+            onClick={() => navigate(`/projects/${projectId}/knowledge`)}
             className="p-2 rounded-md hover:bg-accent transition-colors"
           >
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />

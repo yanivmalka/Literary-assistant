@@ -162,7 +162,7 @@ export default function ProjectDetailPage() {
       {/* Entity categories */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Link
-          to={`/projects/${projectId}/entities?type=character`}
+          to={`/projects/${projectId}/knowledge`}
           className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
         >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
@@ -176,7 +176,7 @@ export default function ProjectDetailPage() {
         </Link>
 
         <Link
-          to={`/projects/${projectId}/entities?type=location`}
+          to={`/projects/${projectId}/knowledge`}
           className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
         >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
@@ -190,7 +190,7 @@ export default function ProjectDetailPage() {
         </Link>
 
         <Link
-          to={`/projects/${projectId}/entities?type=object`}
+          to={`/projects/${projectId}/knowledge`}
           className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
         >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
@@ -204,7 +204,7 @@ export default function ProjectDetailPage() {
         </Link>
 
         <Link
-          to={`/projects/${projectId}/entities?type=ability`}
+          to={`/projects/${projectId}/knowledge`}
           className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
         >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
