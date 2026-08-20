@@ -71,3 +71,51 @@ DROP CONSTRAINT IF EXISTS check_entity_reference_not_null;
 ALTER TABLE IF EXISTS knowledge_branch_entities
 ADD CONSTRAINT check_entity_reference_not_null 
 CHECK (source_entity_id IS NOT NULL OR entity_id IS NOT NULL);
+
+-- ============================================================================
+-- PART 2: Add missing branch_id to knowledge_entity_relationships
+-- ============================================================================
+
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+ADD COLUMN IF NOT EXISTS branch_id UUID;
+
+-- Add foreign key constraint for branch_id
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+DROP CONSTRAINT IF EXISTS fk_entity_relationships_branch_id;
+
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+ADD CONSTRAINT fk_entity_relationships_branch_id 
+FOREIGN KEY (branch_id) REFERENCES knowledge_branches(id) ON DELETE CASCADE;
+
+-- Add index for branch_id queries
+CREATE INDEX IF NOT EXISTS idx_entity_relationships_branch_id 
+ON knowledge_entity_relationships(branch_id);
+
+-- Add the operation, review_status, and base_exists columns if they don't exist
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+ADD COLUMN IF NOT EXISTS operation TEXT NOT NULL DEFAULT 'add',
+ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'approved',
+ADD COLUMN IF NOT EXISTS base_exists BOOLEAN NOT NULL DEFAULT true;
+
+-- Add constraints for valid values
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+DROP CONSTRAINT IF EXISTS knowledge_entity_relationships_operation_check;
+
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+ADD CONSTRAINT knowledge_entity_relationships_operation_check
+CHECK (operation IN ('add', 'remove'));
+
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+DROP CONSTRAINT IF EXISTS knowledge_entity_relationships_review_status_check;
+
+ALTER TABLE IF EXISTS knowledge_entity_relationships
+ADD CONSTRAINT knowledge_entity_relationships_review_status_check
+CHECK (review_status IN ('pending', 'approved', 'rejected'));
+
+-- Add index for branch review queries
+CREATE INDEX IF NOT EXISTS idx_entity_relationships_branch_review
+ON knowledge_entity_relationships(project_id, branch_id, review_status);
+
+-- Add index for branch endpoints
+CREATE INDEX IF NOT EXISTS idx_entity_relationships_branch_endpoints
+ON knowledge_entity_relationships(branch_id, source_entity_id, target_entity_id);
