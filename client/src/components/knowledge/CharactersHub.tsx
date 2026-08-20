@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch, Plus } from 'lucide-react'
 import { useBranchStore } from '@/stores/branchStore'
@@ -26,6 +26,7 @@ export default function CharactersHub({ projectId }: CharactersHubProps) {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedCharacter, setSelectedCharacter] = useState<Entity | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const createInProgressRef = useRef(false)
 
   // Get characters for selected version (Main or Branch)
   const characters = selectedVersion === 'main'
@@ -44,6 +45,11 @@ export default function CharactersHub({ projectId }: CharactersHubProps) {
   }
 
   const handleCreateNew = async () => {
+    // React state updates are asynchronous, so use a ref to prevent
+    // duplicate submissions from rapid clicks or repeated events.
+    if (createInProgressRef.current) return
+
+    createInProgressRef.current = true
     setIsCreating(true)
     try {
       const newEntity = await createEntity(
@@ -61,6 +67,7 @@ export default function CharactersHub({ projectId }: CharactersHubProps) {
     } catch (error) {
       console.error('Failed to create character:', error)
     } finally {
+      createInProgressRef.current = false
       setIsCreating(false)
     }
   }

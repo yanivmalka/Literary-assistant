@@ -444,13 +444,17 @@ export const useEntityStore = create<EntityState>((set, get) => ({
       const branchId = branchContext?.branchId || null
 
       // Check for duplicate name in the same layer and project
-      const { data: existingEntities, error: checkError } = await supabase
+      const duplicateQuery = supabase
         .from('knowledge_entities')
         .select('id, canonical_name, layer')
         .eq('project_id', projectId)
         .eq('canonical_name', name)
         .eq('layer', layer)
-        .maybeSingle()
+        .is('version_id', null)
+
+      const { data: existingEntities, error: checkError } = branchId
+        ? await duplicateQuery.eq('branch_id', branchId).maybeSingle()
+        : await duplicateQuery.is('branch_id', null).maybeSingle()
 
       if (checkError) {
         console.error('Failed to check for duplicate entity:', checkError)
@@ -476,7 +480,10 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           source: 'user',
           review_status: 'confirmed',
         }
-        set({ entities: [...get().entities, existingEntity] })
+        const currentEntities = get().entities
+        if (!currentEntities.some(entity => entity.id === existingEntity.id)) {
+          set({ entities: [...currentEntities, existingEntity] })
+        }
         return existingEntity
       }
 
