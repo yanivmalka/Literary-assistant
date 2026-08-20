@@ -5,7 +5,7 @@ import { ChevronRight, FolderOpen, FileText, MessageSquare, AlertTriangle, GitBr
 import { useProjectStore } from '@/stores/projectStore'
 
 interface ProjectBreadcrumbProps {
-  currentPage: 'documents' | 'entities' | 'qa' | 'contradictions' | 'branches'
+  currentPage: 'documents' | 'entities' | 'qa' | 'contradictions' | 'branches' | 'timeline'
   showTabs?: boolean
 }
 
