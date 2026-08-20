@@ -24,24 +24,20 @@ describe('Auto-create Main/Branch for Extraction', () => {
       expect(hasMain).not.toBe(true)
     })
 
-    it('should bootstrap Main layer when first extraction is triggered', () => {
+    it('should initialize Main layer implicitly when first extraction is triggered', () => {
       const projectId = 'test-project-1'
       const userId = 'user-1'
 
-      // Simulated bootstrap process
-      const bootstrapMarker = {
-        id: 'marker-1',
-        project_id: projectId,
-        user_id: userId,
-        canonical_name: '__bootstrap__',
-        entity_type: 'event',
-        layer: 'main',
-        source: 'system',
-      }
+      // Main initialization is implicit: no bootstrap entity is created.
+      // Instead, the first extraction directly writes real entities to the Main layer.
+      // The Main layer is considered initialized once it contains any real entities.
 
-      expect(bootstrapMarker.layer).toBe('main')
-      expect(bootstrapMarker.source).toBe('system')
-      expect(bootstrapMarker.project_id).toBe(projectId)
+      const mainEmptyBefore = true  // No entities in Main
+      const useMainForFirstExtraction = !mainEmptyBefore
+
+      expect(mainEmptyBefore).toBe(true)
+      expect(useMainForFirstExtraction).toBe(true)
+      // After extraction completes, Main will have real entities and next extraction uses Branch
     })
 
     it('should route first extraction to Main (not Branch)', () => {
@@ -271,7 +267,7 @@ describe('Auto-create Main/Branch for Extraction', () => {
         {
           stage: 'no_main',
           condition: 'true',
-          actions: ['ensureMainBootstrapped()', 'useMainForExtraction=true', 'branchId=null'],
+          actions: ['useMainForExtraction=true', 'branchId=null', 'extract to Main directly'],
         },
         {
           stage: 'main_exists',

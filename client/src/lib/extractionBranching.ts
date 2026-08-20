@@ -714,9 +714,10 @@ export async function verifyBranchIsolation(
  */
 
 /**
- * Main initialization is implicit: an empty Main layer has no entity rows.
- * Legacy projects may still contain the historical __bootstrap__ row; it is
- * excluded from Main-exists checks and entity reads without being deleted.
+ * Main initialization is implicit and automatic: 
+ * - Empty Main layer: has no knowledge_entities with layer='main' (excluding legacy bootstrap)
+ * - First extraction automatically initializes Main by inserting real entities
+ * - Legacy projects may contain historical __bootstrap__ rows; these are filtered out and will be cleaned by migration 111
  */
 export async function hasMainEntities(projectId: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser()

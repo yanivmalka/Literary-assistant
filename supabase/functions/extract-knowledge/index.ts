@@ -750,20 +750,23 @@ Deno.serve(async (req) => {
     );
 
     // ==============================
-    // Authorization: Main bootstrap flow
+    // Authorization: Main initialization flow
     // ==============================
+    // Main layer is initialized implicitly: the first extraction with use_main=true
+    // creates real entities. Subsequent extractions go to Branch.
+    // Legacy projects may have __bootstrap__ rows; these are filtered out.
     let targetLayer: "main" | "branch" = "branch";
     let targetBranchId: string | null = null;
 
     if (useMainForExtraction) {
-      // Main bootstrap: verify Main doesn't already have entities (beyond bootstrap marker)
+      // Main initialization: verify Main doesn't already have real entities (excluding legacy bootstrap)
       const { data: mainEntities, error: mainCheckError } = await supabase
         .from("knowledge_entities")
         .select("id")
         .eq("project_id", body.project_id)
         .eq("user_id", authenticatedUser.id)
         .eq("layer", "main")
-        .neq("canonical_name", "__bootstrap__")  // Exclude bootstrap marker itself
+        .neq("canonical_name", "__bootstrap__")  // Exclude legacy bootstrap marker
         .limit(1);
 
       if (mainCheckError) {
@@ -775,10 +778,10 @@ Deno.serve(async (req) => {
         return errorResponse("Main layer already exists with entities. AI extraction cannot write to Main. Use active Branch instead.", 400);
       }
 
-      // Allow extraction to Main only during bootstrap
+      // Allow extraction to Main only during initialization (first extraction)
       targetLayer = "main";
       targetBranchId = null;
-      console.log(`[extract-knowledge] Main bootstrap extraction mode enabled for project ${body.project_id}`);
+      console.log(`[extract-knowledge] Main layer initialization enabled for project ${body.project_id}`);
     } else {
       // Normal extraction: validate active Branch
       const { data: activeBranch, error: branchError } = await supabase
