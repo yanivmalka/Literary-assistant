@@ -20,6 +20,9 @@ ADD COLUMN IF NOT EXISTS rejected_fields TEXT[] DEFAULT '{}';
 
 -- Add foreign key constraint for entity_id
 ALTER TABLE IF EXISTS knowledge_branch_entities
+DROP CONSTRAINT IF EXISTS fk_branch_entity_entity_id;
+
+ALTER TABLE IF EXISTS knowledge_branch_entities
 ADD CONSTRAINT fk_branch_entity_entity_id 
 FOREIGN KEY (entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE;
 
@@ -34,10 +37,16 @@ ALTER COLUMN source_entity_id DROP NOT NULL;
 
 -- Add the nullable foreign key constraint
 ALTER TABLE IF EXISTS knowledge_branch_entities
+DROP CONSTRAINT IF EXISTS fk_branch_entity_source_entity_id;
+
+ALTER TABLE IF EXISTS knowledge_branch_entities
 ADD CONSTRAINT fk_branch_entity_source_entity_id 
 FOREIGN KEY (source_entity_id) REFERENCES knowledge_entities(id) ON DELETE CASCADE;
 
 -- Add constraint: source_entity_id and entity_id cannot both be NULL
+ALTER TABLE IF EXISTS knowledge_branch_entities
+DROP CONSTRAINT IF EXISTS check_entity_reference_not_null;
+
 ALTER TABLE IF EXISTS knowledge_branch_entities
 ADD CONSTRAINT check_entity_reference_not_null
 CHECK (source_entity_id IS NOT NULL OR entity_id IS NOT NULL);
@@ -53,6 +62,9 @@ SET entity_id = source_entity_id
 WHERE entity_id IS NULL AND source_entity_id IS NOT NULL;
 
 -- Now add the unique constraint
+ALTER TABLE IF EXISTS knowledge_branch_entities
+DROP CONSTRAINT IF EXISTS uq_branch_entity;
+
 ALTER TABLE IF EXISTS knowledge_branch_entities
 ADD CONSTRAINT uq_branch_entity UNIQUE (branch_id, entity_id);
 
@@ -73,11 +85,17 @@ ADD COLUMN IF NOT EXISTS branch_id UUID;
 
 -- Add foreign key for branch_id
 ALTER TABLE IF EXISTS knowledge_entities
+DROP CONSTRAINT IF EXISTS fk_entity_branch_id;
+
+ALTER TABLE IF EXISTS knowledge_entities
 ADD CONSTRAINT fk_entity_branch_id 
 FOREIGN KEY (branch_id) REFERENCES knowledge_branches(id) ON DELETE CASCADE;
 
 -- Add constraint: IF layer='branch' THEN branch_id IS NOT NULL
 -- AND IF layer='main' THEN branch_id IS NULL
+ALTER TABLE IF EXISTS knowledge_entities
+DROP CONSTRAINT IF EXISTS check_entity_branch_layer_consistency;
+
 ALTER TABLE IF EXISTS knowledge_entities
 ADD CONSTRAINT check_entity_branch_layer_consistency
 CHECK (
