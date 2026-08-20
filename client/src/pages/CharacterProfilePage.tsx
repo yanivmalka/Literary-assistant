@@ -25,7 +25,7 @@ export default function CharacterProfilePage() {
   const { projectId, entityId } = useParams<{ projectId: string; entityId: string }>()
   const navigate = useNavigate()
   
-  const { entities, fetchEntities, updateEntity } = useEntityStore()
+  const { fetchEntities, updateEntity, getMainOnlyEntities, getEffectiveBranchEntities } = useEntityStore()
   const { currentBranch, fetchCurrentBranch } = useBranchStore()
 
   const [viewMode, setViewMode] = useState<ViewMode>('profile')
@@ -36,7 +36,11 @@ export default function CharacterProfilePage() {
   const [relationships, setRelationships] = useState<Relationship[]>([])
   const [loadingRelationships, setLoadingRelationships] = useState(false)
 
-  const entity = entities.find(e => e.id === entityId)
+  // Resolve entity from version-specific dataset
+  const versionEntities = selectedVersion === 'main'
+    ? getMainOnlyEntities()
+    : getEffectiveBranchEntities()
+  const entity = versionEntities.find(e => e.id === entityId)
   const entityType = entity?.entity_type as any
 
   // Memoize field lists so they only change when entity type actually changes,
@@ -315,7 +319,7 @@ export default function CharacterProfilePage() {
           <RelationshipPanel
             entity={{ id: entity.id, name: entity.name, entity_type: entity.entity_type }}
             relationships={relationships}
-            allEntities={entities}
+            allEntities={versionEntities}
             branchId={currentBranch?.id}
             isEditMode={viewMode === 'edit'}
             onAddRelationship={async (targetId, type) => {

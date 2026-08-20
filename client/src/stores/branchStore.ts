@@ -482,6 +482,18 @@ export const useBranchStore = create<BranchState>((set, get) => ({
         const currentAttrs = (current?.attributes || {}) as Record<string, unknown>
         currentAttrs[attrKey] = branchValue
         updatePayload = { attributes: currentAttrs }
+      } else if (field.startsWith('structured_fields.')) {
+        // Need to update a specific structured_fields key
+        const structKey = field.replace('structured_fields.', '')
+        const { data: current } = await supabase
+          .from('knowledge_entities')
+          .select('structured_fields')
+          .eq('id', sourceEntityId)
+          .single()
+
+        const currentStructured = (current?.structured_fields || {}) as Record<string, unknown>
+        currentStructured[structKey] = branchValue
+        updatePayload = { structured_fields: currentStructured }
       }
 
       updatePayload.updated_at = new Date().toISOString()
@@ -522,6 +534,8 @@ export const useBranchStore = create<BranchState>((set, get) => ({
             const newAttrs = { ...(e.attributes || {}), [attrKey]: branchValue }
             return { ...e, attributes: newAttrs }
           }
+          // Note: structured_fields updates are done on server via updatePayload,
+          // but MainEntity interface doesn't include structured_fields, so we skip local state update
           return e
         }),
       })
