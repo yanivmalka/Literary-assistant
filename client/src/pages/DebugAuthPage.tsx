@@ -106,7 +106,7 @@ export default function DebugAuthPage() {
                   value={testPassword}
                   onChange={(e) => setTestPassword(e.target.value)}
                   className="w-full px-3 py-2 border rounded mb-4 bg-background"
-                  autoComplete="password"
+                  autoComplete="current-password"
                 />
               </div>
 
