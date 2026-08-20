@@ -11,6 +11,7 @@ interface CharacterEditModalProps {
   isOpen: boolean
   character: Entity
   projectId: string
+  selectedVersion: 'main' | 'branch'
   onClose: () => void
   onCharacterUpdated?: () => void
 }
@@ -23,18 +24,18 @@ export default function CharacterEditModal({
   isOpen,
   character,
   projectId,
+  selectedVersion,
   onClose,
   onCharacterUpdated,
 }: CharacterEditModalProps) {
   const { t } = useTranslation()
   const { updateEntity, fetchEntities } = useEntityStore()
-  const { currentBranch, fetchCurrentBranch } = useBranchStore()
+  const { currentBranch } = useBranchStore()
 
   const [mountNode, setMountNode] = useState<HTMLElement | null>(null)
   const [formData, setFormData] = useState<FormData>({})
   const [originalFormData, setOriginalFormData] = useState<FormData>({})
   const [saving, setSaving] = useState(false)
-  const [isBranch, setIsBranch] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   const entityType = character.entity_type as any
@@ -50,14 +51,6 @@ export default function CharacterEditModal({
   useEffect(() => {
     setMountNode(document.body)
   }, [])
-
-  useEffect(() => {
-    if (projectId) {
-      fetchCurrentBranch(projectId).then(branch => {
-        setIsBranch(!!branch)
-      })
-    }
-  }, [projectId, fetchCurrentBranch])
 
   // Initialize form data
   useEffect(() => {
@@ -114,7 +107,8 @@ export default function CharacterEditModal({
         structured_fields: structuredFields,
       }
 
-      const branchContext = isBranch && currentBranch
+      // Route based on selectedVersion, not currentBranch existence
+      const branchContext = selectedVersion === 'branch' && currentBranch
         ? { branchId: currentBranch.id, sourceEntityId: character.id }
         : undefined
 

@@ -32,7 +32,7 @@ export default function CharacterProfilePage() {
   const [formData, setFormData] = useState<FormData>({})
   const [originalFormData, setOriginalFormData] = useState<FormData>({})
   const [saving, setSaving] = useState(false)
-  const [isBranch, setIsBranch] = useState(false)
+  const [selectedVersion, setSelectedVersion] = useState<'main' | 'branch'>('main')
   const [relationships, setRelationships] = useState<Relationship[]>([])
   const [loadingRelationships, setLoadingRelationships] = useState(false)
 
@@ -55,7 +55,10 @@ export default function CharacterProfilePage() {
     if (projectId) {
       fetchEntities(projectId)
       fetchCurrentBranch(projectId).then(branch => {
-        setIsBranch(!!branch)
+        // If a branch exists, default to branch view; otherwise stay on main
+        if (branch) {
+          setSelectedVersion('branch')
+        }
       })
     }
   }, [projectId, fetchEntities, fetchCurrentBranch])
@@ -128,8 +131,8 @@ export default function CharacterProfilePage() {
         structured_fields: structuredFields,
       }
 
-      // If branch is active, pass branch context
-      const branchContext = isBranch && currentBranch
+      // Route based on selectedVersion, not currentBranch existence
+      const branchContext = selectedVersion === 'branch' && currentBranch
         ? { branchId: currentBranch.id, sourceEntityId: entityId }
         : undefined
 
@@ -175,7 +178,7 @@ export default function CharacterProfilePage() {
             <h1 className="text-2xl font-bold">{entity.name}</h1>
             <p className="text-sm text-muted-foreground mt-1">
               {t('entities.typesSingular.character')}
-              {isBranch && currentBranch && (
+              {currentBranch && (
                 <span className="ml-2 text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
                   {currentBranch.name}
                 </span>
@@ -194,6 +197,35 @@ export default function CharacterProfilePage() {
           </button>
         )}
       </div>
+
+      {/* Version Selection */}
+      {currentBranch && viewMode === 'profile' && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">{t('branch.version')}:</span>
+            <button
+              onClick={() => setSelectedVersion('main')}
+              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                selectedVersion === 'main'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              {t('branch.main')}
+            </button>
+            <button
+              onClick={() => setSelectedVersion('branch')}
+              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                selectedVersion === 'branch'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              {currentBranch.name}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="border rounded-lg p-6 bg-card">

@@ -20,6 +20,8 @@ interface EntityModalProps {
   projectId: string
   /** If provided, modal is in edit mode. Otherwise, create mode. */
   entity?: Entity | null
+  /** Version context for determining edit target (Main or Branch). Defaults to 'main'. */
+  selectedVersion?: 'main' | 'branch'
   onSaved?: () => void
 }
 
@@ -29,6 +31,7 @@ export default function EntityModal({
   entityType,
   projectId,
   entity,
+  selectedVersion = 'main',
   onSaved,
 }: EntityModalProps) {
   const { t } = useTranslation()
@@ -151,8 +154,8 @@ export default function EntityModal({
       if (isEditMode && entity) {
         // Update existing entity
         const name = (structuredFields.name as string) || entity.name
-        // Pass branch context if editing and branch is active
-        const branchContext = currentBranch
+        // Route based on selectedVersion, not currentBranch existence
+        const branchContext = selectedVersion === 'branch' && currentBranch
           ? { branchId: currentBranch.id, sourceEntityId: entity.id }
           : undefined
         
@@ -167,8 +170,8 @@ export default function EntityModal({
         // Create new entity
         const name = (structuredFields.name as string) || 'ישות חדשה'
         structuredFields.name = name
-        // Pass branch context for creates if branch is active
-        const branchContext = currentBranch
+        // Route based on selectedVersion, not currentBranch existence
+        const branchContext = selectedVersion === 'branch' && currentBranch
           ? { branchId: currentBranch.id, layer: 'branch' as const }
           : undefined
         

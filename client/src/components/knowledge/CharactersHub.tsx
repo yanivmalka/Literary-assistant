@@ -15,11 +15,11 @@ interface CharactersHubProps {
 
 type VersionType = 'main' | 'branch'
 
-export default function CharactersHub({ projectId, entities }: CharactersHubProps) {
+export default function CharactersHub({ projectId }: CharactersHubProps) {
   const { t } = useTranslation()
 
   const { currentBranch } = useBranchStore()
-  const { createEntity, fetchEntities: fetchEntitiesStore } = useEntityStore()
+  const { createEntity, fetchEntities: fetchEntitiesStore, getMainOnlyEntities, getEffectiveBranchEntities } = useEntityStore()
 
   const [selectedVersion, setSelectedVersion] = useState<VersionType>('main')
   const [detailModalOpen, setDetailModalOpen] = useState(false)
@@ -27,10 +27,10 @@ export default function CharactersHub({ projectId, entities }: CharactersHubProp
   const [selectedCharacter, setSelectedCharacter] = useState<Entity | null>(null)
   const [isCreating, setIsCreating] = useState(false)
 
-  // Get characters for current version
-  const characters = entities.filter(
-    e => e.entity_type === 'character'
-  )
+  // Get characters for selected version (Main or Branch)
+  const characters = selectedVersion === 'main'
+    ? getMainOnlyEntities({ type: 'character' })
+    : getEffectiveBranchEntities({ type: 'character' })
 
   const handleCharacterClick = (character: Entity) => {
     setSelectedCharacter(character)
@@ -179,6 +179,7 @@ export default function CharactersHub({ projectId, entities }: CharactersHubProp
           isOpen={editModalOpen}
           character={selectedCharacter}
           projectId={projectId}
+          selectedVersion={selectedVersion}
           onClose={handleCloseEditModal}
           onCharacterUpdated={() => {
             handleCloseEditModal()

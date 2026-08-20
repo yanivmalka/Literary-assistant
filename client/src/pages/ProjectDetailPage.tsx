@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Plus, Map, ArrowLeft, Users, MapPin, Calendar, FileText, MessageSquare, AlertTriangle, GitBranch } from 'lucide-react'
+import { Plus, Map, ArrowLeft, Users, MapPin, Calendar, MessageSquare, AlertTriangle, GitBranch } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useEntityStore } from '@/stores/entityStore'
@@ -62,22 +62,6 @@ export default function ProjectDetailPage() {
 
       {/* Sub-navigation */}
       <nav className="flex flex-wrap gap-2 mb-8 border-b pb-3">
-        <Link
-          to={`/projects/${projectId}/knowledge`}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md hover:bg-muted transition-colors"
-        >
-          <Users className="h-4 w-4" />
-          {t('knowledge.title')}
-        </Link>
-
-        <Link
-          to={`/projects/${projectId}/documents`}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md hover:bg-muted transition-colors"
-        >
-          <FileText className="h-4 w-4" />
-          {t('documents.title')}
-        </Link>
-
         <Link
           to={`/projects/${projectId}/qa`}
           className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${hasReadyDocument ? 'hover:bg-muted' : 'opacity-50 pointer-events-none'}`}

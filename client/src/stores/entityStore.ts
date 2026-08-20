@@ -46,6 +46,9 @@ interface EntityState {
   loading: boolean
   selectedEntity: Entity | null
   entityMentions: EntityMention[]
+  // Cached dataset snapshots for version-aware selectors
+  mainEntitiesCache: Entity[] | null
+  branchEntitiesCache: Entity[] | null
 
   fetchEntities: (projectId: string, filters?: { type?: string; status?: string }) => Promise<void>
   fetchMergeSuggestions: (projectId: string) => Promise<void>
@@ -56,6 +59,8 @@ interface EntityState {
   createEntity: (projectId: string, entityType: EntityType, structuredFields: Record<string, unknown>, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => Promise<Entity | null>
   updateEntity: (entityId: string, updates: { canonical_name?: string; description?: string | null; structured_fields?: Record<string, unknown>; attributes?: Record<string, unknown> }, branchContext?: { branchId: string; sourceEntityId: string }) => Promise<boolean>
   deleteEntity: (entityId: string, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => Promise<boolean>
+  getMainOnlyEntities: (filters?: { type?: string; status?: string }) => Entity[]
+  getEffectiveBranchEntities: (filters?: { type?: string; status?: string }) => Entity[]
 }
 
 export const useEntityStore = create<EntityState>((set, get) => ({
@@ -64,6 +69,8 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   loading: false,
   selectedEntity: null,
   entityMentions: [],
+  mainEntitiesCache: null,
+  branchEntitiesCache: null,
 
   fetchEntities: async (projectId, filters) => {
     set({ loading: true })
@@ -87,7 +94,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
 
       if (mainError) {
         console.error('Failed to fetch main entities:', mainError)
-        set({ entities: [] })
+        set({ entities: [], mainEntitiesCache: [], branchEntitiesCache: [] })
         return
       }
 
@@ -151,7 +158,49 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         }
       }
 
-      // Step 5: Build effective entity view (Main + Branch merged)
+      // ============================================
+      // Build Main-only dataset (no Branch overlays)
+      // ============================================
+      const mainOnlyEntities = new Map<string, Entity>()
+
+      if (mainEntities) {
+        for (const mainEntity of mainEntities) {
+          const mainId = mainEntity.id as string
+
+          const effectiveData = {
+            id: mainId,
+            canonical_name: mainEntity.canonical_name as string,
+            entity_type: mainEntity.entity_type as string,
+            description: mainEntity.description as string | null,
+            attributes: mainEntity.attributes as Record<string, unknown> || {},
+            structured_fields: mainEntity.structured_fields as Record<string, unknown> || {},
+            created_at: mainEntity.created_at as string,
+            updated_at: mainEntity.updated_at as string,
+          }
+
+          const entity: Entity = {
+            id: effectiveData.id,
+            name: effectiveData.canonical_name,
+            entity_type: effectiveData.entity_type,
+            status: 'confirmed',
+            aliases: aliasMap.get(mainId) || [],
+            metadata: effectiveData.attributes,
+            created_at: effectiveData.created_at,
+            updated_at: effectiveData.updated_at,
+            entity_types: (mainEntity.entity_types as string[]) || [mainEntity.entity_type as string],
+            description: effectiveData.description,
+            attributes: effectiveData.attributes,
+            structured_fields: effectiveData.structured_fields,
+            source: (mainEntity.source as string) || 'ai',
+          }
+
+          mainOnlyEntities.set(mainId, entity)
+        }
+      }
+
+      // ============================================
+      // Build effective Branch dataset (Main + Overlays + Branch-only)
+      // ============================================
       const effectiveEntities = new Map<string, Entity>()
 
       // Add Main entities with Branch overlays applied
@@ -229,16 +278,23 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         effectiveEntities.set(branchId, entity)
       }
 
-      // Step 6: Apply type filter if provided
-      let filtered = Array.from(effectiveEntities.values())
+      // Step 5: Apply type filter if provided (to both datasets)
+      let mainFiltered = Array.from(mainOnlyEntities.values())
+      let effectiveFiltered = Array.from(effectiveEntities.values())
+      
       if (filters?.type) {
-        filtered = filtered.filter(e => e.entity_type === filters.type)
+        mainFiltered = mainFiltered.filter(e => e.entity_type === filters.type)
+        effectiveFiltered = effectiveFiltered.filter(e => e.entity_type === filters.type)
       }
 
-      set({ entities: filtered })
+      set({ 
+        entities: effectiveFiltered,
+        mainEntitiesCache: mainFiltered,
+        branchEntitiesCache: effectiveFiltered,
+      })
     } catch (error) {
       console.error('Failed to fetch entities:', error)
-      set({ entities: [] })
+      set({ entities: [], mainEntitiesCache: [], branchEntitiesCache: [] })
     } finally {
       set({ loading: false })
     }
@@ -612,5 +668,37 @@ export const useEntityStore = create<EntityState>((set, get) => ({
       console.error('Failed to delete entity:', error)
       return false
     }
+  },
+
+  // ==============================
+  // Get Main-only entities (no Branch overlays)
+  // ==============================
+  // Returns canonical Main dataset without any Branch modifications
+  // Useful when selectedVersion === 'main'
+  getMainOnlyEntities: (filters?: { type?: string; status?: string }) => {
+    const cache = get().mainEntitiesCache
+    if (!cache) return []
+    
+    let result = [...cache]
+    if (filters?.type) {
+      result = result.filter(e => e.entity_type === filters.type)
+    }
+    return result
+  },
+
+  // ==============================
+  // Get effective Branch entities (Main + Overlays + Branch-only)
+  // ==============================
+  // Returns entities with Branch overlays applied
+  // Useful when selectedVersion === 'branch'
+  getEffectiveBranchEntities: (filters?: { type?: string; status?: string }) => {
+    const cache = get().branchEntitiesCache
+    if (!cache) return []
+    
+    let result = [...cache]
+    if (filters?.type) {
+      result = result.filter(e => e.entity_type === filters.type)
+    }
+    return result
   },
 }))
