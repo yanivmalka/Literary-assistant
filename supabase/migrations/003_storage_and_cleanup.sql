@@ -16,33 +16,65 @@ VALUES ('map-images', 'map-images', false)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage policies for the map-images bucket
-CREATE POLICY "Users can upload their own map images"
-  ON storage.objects FOR INSERT
-  WITH CHECK (
-    bucket_id = 'map-images' AND
-    auth.uid()::text = (storage.foldername(name))[1]
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Users can upload their own map images'
+    AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Users can upload their own map images"
+      ON storage.objects FOR INSERT
+      WITH CHECK (
+        bucket_id = 'map-images' AND
+        auth.uid()::text = (storage.foldername(name))[1]
+      );
+  END IF;
+END $$;
 
-CREATE POLICY "Users can view their own map images"
-  ON storage.objects FOR SELECT
-  USING (
-    bucket_id = 'map-images' AND
-    auth.uid()::text = (storage.foldername(name))[1]
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Users can view their own map images'
+    AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Users can view their own map images"
+      ON storage.objects FOR SELECT
+      USING (
+        bucket_id = 'map-images' AND
+        auth.uid()::text = (storage.foldername(name))[1]
+      );
+  END IF;
+END $$;
 
-CREATE POLICY "Users can update their own map images"
-  ON storage.objects FOR UPDATE
-  USING (
-    bucket_id = 'map-images' AND
-    auth.uid()::text = (storage.foldername(name))[1]
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Users can update their own map images'
+    AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Users can update their own map images"
+      ON storage.objects FOR UPDATE
+      USING (
+        bucket_id = 'map-images' AND
+        auth.uid()::text = (storage.foldername(name))[1]
+      );
+  END IF;
+END $$;
 
-CREATE POLICY "Users can delete their own map images"
-  ON storage.objects FOR DELETE
-  USING (
-    bucket_id = 'map-images' AND
-    auth.uid()::text = (storage.foldername(name))[1]
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Users can delete their own map images'
+    AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Users can delete their own map images"
+      ON storage.objects FOR DELETE
+      USING (
+        bucket_id = 'map-images' AND
+        auth.uid()::text = (storage.foldername(name))[1]
+      );
+  END IF;
+END $$;
 
 -- ============================================
 -- TRASH AUTO-CLEANUP FUNCTION
