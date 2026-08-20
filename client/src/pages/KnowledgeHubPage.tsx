@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Users, MapPin, Calendar, ArrowLeft } from 'lucide-react'
 import { useEntityStore } from '@/stores/entityStore'
 import { useBranchStore } from '@/stores/branchStore'
@@ -10,15 +10,27 @@ import TimelineHub from '@/components/knowledge/TimelineHub'
 
 type TabType = 'characters' | 'locations' | 'timeline'
 
+const isTabType = (value: string | null): value is TabType =>
+  value === 'characters' || value === 'locations' || value === 'timeline'
+
 export default function KnowledgeHubPage() {
   const { t } = useTranslation()
   const { projectId } = useParams<{ projectId: string }>()
   const navigateToProject = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const { entities, fetchEntities } = useEntityStore()
   const { fetchCurrentBranch } = useBranchStore()
-  const [activeTab, setActiveTab] = useState<TabType>('characters')
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    const requestedTab = searchParams.get('tab')
+    return isTabType(requestedTab) ? requestedTab : 'characters'
+  })
   const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab')
+    setActiveTab(isTabType(requestedTab) ? requestedTab : 'characters')
+  }, [searchParams])
 
   useEffect(() => {
     if (projectId) {

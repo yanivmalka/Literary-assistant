@@ -1,11 +1,12 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Plus, Map, ArrowLeft, Users, MapPin, Sword, Sparkles, FileText, MessageSquare, AlertTriangle, GitBranch } from 'lucide-react'
+import { Plus, Map, ArrowLeft, Users, MapPin, Calendar, FileText, MessageSquare, AlertTriangle, GitBranch } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useEntityStore } from '@/stores/entityStore'
 import { useContradictionStore } from '@/stores/contradictionStore'
+import { getProjectEvents } from '@/lib/eventService'
 import KnowledgeOverview from '@/components/knowledge/KnowledgeOverview'
 
 export default function ProjectDetailPage() {
@@ -16,6 +17,7 @@ export default function ProjectDetailPage() {
   const { documents, fetchDocuments } = useDocumentStore()
   const { entities, fetchEntities } = useEntityStore()
   const { contradictions, fetchContradictions } = useContradictionStore()
+  const [timelineEventCount, setTimelineEventCount] = useState(0)
 
   useEffect(() => {
     if (projectId) {
@@ -24,6 +26,9 @@ export default function ProjectDetailPage() {
       fetchDocuments(projectId)
       fetchEntities(projectId)
       fetchContradictions(projectId)
+      getProjectEvents(projectId)
+        .then(events => setTimelineEventCount(events.length))
+        .catch(() => setTimelineEventCount(0))
     }
   }, [projectId, fetchProject, fetchProjectMaps, fetchDocuments, fetchEntities, fetchContradictions])
 
@@ -159,10 +164,10 @@ export default function ProjectDetailPage() {
         )}
       </section>
 
-      {/* Entity categories */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Knowledge categories */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Link
-          to={`/projects/${projectId}/knowledge`}
+          to={`/projects/${projectId}/knowledge?tab=characters`}
           className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
         >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
@@ -176,7 +181,7 @@ export default function ProjectDetailPage() {
         </Link>
 
         <Link
-          to={`/projects/${projectId}/knowledge`}
+          to={`/projects/${projectId}/knowledge?tab=locations`}
           className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
         >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
@@ -190,31 +195,15 @@ export default function ProjectDetailPage() {
         </Link>
 
         <Link
-          to={`/projects/${projectId}/knowledge`}
+          to={`/projects/${projectId}/knowledge?tab=timeline`}
           className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
         >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
-            <Sword className="h-5 w-5 text-amber-500" />
-            {t('entities.types.object')}
+            <Calendar className="h-5 w-5 text-indigo-500" />
+            {t('timeline.title')}
           </h3>
-          <p className="text-sm text-muted-foreground">{t('home.magic.description')}</p>
-          <p className="text-lg font-bold mt-3">
-            {entities.filter(e => e.entity_type === 'object').length}
-          </p>
-        </Link>
-
-        <Link
-          to={`/projects/${projectId}/knowledge`}
-          className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
-        >
-          <h3 className="font-semibold flex items-center gap-2 mb-2">
-            <Sparkles className="h-5 w-5 text-purple-500" />
-            {t('entities.types.ability')}
-          </h3>
-          <p className="text-sm text-muted-foreground">{t('home.magic.description')}</p>
-          <p className="text-lg font-bold mt-3">
-            {entities.filter(e => e.entity_type === 'ability').length}
-          </p>
+          <p className="text-sm text-muted-foreground">{t('timeline.eventsComingSoon')}</p>
+          <p className="text-lg font-bold mt-3">{timelineEventCount}</p>
         </Link>
       </div>
     </div>
