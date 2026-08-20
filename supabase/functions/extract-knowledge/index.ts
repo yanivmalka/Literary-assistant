@@ -1068,6 +1068,25 @@ Deno.serve(async (req) => {
     // Step 5: Normalize & upsert entities (incremental merge)
     // Priority: user data > existing extracted data > new extracted data > null
     // ==============================
+    // ======= DEBUG: Log what Gemini extracted =======
+    console.log('[extract-knowledge] Gemini extracted:', {
+      characters: extraction.characters?.length || 0,
+      locations: extraction.locations?.length || 0,
+      objects: extraction.objects?.length || 0,
+      abilities: extraction.abilities?.length || 0,
+      magic_abilities: extraction.magic_abilities?.length || 0,
+      events: extraction.events?.length || 0,
+      relationships: extraction.relationships?.length || 0,
+    });
+    
+    if (extraction.abilities && extraction.abilities.length > 0) {
+      console.log('[extract-knowledge] Abilities found:', extraction.abilities.map(a => ({ name: a.name, type: a.ability_type })));
+    }
+    if (extraction.magic_abilities && extraction.magic_abilities.length > 0) {
+      console.log('[extract-knowledge] Magic abilities found:', extraction.magic_abilities.map(a => ({ name: a.name, type: a.ability_type })));
+    }
+    // ================================================
+
     const normalizedEntities = normalizeEntities(extraction, chunkLookup);
     const entityIdEntries: Array<{ entity: NormalizedEntity; id: string }> = [];
     let entitiesSaved = 0;

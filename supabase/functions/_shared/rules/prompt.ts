@@ -154,33 +154,22 @@ DO extract:
 
 === ABILITIES ===
 
-Extract TWO separate arrays based on ability type. Look for:
-1. Phrases with "יכולת" (ability), "כושר" (power/capacity), "מיומנות" (skill), "טכניקה" (technique)
-2. Named special powers or martial techniques
-3. Context showing a character "uses" or "has" this ability
+Extract abilities into TWO SEPARATE ARRAYS. This is MANDATORY.
 
 **abilities[]** — Physical/combat abilities:
-- Martial techniques: "לחימה בשתי חרבות", "קריאת שפתיים", "כושר טלקינזיס"
-- Combat skills, athletic abilities, trained techniques
-- Physical feats mentioned as special or distinct
-- Example: "קתיע קרב", "לחימה בשתי חרבות", "קריאת שפתיים", "ריפוי אנרגטי"
+- "קריאת שפתיים"
+- "לחימה בשתי חרבות"
+- "ריפוי אנרגטי"
 
 **magic_abilities[]** — Magical/supernatural abilities:
-- Magical powers: "רונת אש", "טלקינזיס", "ראייה דרך קירות"
-- Spells, supernatural techniques, mystical powers
-- Abilities explicitly described as magical or supernatural
-- Example: "רונת אש" (fire magic), "יכולת ראייה דרך קירות" (vision through walls), "טלקינזיס"
+- "טלקינזיס"
+- "רונת אש"
 
-DO NOT extract:
-- Pure generic descriptors: "חזק", "מהיר", "חכם" (without being framed as a special technique)
-- General magic system concepts UNLESS they refer to a specific usable ability (e.g., "כישוף" as a system ≠ extract; "רונת אש" ✓ do extract)
-- Vague references to "power" WITHOUT specifics or named techniques
+When you find these named abilities in the text, extract them immediately as first-class entities.
 
-DO extract — PRIORITY:
-- ANY phrase containing "יכולת" + a specific name (e.g., "יכולת קריאת שפתיים" → extract "קריאת שפתיים")
-- Specific martial/combat techniques named and attributed to characters
-- Specific magical abilities with names
-- Named abilities even if short description provided
+If the text mentions: "בעל יכולת X" or "לחימה בX" or "טכניקת X" → extract X as an ability.
+
+Look for the keyword "יכולת" - whenever you see it, the thing after it is an ability to extract.
 
 === CONTEXT AWARENESS ===
 - If a word can be either a character name or a concept (e.g., "רונה" could be a person or a type of magic), decide based on context.
