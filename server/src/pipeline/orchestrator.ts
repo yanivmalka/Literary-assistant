@@ -179,10 +179,6 @@ async function executeStage(
         return await runChunking(versionId)
       case 'indexing':
         return await runIndexing(versionId)
-      case 'entity_extraction':
-        return await runEntityExtraction(versionId, projectId, userId)
-      case 'attribute_extraction':
-        return await runAttributeExtraction(projectId)
       case 'contradiction_detection':
         return await runContradictionDetection(projectId)
       default:
@@ -338,33 +334,6 @@ async function runIndexing(versionId: string): Promise<StageResult> {
   }
 
   return { success: true }
-}
-
-/**
- * Stage: Extract entities from chunks using AI.
- * Skips gracefully if no CompletionProvider available.
- */
-async function runEntityExtraction(_versionId: string, _projectId: string, _userId: string): Promise<StageResult> {
-  // The legacy server extractor writes Main-scoped tables and has no Branch context.
-  // Keep the pipeline safe by refusing this stage until it is routed through the
-  // Branch-validated extract-knowledge function.
-  return {
-    skipped: true,
-    success: true,
-    skipReason: 'Legacy AI entity extraction disabled: active Branch routing is required.',
-  }
-}
-
-/**
- * Stage: Extract detailed attributes for entities.
- * Skips if no CompletionProvider available.
- */
-async function runAttributeExtraction(_projectId: string): Promise<StageResult> {
-  return {
-    skipped: true,
-    success: true,
-    skipReason: 'Legacy AI attribute extraction disabled: active Branch routing is required.',
-  }
 }
 
 /**
