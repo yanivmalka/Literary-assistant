@@ -99,6 +99,60 @@ export function setCooldown(modelId: string, failureCount: number, cooldownUntil
 }
 
 // ============================================
+// Rate-limit Backoff
+// ============================================
+
+/**
+ * A 429 can be caused by a short request-rate window or by exhausted quota.
+ * Do not blindly replay the same request: wait briefly, then let the existing
+ * model fallback chain make one bounded alternative attempt.
+ */
+const MAX_429_BACKOFF_MS = 5_000;
+const DEFAULT_429_BACKOFF_MS = 500;
+
+function parseRetryDelayMs(response: Response, errorText: string): number | null {
+  const retryAfter = response.headers.get("retry-after")?.trim();
+
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return seconds * 1_000;
+    }
+
+    const retryAt = Date.parse(retryAfter);
+    if (!Number.isNaN(retryAt)) {
+      return Math.max(0, retryAt - Date.now());
+    }
+  }
+
+  // Gemini may return google.rpc.RetryInfo in the JSON error body instead of
+  // an HTTP Retry-After header, for example: { "retryDelay": "2s" }.
+  const retryDelayMatch = errorText.match(/"retryDelay"\s*:\s*"([\d.]+)s"/i);
+  if (retryDelayMatch) {
+    const seconds = Number(retryDelayMatch[1]);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return seconds * 1_000;
+    }
+  }
+
+  return null;
+}
+
+function get429BackoffMs(response: Response, errorText: string): number {
+  const retryDelayMs = parseRetryDelayMs(response, errorText);
+  if (retryDelayMs !== null) {
+    return Math.min(retryDelayMs, MAX_429_BACKOFF_MS);
+  }
+
+  // Small jitter prevents concurrent edge invocations from retrying together.
+  return DEFAULT_429_BACKOFF_MS + Math.floor(Math.random() * 250);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// ============================================
 // Main Fallback Execution Engine
 // ============================================
 
@@ -106,8 +160,9 @@ export function setCooldown(modelId: string, failureCount: number, cooldownUntil
  * Calls the Gemini API with automatic model fallback.
  *
  * Tries models in priority order (from GEMINI_MODELS config).
- * On retriable errors (429, 5xx, timeout, model unavailable),
- * falls back to the next model.
+ * On 429, waits for a bounded Retry-After/retryDelay interval (or a short
+ * jittered delay) before falling back to the next model. Other retriable
+ * errors (5xx, timeout, model unavailable) fall back immediately.
  * On non-retriable errors (401, 403, 400), fails immediately.
  *
  * @param payload - The Gemini API request body
@@ -127,8 +182,8 @@ export async function callGeminiWithFallback(
   const fallbackChain: FallbackAttempt[] = [];
   const modelsToTry = GEMINI_MODELS.slice().sort((a, b) => a.priority - b.priority);
 
-  for (const modelConfig of modelsToTry) {
-    const modelId = modelConfig.id;
+  for (let modelIndex = 0; modelIndex < modelsToTry.length; modelIndex++) {
+    const modelId = modelsToTry[modelIndex].id;
 
     // Note: Cooldown is not used in serverless edge functions (no persistent state between invocations)
 
@@ -208,6 +263,14 @@ export async function callGeminiWithFallback(
       }
 
       // Retriable error: try next model. Only cooldown on transient errors (429/5xx), not permanent ones (404)
+      if (status === 429 && modelIndex < modelsToTry.length - 1) {
+        const backoffMs = get429BackoffMs(response, errorText);
+        console.warn(
+          `[Gemini Fallback] Rate limited by ${modelId}. Waiting ${backoffMs}ms before trying the next model.`
+        );
+        await sleep(backoffMs);
+      }
+
       console.log(
         `[Gemini Fallback] Retriable error from ${modelId} (HTTP ${status}). Falling back.`
       );
