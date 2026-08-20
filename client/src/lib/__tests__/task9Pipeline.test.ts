@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { buildEntityOverlayRecord, buildExtractionRequest } from '../extractionBranching'
 
 /**
  * Task 9: Full AI Extraction Pipeline + Branch Review/Merge
@@ -42,18 +43,28 @@ describe('Task 9: Extraction Pipeline + Review/Merge', () => {
     })
 
     it('routes every subsequent extraction request to the active Branch', () => {
-      const request = { use_main: false, target_branch_id: 'branch-1' }
+      const request = buildExtractionRequest('v2', 'project-1', 'doc-2', 'user-1', 'branch-1', 0, 3)
 
       expect(request.use_main).toBe(false)
       expect(request.target_branch_id).toBe('branch-1')
     })
 
     it('creates a Branch overlay that preserves Main identity', () => {
-      const overlay = {
-        source_entity_id: 'main-aron',
-        entity_id: 'main-aron',
-        overrides: { 'structured_fields.age': '30' },
-      }
+      const overlay = buildEntityOverlayRecord(
+        'branch-1',
+        'main-aron',
+        {
+          id: 'main-aron',
+          canonical_name: 'Aron',
+          entity_type: 'character',
+          entity_types: ['character'],
+          description: null,
+          attributes: {},
+          structured_fields: {},
+        },
+        { 'structured_fields.age': '30' },
+        { 'structured_fields.age': '25' },
+      )
 
       expect(overlay.source_entity_id).toBe('main-aron')
       expect(overlay.entity_id).toBe('main-aron')

@@ -479,7 +479,7 @@ function normalizeEntities(extraction: GeminiExtraction): NormalizedEntity[] {
   // Apply post-processing filters from centralized rules
   const results: NormalizedEntity[] = [];
   let filteredCount = 0;
-  for (const entity of entityMap.values()) {
+  for (const entity of deduplicateBatchEntities(Array.from(entityMap.values()))) {
     if (!shouldFilterEntity(entity)) {
       results.push(entity);
     } else {
