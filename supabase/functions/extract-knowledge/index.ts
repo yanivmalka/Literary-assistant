@@ -1137,6 +1137,7 @@ Deno.serve(async (req) => {
     let valuesSynced = 0;
     let valueEvidenceSynced = 0;
     const valueSyncErrors: string[] = [];
+    const persistenceErrors: string[] = [];
 
     for (const entity of normalizedEntities) {
       // In Main bootstrap mode, entities receive new UUIDs directly.
@@ -1175,7 +1176,9 @@ Deno.serve(async (req) => {
             .eq("branch_id", targetBranchId!);
 
           if (branchUpdateError) {
-            console.error(`Failed to update Branch entity '${entity.canonical_name}':`, branchUpdateError.message);
+            const message = `Failed to update Branch entity '${entity.canonical_name}': ${branchUpdateError.message}`;
+            console.error(message);
+            persistenceErrors.push(message);
             continue;
           }
 
@@ -1208,7 +1211,9 @@ Deno.serve(async (req) => {
             );
 
           if (branchMappingError) {
-            console.error(`Failed to update Branch mapping for '${entity.canonical_name}':`, branchMappingError.message);
+            const message = `Failed to update Branch mapping for '${entity.canonical_name}': ${branchMappingError.message}`;
+            console.error(message);
+            persistenceErrors.push(message);
             continue;
           }
 
@@ -1244,7 +1249,9 @@ Deno.serve(async (req) => {
             );
 
           if (overlayError) {
-            console.error(`Failed to create overlay for '${entity.canonical_name}':`, overlayError.message);
+            const message = `Failed to create overlay for '${entity.canonical_name}': ${overlayError.message}`;
+            console.error(message);
+            persistenceErrors.push(message);
             continue;
           }
           entityId = existing.id;
@@ -1275,7 +1282,9 @@ Deno.serve(async (req) => {
           .single();
 
         if (insertError || !inserted) {
-          console.error(`Failed to insert ${targetLayer} entity '${entity.canonical_name}':`, insertError?.message);
+          const message = `Failed to insert ${targetLayer} entity '${entity.canonical_name}': ${insertError?.message || "no row returned"}`;
+          console.error(message);
+          persistenceErrors.push(message);
           continue;
         }
         entityId = inserted.id;
@@ -1312,7 +1321,25 @@ Deno.serve(async (req) => {
             );
 
           if (branchMappingError) {
-            console.error(`Failed to map branch-only entity '${entity.canonical_name}':`, branchMappingError.message);
+            const message = `Failed to map branch-only entity '${entity.canonical_name}': ${branchMappingError.message}`;
+            console.error(message);
+
+            // Do not leave an entity that the Branch cannot address. The delete
+            // is scoped to the just-created row, project and branch.
+            const { error: cleanupError } = await supabase
+              .from("knowledge_entities")
+              .delete()
+              .eq("id", entityId)
+              .eq("project_id", body.project_id)
+              .eq("branch_id", targetBranchId!)
+              .eq("layer", "branch");
+            if (cleanupError) {
+              const cleanupMessage = `Failed to clean up unmapped Branch entity '${entity.canonical_name}': ${cleanupError.message}`;
+              console.error(cleanupMessage);
+              persistenceErrors.push(`${message}; ${cleanupMessage}`);
+            } else {
+              persistenceErrors.push(message);
+            }
             continue;
           }
           branchEntitiesSaved++;
