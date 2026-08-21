@@ -6,6 +6,7 @@ import {
   type EntityResolutionRecord,
 } from "../_shared/entity-resolution.ts";
 import type { ExtractionNameUncertainty, ExtractionSourceReference } from "../_shared/extraction-contract.ts";
+import { getEmbeddedAbilityReferences } from "../_shared/ability-links.ts";
 
 export interface ExtractedEntity {
   name: string;
@@ -104,6 +105,17 @@ export interface NormalizedEntity {
   field_confidence?: Record<string, number>;
 }
 
+function normalizeStringList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .map((item) => item.trim())
+  }
+  if (typeof value === "string") {
+    return value.split(",").map((item) => item.trim()).filter(Boolean)
+  }
+  return []
+}
+
 /** Builds the structured fields used by persistence from one extracted entity. */
 export function buildStructuredFields(type: string, entity: ExtractedEntity): Record<string, unknown> {
   const fields: Record<string, unknown> = {};
@@ -160,7 +172,8 @@ export function buildStructuredFields(type: string, entity: ExtractedEntity): Re
     fields.cost = entity.cost || null;
     fields.power_level = entity.power_level || null;
     fields.magic_system = entity.magic_system || null;
-    fields.users = entity.users ? entity.users.join(", ") : null;
+    const users = normalizeStringList(entity.users)
+    fields.users = users.length > 0 ? users.join(", ") : null;
     fields.narrative_impact = null;
     fields.related_events = null;
   }
@@ -267,8 +280,12 @@ export function normalizeEntities(
       if (entity.relationships && entity.relationships.length > 0) {
         existing.attributes.relationships = [...((existing.attributes.relationships as string[]) || []), ...entity.relationships];
       }
-      if (entity.users && entity.users.length > 0) {
-        existing.attributes.users = [...((existing.attributes.users as string[]) || []), ...entity.users];
+      const entityUsers = normalizeStringList(entity.users)
+      if (entityUsers.length > 0) {
+        existing.attributes.users = [...new Set([
+          ...normalizeStringList(existing.attributes.users),
+          ...entityUsers,
+        ])]
       }
       if (entity.members && entity.members.length > 0) {
         existing.attributes.members = [...((existing.attributes.members as string[]) || []), ...entity.members];
@@ -283,7 +300,8 @@ export function normalizeEntities(
       if (extractionMetadata) attributes.extraction_meta = extractionMetadata;
       if (entity.abilities && entity.abilities.length > 0) attributes.abilities = entity.abilities;
       if (entity.relationships && entity.relationships.length > 0) attributes.relationships = entity.relationships;
-      if (entity.users && entity.users.length > 0) attributes.users = entity.users;
+      const entityUsers = normalizeStringList(entity.users)
+      if (entityUsers.length > 0) attributes.users = entityUsers;
       if (entity.members && entity.members.length > 0) attributes.members = entity.members;
       if (entity.purpose) attributes.purpose = entity.purpose;
 
@@ -315,11 +333,44 @@ export function normalizeEntities(
     }
   }
 
+  const physicalAbilities = [...(extraction.abilities || [])]
+  const magicAbilities = [...(extraction.magic_abilities || [])]
+
+  // Backward compatibility: promote skills embedded on characters to first-class
+  // entities so the UI can display them and the persistence layer can link them.
+  for (const character of extraction.characters || []) {
+    const characterAttributes = character.attributes || {}
+    for (const reference of getEmbeddedAbilityReferences({
+      ...characterAttributes,
+      abilities: character.abilities ?? characterAttributes.abilities,
+      magic_abilities: characterAttributes.magic_abilities,
+      life_skills: characterAttributes.life_skills,
+      skills: characterAttributes.skills,
+      magic_skills: characterAttributes.magic_skills,
+    })) {
+      const target = reference.entityType === "magic_ability" ? magicAbilities : physicalAbilities
+      const existing = target.find((ability) => normalizeKey(ability.name) === normalizeKey(reference.name))
+      if (existing) {
+        existing.users = [...new Set([
+          ...normalizeStringList(existing.users),
+          character.name,
+        ])]
+      } else {
+        target.push({
+          name: reference.name,
+          users: [character.name],
+          chunk_positions: character.chunk_positions || [],
+          evidence: character.evidence || [],
+        })
+      }
+    }
+  }
+
   for (const character of extraction.characters || []) addEntity(character.name, "character", character);
   for (const location of extraction.locations || []) addEntity(location.name, "location", location);
   for (const object of extraction.objects || []) addEntity(object.name, "object", object);
-  for (const ability of extraction.abilities || []) addEntity(ability.name, "ability", ability);
-  for (const magicAbility of extraction.magic_abilities || []) addEntity(magicAbility.name, "magic_ability", magicAbility);
+  for (const ability of physicalAbilities) addEntity(ability.name, "ability", ability);
+  for (const magicAbility of magicAbilities) addEntity(magicAbility.name, "magic_ability", magicAbility);
   for (const organization of extraction.organizations || []) addEntity(organization.name, "organization", organization);
 
   const entries = Array.from(entityMap.entries());

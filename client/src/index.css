@@ -85,7 +85,7 @@
     );
     background-size: 250% 100%;
     background-position: 200% 0;
-    animation: document-tile-processing 1.8s ease-in-out infinite;
+    animation: document-tile-processing 4s ease-in-out infinite;
   }
 
   @keyframes document-tile-processing {

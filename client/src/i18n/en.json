@@ -248,6 +248,7 @@
       },
       "lifeSkills": {
         "label": "Life Skills",
+        "categoryDescription": "Physical abilities, combat skills, and practical life skills",
         "title": "No life skills were found for this character yet.",
         "description": "Life skills identified in your documents and linked to this character will appear here."
       },
@@ -521,7 +522,8 @@
       "unknownType": "Entity"
     },
     "abilities": {
-      "title": "Abilities"
+      "title": "Abilities",
+      "loading": "Loading abilities..."
     },
     "branch": {
       "main": "Main",

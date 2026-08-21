@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Shield, Sparkles } from 'lucide-react'
 import type { Entity } from '@/stores/entityStore'
@@ -159,11 +160,11 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </button>
           <div>
-            <h2 className="text-xl font-bold">Abilities</h2>
+            <h2 className="text-xl font-bold">{t('ui.abilities.title')}</h2>
             <p className="text-sm text-muted-foreground mt-1">{character.name}</p>
           </div>
         </div>
-        <p className="text-muted-foreground text-center py-8">Loading abilities...</p>
+        <p className="text-muted-foreground text-center py-8">{t('ui.abilities.loading')}</p>
       </div>
     )
   }
@@ -179,7 +180,7 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
           <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
         </button>
         <div>
-          <h2 className="text-xl font-bold">Abilities</h2>
+          <h2 className="text-xl font-bold">{t('ui.abilities.title')}</h2>
           <p className="text-sm text-muted-foreground mt-1">{character.name}</p>
         </div>
       </div>
@@ -193,10 +194,10 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
         >
           <div className="flex items-center gap-3 mb-4">
             <Shield className="h-6 w-6 text-orange-500" />
-            <h3 className="text-lg font-semibold">Life Skills</h3>
+            <h3 className="text-lg font-semibold">{t('entities.emptyStates.lifeSkills.label')}</h3>
           </div>
           <p className="text-sm text-muted-foreground">
-            Physical abilities, combat skills, and practical life skills
+            {t('entities.emptyStates.lifeSkills.categoryDescription')}
           </p>
         </button>
 

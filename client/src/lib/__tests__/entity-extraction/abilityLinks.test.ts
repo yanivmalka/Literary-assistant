@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { buildAbilityLinks, type AbilityLinkEntity } from '../../../../../supabase/functions/_shared/ability-links'
 
 function entity(overrides: Partial<AbilityLinkEntity>): AbilityLinkEntity {

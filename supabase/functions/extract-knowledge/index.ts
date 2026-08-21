@@ -43,7 +43,7 @@ import {
 import { normalizeEntities as normalizeEntitiesForExtraction } from "./normalization.ts";
 import { parseExtractionJson, normalizeExtractionPayload, validateExtractionMode, validateExtractionPayload } from "./testable-pipeline.ts";
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
-import { buildAbilityLinks } from "../_shared/ability-links.ts";
+import { buildAbilityLinks, getEmbeddedAbilityReferences } from "../_shared/ability-links.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1241,6 +1241,7 @@ Deno.serve(async (req) => {
       // In Main bootstrap mode, entities receive new UUIDs directly.
       // In Branch mode, resolve current-Branch entities first, then Main/overlays.
       let existing: ExtractionEntityCandidate | null = null;
+      let persistedMainId: string | null = null;
 
       if (targetLayer === "branch") {
         existing = await findExistingEntity(
@@ -1249,6 +1250,21 @@ Deno.serve(async (req) => {
           body.user_id,
           targetBranchId!,
           entity,
+        );
+      }
+
+      if (targetLayer === "main" && (entity.entity_type === "ability" || entity.entity_type === "magic_ability")) {
+        // Embedded skills can be promoted in more than one batch. Reuse the
+        // Main row created earlier in this extraction run instead of creating
+        // duplicate ability entities.
+        persistedMainId = await findPersistedEntityId(
+          supabase,
+          body.project_id,
+          body.user_id,
+          null,
+          entity.canonical_name,
+          entity.entity_type,
+          entityIdEntries,
         );
       }
 
@@ -1356,6 +1372,8 @@ Deno.serve(async (req) => {
           entityId = existing.id;
           branchEntitiesSaved++;
         }
+      } else if (persistedMainId) {
+        entityId = persistedMainId;
       } else {
         // New entity: insert based on target layer
         const { data: inserted, error: insertError } = await supabase
@@ -1520,47 +1538,6 @@ Deno.serve(async (req) => {
         aliasesSaved++;
       }
 
-      // Create character → ability relationships (for characters extracted with abilities)
-      // This converts abilities from embedded data (in attributes) to first-class entities with relationships
-      if (entity.entity_type === "character" && Array.isArray(entity.attributes?.abilities) && entity.attributes.abilities.length > 0) {
-        for (const abilityName of entity.attributes.abilities) {
-          if (!abilityName || typeof abilityName !== "string") continue;
-
-          // Find the ability entity that was normalized from this extraction
-          const abilityId = findBatchEntityId(abilityName.trim(), entityIdEntries);
-          if (!abilityId) {
-            // Ability not in current batch (may be from prior extraction)
-            // Skip relationship creation; it may already exist
-            continue;
-          }
-
-          // Create or update the character → ability relationship
-          const { error: relError } = await supabase
-            .from("knowledge_entity_relationships")
-            .upsert(
-              {
-                project_id: body.project_id,
-                document_id: body.document_id,
-                version_id: body.version_id,
-                source_entity_id: entityId,
-                target_entity_id: abilityId,
-                relationship_type: "has_ability",
-                evidence: null,
-                chunk_position: entity.chunk_positions?.[0] || null,
-                raw_extraction_id: rawExtractionId,
-                branch_id: targetBranchId || null,
-                operation: "add",
-                review_status: targetLayer === "main" ? "approved" : "pending",
-                base_exists: false,
-              },
-              { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" }
-            );
-
-          if (relError) {
-            console.warn(`Failed to create character→ability relationship for '${entity.canonical_name}' → '${abilityName}':`, relError.message);
-          }
-        }
-      }
     }
 
     if (persistenceErrors.length > 0) {
