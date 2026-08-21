@@ -5,6 +5,7 @@ import {
 } from '../../../../../supabase/functions/extract-knowledge/normalization.ts'
 import {
   parseExtractionJson,
+  normalizeExtractionPayload,
   validateExtractionMode,
 } from '../../../../../supabase/functions/extract-knowledge/testable-pipeline.ts'
 import {
@@ -87,6 +88,31 @@ describe('Entity Extraction automatic checks (in-memory fixtures)', () => {
     expect(parseExtractionJson<{ characters: unknown[] }>('```json\n{"characters": []}\n```')).toEqual({ characters: [] })
     expect(parseExtractionJson<{ locations: unknown[] }>('Model response: {"locations": []} תודה')).toEqual({ locations: [] })
     expect(parseExtractionJson('{not valid json')).toBeNull()
+  })
+
+  it('[response normalization] maps generic entities while preserving events', () => {
+    const parsed = parseExtractionJson<unknown>(JSON.stringify({
+      data: {
+        entities: [
+          { name: 'ליאו פרוסט', entityType: 'person' },
+          { name: 'יער אירויין', kind: 'place' },
+          { name: 'רונת אש', category: 'magic ability' },
+        ],
+        events: [{ name: 'קרב ההרים' }],
+      },
+    }))
+
+    const extraction = normalizeExtractionPayload<typeof extractionFixture>(parsed)
+
+    expect(extraction?.characters).toHaveLength(1)
+    expect(extraction?.locations).toHaveLength(1)
+    expect(extraction?.magic_abilities).toHaveLength(1)
+    expect(extraction?.events).toEqual([{ name: 'קרב ההרים' }])
+    expect(normalizeEntities(extraction!, chunkFixture)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ canonical_name: 'ליאו פרוסט', entity_type: 'character' }),
+      expect.objectContaining({ canonical_name: 'יער אירויין', entity_type: 'location' }),
+      expect.objectContaining({ canonical_name: 'רונת אש', entity_type: 'magic_ability' }),
+    ]))
   })
 
   it('[normalization] strips nikud and ignores the Hebrew definite article in keys', () => {
