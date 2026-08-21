@@ -62,6 +62,41 @@
     background: hsl(var(--muted-foreground) / 0.5);
   }
 
+  /* A blue-silver light sweep over the active knowledge extraction panel. */
+  .extraction-progress-processing {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .extraction-progress-processing::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    background: linear-gradient(
+      110deg,
+      transparent 0%,
+      rgba(96, 165, 250, 0.08) 35%,
+      rgba(226, 232, 240, 0.8) 50%,
+      rgba(59, 130, 246, 0.1) 65%,
+      transparent 100%
+    );
+    background-size: 250% 100%;
+    background-position: 200% 0;
+    animation: extraction-progress-processing 2.5s ease-in-out infinite;
+  }
+
+  @keyframes extraction-progress-processing {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -50% 0;
+    }
+  }
+
   /* A green light sweep over the entire document tile while it is processing. */
   .document-tile-processing {
     position: relative;
