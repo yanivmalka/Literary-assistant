@@ -100,7 +100,7 @@ export default function CharactersHub({ projectId }: CharactersHubProps) {
             <div className="font-semibold text-lg mb-2">{t('branch.main')}</div>
             <p className="text-sm text-muted-foreground mb-4">{t('branch.mainDescription')}</p>
             <div className="text-2xl font-bold text-primary">
-              {characters.length}
+              {mainCharacters.length}
             </div>
             <p className="text-xs text-muted-foreground mt-1">{t('entities.types.character')}</p>
           </button>
@@ -121,7 +121,7 @@ export default function CharactersHub({ projectId }: CharactersHubProps) {
               </div>
               <p className="text-sm text-muted-foreground mb-4">{t('branch.branchDescription')}</p>
               <div className="text-2xl font-bold text-primary">
-                {characters.length}
+                {branchCharacters.length}
               </div>
               <p className="text-xs text-muted-foreground mt-1">{t('entities.types.character')}</p>
             </button>

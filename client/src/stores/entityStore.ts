@@ -52,7 +52,7 @@ interface EntityState {
   mainEntitiesCache: Entity[] | null
   branchEntitiesCache: Entity[] | null
 
-  fetchEntities: (projectId: string, filters?: { type?: string; status?: string }) => Promise<void>
+  fetchEntities: (projectId: string, filters?: { type?: string; status?: string }, profile?: ExtractionModelProfile) => Promise<void>
   fetchMergeSuggestions: (projectId: string) => Promise<void>
   confirmEntity: (projectId: string, entityId: string) => Promise<void>
   dismissEntity: (projectId: string, entityId: string) => Promise<void>
@@ -75,7 +75,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   mainEntitiesCache: null,
   branchEntitiesCache: null,
 
-  fetchEntities: async (projectId, filters) => {
+  fetchEntities: async (projectId, filters, profile = 'current') => {
     set({ loading: true })
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -107,6 +107,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         .select('id')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
+        .eq('profile', profile)
         .eq('is_current', true)
         .eq('status', 'active')
         .maybeSingle()

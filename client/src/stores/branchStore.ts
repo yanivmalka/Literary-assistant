@@ -176,7 +176,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
   // ==============================
   // Fetch the current active branch
   // ==============================
-  fetchCurrentBranch: async (projectId: string) => {
+  fetchCurrentBranch: async (projectId: string, profile = 'current') => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return null
@@ -186,7 +186,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
         .select('*')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
-        .eq('profile', 'current')
+        .eq('profile', profile)
         .eq('is_current', true)
         .eq('status', 'active')
         .maybeSingle()

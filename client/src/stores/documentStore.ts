@@ -453,6 +453,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         extractionInProgress: false,
         extractionDone: true,
       })
+      // The extraction and entity stores are independent; refresh the cache
+      // before the completion message is dismissed or the user opens Knowledge.
+      await useEntityStore.getState().fetchEntities(projectId, undefined, modelProfile)
       console.log('[Knowledge] Extraction complete')
     }
   },
