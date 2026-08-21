@@ -226,8 +226,32 @@ export async function callGeminiWithFallback(
       const latencyMs = Date.now() - startTime;
 
       if (response.ok) {
-        // Success
         const data = await response.json();
+        const candidates = (data as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> }).candidates || [];
+        const hasText = candidates.some((candidate) =>
+          (candidate.content?.parts || []).some((part) =>
+            typeof part.text === "string" && part.text.trim().length > 0,
+          ),
+        );
+
+        // A successful HTTP response can still be unusable (for example when
+        // the model is blocked or returns only metadata/thought parts). Treat
+        // that as a retriable model failure so another configured model gets
+        // a chance instead of returning an empty extraction as success.
+        if (!hasText) {
+          const reason = "Model returned no text candidate";
+          console.warn(`[Gemini Fallback] ${reason}: ${modelId}`);
+          fallbackChain.push({
+            model: modelId,
+            status: response.status,
+            error: reason,
+            reason: "empty model response",
+            timestampMs: Date.now(),
+          });
+          recordModelFailure(modelId);
+          continue;
+        }
+
         console.log(
           `[Gemini Fallback] Success with ${modelId} (${latencyMs}ms)`
         );

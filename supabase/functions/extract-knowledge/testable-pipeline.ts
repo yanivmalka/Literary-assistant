@@ -33,6 +33,83 @@ export function parseExtractionJson<T>(responseText: string): T | null {
   }
 }
 
+/**
+ * Normalize common model wrappers into the extraction contract expected by
+ * the persistence pipeline. Models sometimes wrap the JSON in `result`,
+ * `data`, or an `entities` array even when the prompt asks for top-level
+ * arrays. Returning null for an unknown shape prevents silent zero-entity
+ * successes.
+ */
+export function normalizeExtractionPayload<T>(payload: unknown): T | null {
+  if (Array.isArray(payload)) {
+    const grouped: Record<string, unknown[]> = {}
+    for (const item of payload) {
+      if (!item || typeof item !== 'object') continue
+      const record = item as Record<string, unknown>
+      const rawType = String(record.entity_type ?? record.type ?? '').toLowerCase()
+      const type = rawType === 'character' || rawType === 'person' || rawType === 'people'
+        ? 'characters'
+        : rawType === 'location' || rawType === 'place' || rawType === 'places'
+          ? 'locations'
+          : rawType === 'object' || rawType === 'item' || rawType === 'artifact'
+            ? 'objects'
+            : rawType === 'ability' || rawType === 'skill'
+              ? 'abilities'
+              : rawType === 'magic_ability' || rawType === 'magical_ability'
+                ? 'magic_abilities'
+                : rawType === 'organization' || rawType === 'group'
+                  ? 'organizations'
+                  : null
+      if (type) (grouped[type] ||= []).push(item)
+    }
+    return Object.keys(grouped).length > 0 ? grouped as T : null
+  }
+
+  if (!payload || typeof payload !== 'object') return null
+  const record = payload as Record<string, unknown>
+  const wrapperKeys = ['result', 'data', 'extraction', 'output', 'response', 'knowledge']
+  for (const wrapperKey of wrapperKeys) {
+    if (record[wrapperKey] && typeof record[wrapperKey] === 'object') {
+      const wrapped = normalizeExtractionPayload<T>(record[wrapperKey])
+      if (wrapped) return wrapped
+    }
+  }
+
+  const aliases: Record<string, string[]> = {
+    characters: ['characters', 'character', 'people', 'persons'],
+    locations: ['locations', 'location', 'places', 'place'],
+    objects: ['objects', 'object', 'items', 'artifacts'],
+    abilities: ['abilities', 'ability', 'skills'],
+    magic_abilities: ['magic_abilities', 'magicAbilities', 'magical_abilities'],
+    organizations: ['organizations', 'organization', 'groups'],
+    events: ['events', 'event'],
+    relationships: ['relationships', 'relationship'],
+  }
+  const normalized: Record<string, unknown[]> = {}
+  let recognized = false
+
+  for (const [targetKey, sourceKeys] of Object.entries(aliases)) {
+    const sourceKey = sourceKeys.find((key) => key in record)
+    if (!sourceKey) continue
+    const value = record[sourceKey]
+    normalized[targetKey] = Array.isArray(value) ? value : value == null ? [] : [value]
+    recognized = true
+  }
+
+  const entityList = record.entities
+  if (Array.isArray(entityList)) {
+    const grouped = normalizeExtractionPayload<Record<string, unknown[]>>(entityList)
+    if (grouped) {
+      for (const [key, values] of Object.entries(grouped)) {
+        normalized[key] = [...(normalized[key] || []), ...values]
+      }
+      recognized = true
+    }
+  }
+
+  return recognized ? normalized as T : null
+}
+
 /** Validates the same Main/Branch combinations accepted by the Edge Function. */
 export function validateExtractionMode(request: ExtractionModeRequest): ExtractionValidationResult {
   const mode = request.extraction_mode;

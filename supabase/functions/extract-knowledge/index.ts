@@ -41,7 +41,7 @@ import {
   type EntityResolutionRecord,
 } from "../_shared/entity-resolution.ts";
 import { normalizeEntities as normalizeEntitiesForExtraction } from "./normalization.ts";
-import { parseExtractionJson, validateExtractionMode } from "./testable-pipeline.ts";
+import { parseExtractionJson, normalizeExtractionPayload, validateExtractionMode } from "./testable-pipeline.ts";
 import { buildAbilityLinks } from "../_shared/ability-links.ts";
 
 const corsHeaders = {
