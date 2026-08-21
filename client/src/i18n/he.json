@@ -465,8 +465,8 @@
       "extractKnowledgeTitle": "חלץ ידע מהמסמך",
       "modelProfile": "מודל חילוץ",
       "modelProfiles": {
-        "legacy": "המודל הנוכחי",
-        "experimental": "מודל ניסיוני (זהה כרגע)"
+        "current": "המודל הפעיל",
+        "development": "מודל בפיתוח (זהה כרגע)"
       },
       "uploadNotAuthenticated": "יש להתחבר לפני העלאת מסמך",
       "uploadFailed": "העלאת המסמך נכשלה. נסה שוב.",

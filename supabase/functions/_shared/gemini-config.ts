@@ -10,11 +10,11 @@ export interface GeminiModelConfig {
   priority: number;
 }
 
-export type GeminiModelProfile = "legacy" | "experimental";
+export type GeminiModelProfile = "current" | "development";
 
 /**
- * Ordered list of Gemini models used by the current extraction behavior.
- * Keep this export unchanged for callers that use the legacy behavior.
+ * Ordered list of Gemini models used by the active extraction behavior.
+ * Keep this export unchanged for callers that use the current behavior.
  */
 export const GEMINI_MODELS: GeminiModelConfig[] = [
   { id: "gemini-3.5-flash", priority: 1 },
@@ -24,25 +24,25 @@ export const GEMINI_MODELS: GeminiModelConfig[] = [
 
 /**
  * Model profiles are intentionally separate so they can evolve independently.
- * Experimental currently mirrors legacy exactly; change only this profile when
- * developing a new extraction model or fallback chain.
+ * The development profile currently mirrors the active profile exactly; change
+ * only this profile when developing a new extraction model or fallback chain.
  */
 export const GEMINI_MODEL_PROFILES: Record<GeminiModelProfile, GeminiModelConfig[]> = {
-  legacy: GEMINI_MODELS,
-  experimental: [
+  current: GEMINI_MODELS,
+  development: [
     { id: "gemini-3.5-flash", priority: 1 },
     { id: "gemini-3.5-flash-lite", priority: 2 },
     { id: "gemini-2.5-flash", priority: 3 },
   ],
 };
 
-export const DEFAULT_MODEL_PROFILE: GeminiModelProfile = "legacy";
+export const DEFAULT_MODEL_PROFILE: GeminiModelProfile = "current";
 
 /** Default model to use (highest priority) */
 export const DEFAULT_MODEL = GEMINI_MODELS[0].id;
 
 export function isGeminiModelProfile(value: unknown): value is GeminiModelProfile {
-  return value === "legacy" || value === "experimental";
+  return value === "current" || value === "development";
 }
 
 /** Base URL for Gemini API */
