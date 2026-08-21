@@ -41,7 +41,9 @@
   "workspace": {
     "packageJson": {
       "dependencies": [
-        "npm:concurrently@^9.1.0"
+        "npm:@supabase/supabase-js@^2.112.3",
+        "npm:concurrently@^9.1.0",
+        "npm:puppeteer@^25.8.0"
       ]
     }
   }

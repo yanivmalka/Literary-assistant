@@ -30,7 +30,7 @@ describe('Auto-create Main/Branch for Extraction', () => {
       // The Main layer is considered initialized once it contains any real entities.
 
       const mainEmptyBefore = true  // No entities in Main
-      const useMainForFirstExtraction = !mainEmptyBefore
+      const useMainForFirstExtraction = mainEmptyBefore
 
       expect(mainEmptyBefore).toBe(true)
       expect(useMainForFirstExtraction).toBe(true)

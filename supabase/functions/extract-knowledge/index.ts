@@ -803,7 +803,7 @@ Deno.serve(async (req) => {
     // CRITICAL FIX: Use extraction_mode (set per extraction run) instead of checking per batch
     // ==============================
     const extractionMode = body.extraction_mode;
-    const extractionRunId = body.extraction_run_id;
+    const extractionRunId = body.extraction_run_id?.trim() || null;
     const modeValidation = validateExtractionMode(body);
     if (!modeValidation.ok) return errorResponse(`Invalid extraction mode: ${modeValidation.error}`, 400);
 
@@ -840,37 +840,62 @@ Deno.serve(async (req) => {
     let targetBranchId: string | null = null;
 
     if (extractionMode === 'bootstrap' || useMainForExtraction) {
-      // Bootstrap mode: All batches for this extraction run go to Main
-      // Note: This should only be called on the FIRST batch of a new extraction run
-      // The check below ensures Main is still empty (defensive check for unexpected conditions)
-      
-      const { data: mainEntities, error: mainCheckError } = await supabase
-        .from("knowledge_entities")
-        .select("id")
-        .eq("project_id", body.project_id)
-        .eq("user_id", authenticatedUser.id)
-        .eq("layer", "main")
-        .neq("canonical_name", "__bootstrap__")
-        .limit(1);
+      // Bootstrap mode: all batches from one extraction run write to Main.
+      // A prior raw extraction is the durable marker that this run already
+      // passed the empty-Main guard on its first batch.
+      let isBootstrapContinuation = false;
 
-      if (mainCheckError) {
-        return errorResponse(`Failed to check Main layer state: ${mainCheckError.message}`, 500);
+      if (extractionRunId) {
+        const { data: priorBatch, error: priorBatchError } = await supabase
+          .from("raw_extractions")
+          .select("id")
+          .eq("project_id", body.project_id)
+          .eq("document_id", body.document_id)
+          .eq("version_id", body.version_id)
+          .eq("user_id", authenticatedUser.id)
+          .eq("extraction_run_id", extractionRunId)
+          .is("branch_id", null)
+          .limit(1)
+          .maybeSingle();
+
+        if (priorBatchError) {
+          return errorResponse(`Failed to validate bootstrap extraction run: ${priorBatchError.message}`, 500);
+        }
+
+        isBootstrapContinuation = Boolean(priorBatch);
       }
 
-      if (mainEntities && mainEntities.length > 0) {
-        // Main already has entities - this batch should NOT go to Main
-        // This indicates a client-side error: extraction_mode was 'bootstrap' but Main isn't empty
-        return errorResponse(
-          "Bootstrap extraction mode rejected: Main layer already has entities. " +
-          "This may indicate a race condition or client error. " +
-          "Use extraction_mode='branch' for subsequent extractions.",
-          400
-        );
+      if (!isBootstrapContinuation) {
+        // Only a new bootstrap run must prove that Main is still empty.
+        const { data: mainEntities, error: mainCheckError } = await supabase
+          .from("knowledge_entities")
+          .select("id")
+          .eq("project_id", body.project_id)
+          .eq("user_id", authenticatedUser.id)
+          .eq("layer", "main")
+          .neq("canonical_name", "__bootstrap__")
+          .limit(1);
+
+        if (mainCheckError) {
+          return errorResponse(`Failed to check Main layer state: ${mainCheckError.message}`, 500);
+        }
+
+        if (mainEntities && mainEntities.length > 0) {
+          // A different/new bootstrap run cannot write to an initialized Main.
+          return errorResponse(
+            "Bootstrap extraction mode rejected: Main layer already has entities. " +
+            "Use extraction_mode='branch' for subsequent extractions.",
+            400
+          );
+        }
       }
 
       targetLayer = "main";
       targetBranchId = null;
-      console.log(`[extract-knowledge] Extraction run ${extractionRunId}: BOOTSTRAP mode - writing to Main`);
+      console.log(
+        `[extract-knowledge] Extraction run ${extractionRunId ?? "legacy"}: ` +
+        `BOOTSTRAP mode - writing to Main (${isBootstrapContinuation ? "continuation" : "initial batch"})`,
+      );
     } else {
       // Branch mode: All batches go to the specified active branch
       const { data: activeBranch, error: branchError } = await supabase
@@ -1019,6 +1044,7 @@ Deno.serve(async (req) => {
         version_id: body.version_id,
         user_id: body.user_id,
         branch_id: targetBranchId || null,  // null for Main bootstrap, branchId for Branch
+        extraction_run_id: extractionRunId,
         model: modelUsed,
         model_profile: modelProfile,
         raw_response: extraction,
