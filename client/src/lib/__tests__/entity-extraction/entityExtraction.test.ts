@@ -2,18 +2,18 @@ import { describe, expect, it } from 'vitest'
 import {
   normalizeEntities,
   type ExtractedEntity,
-} from '../../../../supabase/functions/extract-knowledge/normalization.ts'
+} from '../../../../../supabase/functions/extract-knowledge/normalization.ts'
 import {
   parseExtractionJson,
   validateExtractionMode,
-} from '../../../../supabase/functions/extract-knowledge/testable-pipeline.ts'
+} from '../../../../../supabase/functions/extract-knowledge/testable-pipeline.ts'
 import {
   applyEntityOverrides,
   resolveExtractionCandidate,
-} from '../../../../supabase/functions/_shared/entity-resolution.ts'
-import { normalizeKey, stripNikud } from '../../../../supabase/functions/_shared/rules/normalization.ts'
-import { shouldFilterEntity } from '../../../../supabase/functions/_shared/rules/filtering.ts'
-import { deduplicateBatchEntities } from '../../../../supabase/functions/_shared/entity-batch.ts'
+} from '../../../../../supabase/functions/_shared/entity-resolution.ts'
+import { normalizeKey, stripNikud } from '../../../../../supabase/functions/_shared/rules/normalization.ts'
+import { shouldFilterEntity } from '../../../../../supabase/functions/_shared/rules/filtering.ts'
+import { deduplicateBatchEntities } from '../../../../../supabase/functions/_shared/entity-batch.ts'
 import { extractionFixture, chunkFixture } from './fixtures/entityExtractionFixtures'
 import { FakeEntityRepository } from './fakeEntityRepository'
 
