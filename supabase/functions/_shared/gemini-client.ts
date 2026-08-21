@@ -6,6 +6,7 @@
 
 import {
   GEMINI_MODELS,
+  type GeminiModelConfig,
   GEMINI_API_BASE,
   MODEL_COOLDOWN_MS,
   COOLDOWN_FAILURE_THRESHOLD,
@@ -176,11 +177,15 @@ export async function callGeminiWithFallback(
   options?: {
     /** Override the timeout per request (ms). Default: 30000 */
     timeoutMs?: number;
+    /** Select a server-side allowlisted model profile. */
+    models?: GeminiModelConfig[];
   }
 ): Promise<GeminiCallResult | GeminiCallError> {
   const timeoutMs = options?.timeoutMs ?? 30_000;
   const fallbackChain: FallbackAttempt[] = [];
-  const modelsToTry = GEMINI_MODELS.slice().sort((a, b) => a.priority - b.priority);
+  const modelsToTry = (options?.models ?? GEMINI_MODELS)
+    .slice()
+    .sort((a, b) => a.priority - b.priority);
 
   for (let modelIndex = 0; modelIndex < modelsToTry.length; modelIndex++) {
     const modelId = modelsToTry[modelIndex].id;

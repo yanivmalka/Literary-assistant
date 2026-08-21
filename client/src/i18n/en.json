@@ -463,6 +463,11 @@
     "documents": {
       "extractKnowledge": "Extract",
       "extractKnowledgeTitle": "Extract knowledge from this document",
+      "modelProfile": "Extraction model",
+      "modelProfiles": {
+        "legacy": "Current model",
+        "experimental": "Experimental model (same for now)"
+      },
       "uploadNotAuthenticated": "Please log in before uploading a document",
       "uploadFailed": "The document upload failed. Please try again.",
       "extractionError": "Knowledge extraction failed. Please try again."

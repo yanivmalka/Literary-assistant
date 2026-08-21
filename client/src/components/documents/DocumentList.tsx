@@ -1,8 +1,14 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileText, Trash2, Brain, Loader2 } from 'lucide-react'
 import { useDocumentStore, type Document } from '@/stores/documentStore'
 import ProcessingStatus from './ProcessingStatus'
 import ExtractionProgress from './ExtractionProgress'
+import {
+  DEFAULT_EXTRACTION_MODEL_PROFILE,
+  EXTRACTION_MODEL_PROFILES,
+  type ExtractionModelProfile,
+} from '@/lib/extractionModels'
 
 interface DocumentListProps {
   projectId: string
@@ -21,6 +27,9 @@ const PROCESSING_STATUSES = new Set([
 
 export default function DocumentList({ projectId }: DocumentListProps) {
   const { t } = useTranslation()
+  const [selectedModelProfile, setSelectedModelProfile] = useState<ExtractionModelProfile>(
+    DEFAULT_EXTRACTION_MODEL_PROFILE,
+  )
   const {
     documents,
     deleteDocument,
@@ -62,7 +71,12 @@ export default function DocumentList({ projectId }: DocumentListProps) {
   const handleExtractKnowledge = async (doc: Document) => {
     if (!doc.latest_version || extractionInProgress) return
     console.log('[Knowledge] Manual extraction triggered for', doc.name)
-    await triggerEntityExtraction(doc.latest_version.id, projectId, doc.id)
+    await triggerEntityExtraction(
+      doc.latest_version.id,
+      projectId,
+      doc.id,
+      selectedModelProfile,
+    )
   }
 
   return (
@@ -91,23 +105,42 @@ export default function DocumentList({ projectId }: DocumentListProps) {
 
             <div className="flex items-center gap-1">
               {doc.latest_version?.status === 'ready' && (
-                <button
-                  onClick={() => handleExtractKnowledge(doc)}
-                  disabled={extractionInProgress}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-                    extractionInProgress
-                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                      : 'bg-green-50 text-green-700 hover:bg-green-100'
-                  }`}
-                  title={t('ui.documents.extractKnowledgeTitle')}
-                >
-                  {extractionInProgress && extractionDocumentId === doc.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Brain className="h-3.5 w-3.5" />
-                  )}
-                  {t('ui.documents.extractKnowledge')}
-                </button>
+                <>
+                  <label htmlFor={`extraction-model-${doc.id}`} className="sr-only">
+                    {t('ui.documents.modelProfile')}
+                  </label>
+                  <select
+                    id={`extraction-model-${doc.id}`}
+                    value={selectedModelProfile}
+                    onChange={event => setSelectedModelProfile(event.target.value as ExtractionModelProfile)}
+                    disabled={extractionInProgress}
+                    className="max-w-36 rounded border bg-background px-2 py-1 text-xs text-foreground disabled:opacity-50"
+                    title={t('ui.documents.modelProfile')}
+                  >
+                    {EXTRACTION_MODEL_PROFILES.map(profile => (
+                      <option key={profile} value={profile}>
+                        {t(`ui.documents.modelProfiles.${profile}`)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => handleExtractKnowledge(doc)}
+                    disabled={extractionInProgress}
+                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                      extractionInProgress
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-green-50 text-green-700 hover:bg-green-100'
+                    }`}
+                    title={t('ui.documents.extractKnowledgeTitle')}
+                  >
+                    {extractionInProgress && extractionDocumentId === doc.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Brain className="h-3.5 w-3.5" />
+                    )}
+                    {t('ui.documents.extractKnowledge')}
+                  </button>
+                </>
               )}
               <button
                 onClick={() => handleDelete(doc.id)}

@@ -22,7 +22,13 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callGeminiWithFallback } from "../_shared/gemini-client.ts";
-import { DEFAULT_MODEL } from "../_shared/gemini-config.ts";
+import {
+  DEFAULT_MODEL,
+  DEFAULT_MODEL_PROFILE,
+  GEMINI_MODEL_PROFILES,
+  isGeminiModelProfile,
+  type GeminiModelProfile,
+} from "../_shared/gemini-config.ts";
 import { buildExtractionPrompt } from "../_shared/rules/prompt.ts";
 import { normalizeKey, stripNikud } from "../_shared/rules/normalization.ts";
 import { shouldFilterEntity } from "../_shared/rules/filtering.ts";
@@ -59,6 +65,8 @@ interface ExtractRequest {
   // CRITICAL FIX: Extraction-level context instead of per-batch decisions
   extraction_mode?: 'bootstrap' | 'branch';
   extraction_run_id?: string;
+  /** Server-side allowlisted model profile, fixed for every batch in a run. */
+  model_profile?: GeminiModelProfile;
 }
 
 interface ExtractedEntity {
@@ -783,6 +791,11 @@ Deno.serve(async (req) => {
       return errorResponse("Missing required fields: version_id, project_id, document_id, user_id.", 400);
     }
 
+    const modelProfile = body.model_profile ?? DEFAULT_MODEL_PROFILE;
+    if (!isGeminiModelProfile(modelProfile)) {
+      return errorResponse("Invalid model_profile. Choose a supported extraction model.", 400);
+    }
+
     // ==============================
     // Validation: Main vs Branch extraction mode
     // CRITICAL FIX: Use extraction_mode (set per extraction run) instead of checking per batch
@@ -904,7 +917,7 @@ Deno.serve(async (req) => {
       return errorResponse("GEMINI_API_KEY not configured", 500);
     }
 
-    console.log(`[extract-knowledge] Version: 2.5.0 | Layer: ${targetLayer} | Auth: OK`);
+    console.log(`[extract-knowledge] Version: 2.5.0 | Layer: ${targetLayer} | Model profile: ${modelProfile} | Auth: OK`);
 
     const offset = body.offset ?? 0;
     const limit = body.limit ?? BATCH_SIZE;
@@ -964,7 +977,10 @@ Deno.serve(async (req) => {
         },
       },
       geminiApiKey,
-      { timeoutMs: 60_000 }
+      {
+        timeoutMs: 60_000,
+        models: GEMINI_MODEL_PROFILES[modelProfile],
+      }
     );
 
     if (!geminiResult.success) {
@@ -985,7 +1001,7 @@ Deno.serve(async (req) => {
       console.error(`[extract-knowledge] Empty response from ${modelUsed}.`);
       const done = chunks.length < limit;
       return new Response(
-        JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, latency_ms: latencyMs }, summary: { entities_saved: 0, normalized_entity_count: 0 } }),
+        JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, model_profile: modelProfile, latency_ms: latencyMs }, summary: { entities_saved: 0, normalized_entity_count: 0 } }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -1016,7 +1032,7 @@ Deno.serve(async (req) => {
         console.warn(`[extract-knowledge] Skipping batch offset=${offset}: unparseable JSON`);
         const done = chunks.length < limit;
         return new Response(
-          JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, latency_ms: latencyMs, skipped: true }, summary: { entities_saved: 0, skipped_parse_error: true } }),
+          JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, model_profile: modelProfile, latency_ms: latencyMs, skipped: true }, summary: { entities_saved: 0, skipped_parse_error: true } }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -1034,6 +1050,7 @@ Deno.serve(async (req) => {
         user_id: body.user_id,
         branch_id: targetBranchId || null,  // null for Main bootstrap, branchId for Branch
         model: modelUsed,
+        model_profile: modelProfile,
         raw_response: extraction,
         input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
         output_tokens: (usage as Record<string, unknown>).candidatesTokenCount ?? null,
@@ -1566,6 +1583,7 @@ Deno.serve(async (req) => {
         next_offset: offset + limit,
         telemetry: {
           model: modelUsed,
+          model_profile: modelProfile,
           input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
           output_tokens: (usage as Record<string, unknown>).candidatesTokenCount ?? null,
           total_tokens: (usage as Record<string, unknown>).totalTokenCount ?? null,

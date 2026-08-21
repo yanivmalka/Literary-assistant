@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import { buildExtractionRequest, hasMainEntities, getOrCreateActiveBranch } from '@/lib/extractionBranching'
+import { DEFAULT_EXTRACTION_MODEL_PROFILE, type ExtractionModelProfile } from '@/lib/extractionModels'
 
 export interface DocumentVersion {
   id: string
@@ -52,7 +53,7 @@ interface DocumentState {
   fetchDocuments: (projectId: string) => Promise<void>
   uploadDocument: (projectId: string, file: File, documentId?: string) => Promise<{ success: boolean; error?: string }>
   deleteDocument: (projectId: string, documentId: string) => Promise<void>
-  triggerEntityExtraction: (versionId: string, projectId: string, documentId: string) => Promise<void>
+  triggerEntityExtraction: (versionId: string, projectId: string, documentId: string, modelProfile?: ExtractionModelProfile) => Promise<void>
   cancelExtraction: () => void
   dismissExtractionStatus: () => void
   startPolling: (projectId: string) => void
@@ -269,7 +270,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     }
   },
 
-  triggerEntityExtraction: async (versionId: string, projectId: string, documentId: string) => {
+  triggerEntityExtraction: async (
+    versionId: string,
+    projectId: string,
+    documentId: string,
+    modelProfile: ExtractionModelProfile = DEFAULT_EXTRACTION_MODEL_PROFILE,
+  ) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -380,6 +386,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             // CRITICAL: Add extraction-level context
             extraction_mode: extractionMode,
             extraction_run_id: extractionRunId,
+            // Keep the selected profile constant across every batch in this run.
+            model_profile: modelProfile,
           },
         })
 
