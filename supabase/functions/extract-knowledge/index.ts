@@ -919,10 +919,21 @@ Deno.serve(async (req) => {
       .order("position", { ascending: true })
       .range(offset, offset + limit - 1);
 
-    if (chunksError || !chunks || chunks.length === 0) {
-      return new Response(
-        JSON.stringify({ success: true, done: true, saved: 0, entities_found: 0, next_offset: offset }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    if (chunksError) {
+      console.error(`[extract-knowledge] Failed to load chunks for version ${body.version_id}:`, chunksError.message);
+      return errorResponse(
+        `Failed to load document chunks: ${chunksError.message}`,
+        500,
+        `version_id=${body.version_id}`,
+      );
+    }
+
+    if (!chunks || chunks.length === 0) {
+      console.error(`[extract-knowledge] No document chunks found for version ${body.version_id} at offset ${offset}.`);
+      return errorResponse(
+        "No document chunks found. Wait for document processing to finish, then retry extraction.",
+        422,
+        `version_id=${body.version_id}, offset=${offset}`,
       );
     }
 
