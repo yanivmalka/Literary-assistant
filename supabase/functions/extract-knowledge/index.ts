@@ -1094,7 +1094,7 @@ Deno.serve(async (req) => {
     }
     // ================================================
 
-    const normalizedEntities = normalizeEntities(extraction, chunkLookup);
+    const normalizedEntities = normalizeEntitiesForExtraction(extraction, chunkLookup);
     const entityIdEntries: Array<{ entity: NormalizedEntity; id: string }> = [];
     let entitiesSaved = 0;
     let mentionsSaved = 0;
