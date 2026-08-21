@@ -11,6 +11,7 @@
 
 import { supabase } from '@/lib/supabase'
 import { LEGACY_BOOTSTRAP_CANONICAL_NAME } from '@/lib/mainLayer'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
 
 export interface BranchEntityData {
   canonical_name: string
@@ -167,7 +168,10 @@ export function buildExtractionRequest(
  * 
  * @throws Error if no active branch exists
  */
-export async function getActiveBranch(projectId: string) {
+export async function getActiveBranch(
+  projectId: string,
+  profile: ExtractionModelProfile = 'current',
+) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     throw new Error('Not authenticated')
@@ -178,6 +182,7 @@ export async function getActiveBranch(projectId: string) {
     .select('*')
     .eq('project_id', projectId)
     .eq('user_id', user.id)
+    .eq('profile', profile)
     .eq('is_current', true)
     .eq('status', 'active')
     .maybeSingle()
@@ -749,7 +754,10 @@ export async function hasMainEntities(projectId: string): Promise<boolean> {
  * Uses is_current=true + status=active uniqueness to prevent duplicate active branches.
  * If concurrent attempts: RLS + constraints ensure only one active branch.
  */
-export async function getOrCreateActiveBranch(projectId: string): Promise<{ id: string }> {
+export async function getOrCreateActiveBranch(
+  projectId: string,
+  profile: ExtractionModelProfile = 'current',
+): Promise<{ id: string }> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
@@ -759,6 +767,7 @@ export async function getOrCreateActiveBranch(projectId: string): Promise<{ id: 
     .select('id')
     .eq('project_id', projectId)
     .eq('user_id', user.id)
+    .eq('profile', profile)
     .eq('is_current', true)
     .eq('status', 'active')
     .maybeSingle()
@@ -775,7 +784,8 @@ export async function getOrCreateActiveBranch(projectId: string): Promise<{ id: 
   // No active branch exists. Try to create one.
   // If race condition: another client creates it first, we'll get "duplicate" error
   // In that case, re-fetch to get the newly created branch
-  const branchName = `Branch ${new Date().toLocaleDateString(navigator.language === 'he' ? 'he-IL' : 'en-US')}`
+  const profileLabel = profile === 'development' ? 'Development' : 'Current'
+  const branchName = `${profileLabel} Branch ${new Date().toLocaleDateString(navigator.language === 'he' ? 'he-IL' : 'en-US')}`
 
   const { data: created, error: createError } = await supabase
     .from('knowledge_branches')
@@ -783,6 +793,7 @@ export async function getOrCreateActiveBranch(projectId: string): Promise<{ id: 
       project_id: projectId,
       user_id: user.id,
       name: branchName,
+      profile,
       status: 'active',
       is_current: true,
     })
@@ -798,6 +809,7 @@ export async function getOrCreateActiveBranch(projectId: string): Promise<{ id: 
       .select('id')
       .eq('project_id', projectId)
       .eq('user_id', user.id)
+      .eq('profile', profile)
       .eq('is_current', true)
       .eq('status', 'active')
       .maybeSingle()

@@ -179,3 +179,30 @@ TEXT:
 ${chunksText}`;
 }
 
+
+
+export type ExtractionPromptProfile = "current" | "development";
+
+/**
+ * Profile-aware prompt entry point.
+ * The shared extraction contract remains identical initially, while the
+ * development profile has an isolated instruction section that can evolve
+ * without changing current. Promotion should transfer reviewed results, not
+ * prompt behavior or raw model output automatically.
+ */
+export function buildExtractionPromptForProfile(
+  chunks: { position: number; content: string }[],
+  profile: ExtractionPromptProfile,
+): string {
+  const basePrompt = buildExtractionPrompt(chunks);
+
+  if (profile === "current") {
+    return basePrompt;
+  }
+
+  return `${basePrompt}
+
+=== DEVELOPMENT PROFILE INSTRUCTIONS ===
+This is the development extraction profile. Keep the same JSON schema and evidence requirements as the active profile, but this section is intentionally isolated so development-specific extraction instructions can evolve without changing the active profile.
+`;
+}

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import i18n from '@/i18n'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import {
   getEffectiveBranchView,
   applyFieldOverride,
@@ -20,6 +21,7 @@ export interface Branch {
   project_id: string
   user_id: string
   name: string
+  profile: ExtractionModelProfile
   status: 'active' | 'archived' | 'merged'
   is_current: boolean
   created_at: string
@@ -164,7 +166,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
       }
 
       const branches = (data || []) as Branch[]
-      const current = branches.find(b => b.is_current && b.status === 'active') || null
+      const current = branches.find(b => b.profile === 'current' && b.is_current && b.status === 'active') || null
       set({ branches, currentBranch: current })
     } catch (err) {
       console.error('Failed to fetch branches:', err)
@@ -184,6 +186,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
         .select('*')
         .eq('project_id', projectId)
         .eq('user_id', user.id)
+        .eq('profile', 'current')
         .eq('is_current', true)
         .eq('status', 'active')
         .maybeSingle()

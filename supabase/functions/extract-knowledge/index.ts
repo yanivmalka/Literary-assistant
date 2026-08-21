@@ -29,7 +29,7 @@ import {
   isGeminiModelProfile,
   type GeminiModelProfile,
 } from "../_shared/gemini-config.ts";
-import { buildExtractionPrompt } from "../_shared/rules/prompt.ts";
+import { buildExtractionPromptForProfile } from "../_shared/rules/prompt.ts";
 import { normalizeKey, stripNikud } from "../_shared/rules/normalization.ts";
 import { shouldFilterEntity } from "../_shared/rules/filtering.ts";
 import { isPrefixMatch, scoreConsolidation, CONSOLIDATION_THRESHOLDS } from "../_shared/rules/consolidation.ts";
@@ -171,8 +171,11 @@ interface GeminiExtraction {
 // Prompt — delegates to centralized rules
 // ============================================
 
-function buildPrompt(chunks: { position: number; content: string }[]): string {
-  return buildExtractionPrompt(chunks);
+function buildPrompt(
+  chunks: { position: number; content: string }[],
+  profile: GeminiModelProfile,
+): string {
+  return buildExtractionPromptForProfile(chunks, profile);
 }
 
 // ============================================
@@ -808,6 +811,10 @@ Deno.serve(async (req) => {
     const modeValidation = validateExtractionMode(body);
     if (!modeValidation.ok) return errorResponse(`Invalid extraction mode: ${modeValidation.error}`, 400);
 
+    if (modelProfile === 'development' && modeValidation.mode !== 'branch') {
+      return errorResponse("Development extraction must use a dedicated Branch.", 400);
+    }
+
     // For backward compatibility, fall back to legacy behavior if extraction_mode not provided
     const useMainForExtraction = modeValidation.mode === 'bootstrap';
     const hasBranchId = !!body.target_branch_id;
@@ -855,6 +862,7 @@ Deno.serve(async (req) => {
           .eq("version_id", body.version_id)
           .eq("user_id", authenticatedUser.id)
           .eq("extraction_run_id", extractionRunId)
+          .eq("model_profile", modelProfile)
           .is("branch_id", null)
           .limit(1)
           .maybeSingle();
@@ -901,10 +909,11 @@ Deno.serve(async (req) => {
       // Branch mode: All batches go to the specified active branch
       const { data: activeBranch, error: branchError } = await supabase
         .from("knowledge_branches")
-        .select("id")
+        .select("id, profile")
         .eq("id", body.target_branch_id)
         .eq("project_id", body.project_id)
         .eq("user_id", authenticatedUser.id)
+        .eq("profile", modelProfile)
         .eq("is_current", true)
         .eq("status", "active")
         .maybeSingle();
@@ -914,12 +923,42 @@ Deno.serve(async (req) => {
       }
 
       if (!activeBranch) {
-        return errorResponse("Extraction rejected: target_branch_id is not the active Branch for this project.", 400);
+        return errorResponse(
+          `Extraction rejected: target_branch_id is not an active ${modelProfile} Branch for this project.`,
+          400,
+        );
       }
 
       targetLayer = "branch";
       targetBranchId = activeBranch.id;
       console.log(`[extract-knowledge] Extraction run ${extractionRunId}: BRANCH mode - writing to branch ${activeBranch.id}`);
+    }
+
+    if (extractionRunId) {
+      const { data: priorRun, error: priorRunError } = await supabase
+        .from("raw_extractions")
+        .select("document_id, version_id, branch_id, model_profile")
+        .eq("project_id", body.project_id)
+        .eq("user_id", authenticatedUser.id)
+        .eq("extraction_run_id", extractionRunId)
+        .limit(1)
+        .maybeSingle();
+
+      if (priorRunError) {
+        return errorResponse(`Failed to validate extraction run lineage: ${priorRunError.message}`, 500);
+      }
+
+      if (priorRun && (
+        priorRun.document_id !== body.document_id ||
+        priorRun.version_id !== body.version_id ||
+        priorRun.branch_id !== targetBranchId ||
+        priorRun.model_profile !== modelProfile
+      )) {
+        return errorResponse(
+          "Extraction run rejected: profile, Branch, document, or version does not match the existing run.",
+          400,
+        );
+      }
     }
 
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
@@ -974,7 +1013,7 @@ Deno.serve(async (req) => {
     // ==============================
     // Step 2: Call Gemini (with multi-model fallback)
     // ==============================
-    const prompt = buildPrompt(chunkData);
+    const prompt = buildPrompt(chunkData, modelProfile);
     const totalChars = chunkData.reduce((sum, c) => sum + c.content.length, 0);
 
     const geminiResult = await callGeminiWithFallback(

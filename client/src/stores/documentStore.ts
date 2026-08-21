@@ -289,15 +289,15 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       // or all go to the same branch.
       const mainExists = await hasMainEntities(projectId)
 
-      if (!mainExists) {
-        // Bootstrap mode: first extraction will initialize Main with all batches
+      if (!mainExists && modelProfile === 'current') {
+        // Current profile may initialize Main on the first extraction.
         extractionMode = 'bootstrap'
         console.log('[Knowledge] Extraction mode: BOOTSTRAP - initializing Main layer with complete extraction')
       } else {
-        // Branch mode: all batches go to active branch/overlay
+        // Development is always isolated in its profile-specific Branch.
         extractionMode = 'branch'
-        console.log('[Knowledge] Extraction mode: BRANCH')
-        activeBranch = await getOrCreateActiveBranch(projectId)
+        console.log(`[Knowledge] Extraction mode: BRANCH (${modelProfile})`)
+        activeBranch = await getOrCreateActiveBranch(projectId, modelProfile)
       }
 
       // Generate extraction run ID for cross-batch resolution
