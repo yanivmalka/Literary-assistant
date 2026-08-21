@@ -1862,6 +1862,23 @@ Deno.serve(async (req) => {
       }
     }
 
+    const persistedItemCount = entitiesSaved + abilityRelationshipsSaved + relationshipsSaved + eventsSaved;
+    if (persistedItemCount === 0) {
+      const message = "Extraction produced no persistable entities, relationships, or events.";
+      const details = [
+        `normalized_entity_count=${normalizedEntities.length}`,
+        `entities_in_payload=${extraction.characters?.length || 0}`,
+        `locations_in_payload=${extraction.locations?.length || 0}`,
+        `objects_in_payload=${extraction.objects?.length || 0}`,
+        `abilities_in_payload=${(extraction.abilities?.length || 0) + (extraction.magic_abilities?.length || 0)}`,
+        `relationships_in_payload=${extraction.relationships?.length || 0}`,
+        `events_in_payload=${extraction.events?.length || 0}`,
+        `raw_extraction_id=${rawExtractionId}`,
+      ].join(", ");
+      console.error(`[extract-knowledge] ${message} ${details}`);
+      return errorResponse(message, 422, details);
+    }
+
     // ==============================
     // Step 8: Return result
     // ==============================

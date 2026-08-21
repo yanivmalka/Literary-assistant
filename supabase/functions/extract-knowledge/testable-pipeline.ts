@@ -208,7 +208,7 @@ function normalizeCanonicalPayload(record: Record<string, unknown>): Record<stri
   for (const entity of record.entities) {
     const legacy = canonicalEntityToLegacy(entity as unknown as Record<string, unknown>)
     if (!legacy) continue
-    const type = String(legacy.type).toLowerCase().replace(/[\\s-]+/g, '_')
+    const type = String(legacy.type).toLowerCase().replace(/[\s-]+/g, '_')
     const bucket = normalizeExtractionType(type)
     if (bucket && bucket !== 'events' && bucket !== 'relationships') (grouped[bucket] ||= []).push(legacy)
   }
