@@ -18,6 +18,58 @@ interface Ability {
   type: 'ability' | 'magic_ability'
 }
 
+function readAbilityName(value: unknown): { name: string; description?: string } | null {
+  if (typeof value === 'string' && value.trim()) return { name: value.trim() }
+  if (!value || typeof value !== 'object') return null
+
+  const record = value as Record<string, unknown>
+  const name = ['name', 'ability', 'skill', 'title', 'canonical_name']
+    .map(key => record[key])
+    .find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)
+  if (!name) return null
+
+  return {
+    name: name.trim(),
+    description: typeof record.description === 'string' ? record.description : undefined,
+  }
+}
+
+function getEmbeddedAbilities(character: Entity): Ability[] {
+  const attributes = {
+    ...(character.structured_fields || {}),
+    ...(character.attributes || {}),
+  } as Record<string, unknown>
+  const result: Ability[] = []
+  const seen = new Set<string>()
+
+  const collect = (
+    keys: string[],
+    type: Ability['type'],
+  ) => {
+    for (const key of keys) {
+      const raw = attributes[key]
+      const values = Array.isArray(raw) ? raw : raw == null ? [] : [raw]
+      for (const value of values) {
+        const parsed = readAbilityName(value)
+        if (!parsed) continue
+        const identity = `${type}:${parsed.name.trim().toLocaleLowerCase()}`
+        if (seen.has(identity)) continue
+        seen.add(identity)
+        result.push({
+          id: `embedded-${type}-${result.length}`,
+          name: parsed.name,
+          description: parsed.description,
+          type,
+        })
+      }
+    }
+  }
+
+  collect(['abilities', 'life_skills', 'skills', 'physical_abilities', 'physicalAbilities'], 'ability')
+  collect(['magic_abilities', 'magic_skills', 'magicAbilities'], 'magic_ability')
+  return result
+}
+
 export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProps) {
   const { t } = useTranslation()
   const [selectedCategory, setSelectedCategory] = useState<AbilityCategory | null>(null)
@@ -33,8 +85,15 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
   const loadAbilities = async () => {
     try {
       setLoading(true)
+      const embeddedAbilities = getEmbeddedAbilities(character)
+      const setEmbeddedState = () => {
+        setAbilities(embeddedAbilities.filter(ability => ability.type === 'ability'))
+        setMagicAbilities(embeddedAbilities.filter(ability => ability.type === 'magic_ability'))
+      }
       
-      // Query relationships for this character
+      // Query relationships for this character. Relationships are canonical;
+      // embedded attributes are used only as a backward-compatible fallback
+      // for extractions created before abilities became first-class entities.
       const { data: relationships, error: relError } = await supabase
         .from('knowledge_entity_relationships')
         .select('target_entity_id, relationship_type')
@@ -43,12 +102,12 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
 
       if (relError) {
         console.error('Failed to fetch relationships:', relError)
+        setEmbeddedState()
         return
       }
 
       if (!relationships || relationships.length === 0) {
-        setAbilities([])
-        setMagicAbilities([])
+        setEmbeddedState()
         return
       }
 
@@ -61,12 +120,12 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
 
       if (entError) {
         console.error('Failed to fetch ability entities:', entError)
+        setEmbeddedState()
         return
       }
 
-      if (!abilityEntities) {
-        setAbilities([])
-        setMagicAbilities([])
+      if (!abilityEntities || abilityEntities.length === 0) {
+        setEmbeddedState()
         return
       }
 
@@ -93,6 +152,8 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
       setMagicAbilities(magicSkills)
     } catch (error) {
       console.error('Error loading abilities:', error)
+      setAbilities(getEmbeddedAbilities(character).filter(ability => ability.type === 'ability'))
+      setMagicAbilities(getEmbeddedAbilities(character).filter(ability => ability.type === 'magic_ability'))
     } finally {
       setLoading(false)
     }
