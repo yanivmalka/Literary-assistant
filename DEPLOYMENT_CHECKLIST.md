@@ -8,7 +8,7 @@
 ## Pre-Deployment Verification
 
 ### Database Migrations
-Apply all migrations in `supabase/migrations/` in numeric order. The current extraction function requires migrations 115-120 in addition to the earlier knowledge-extraction migrations.
+Apply all migrations in `supabase/migrations/` in numeric order. The current extraction function requires migrations 115-121 in addition to the earlier knowledge-extraction migrations.
 
 - [ ] Migration 112 deployed (`add_mentions_provenance.sql`)
   - [ ] `mentions.chunk_id` added with FK to `document_chunks.id`
@@ -56,7 +56,9 @@ Apply all migrations in `supabase/migrations/` in numeric order. The current ext
     ```
     Expected: both columns are returned.
 
-### Code Deployment
+- [ ] Migration 121 deployed (`set_current_model_profile_default.sql`)
+  - [ ] New raw extraction rows default to `model_profile = 'current'`
+
 - [ ] `supabase/functions/_shared/extraction-state.ts` deployed
   - [ ] ExtractionRunState interface accessible
   - [ ] findPriorBatchEntity() function available
@@ -329,7 +331,7 @@ If critical issues occur:
 **Recommended:** Deploy during low-traffic period (e.g., early morning UTC)
 
 - [ ] Pre-deployment: Backup database
-- [ ] Deploy migrations (112-120, in numeric order)
+- [ ] Deploy migrations (112-121, in numeric order)
 - [ ] Deploy function updates
 - [ ] Deploy client updates
 - [ ] Run post-deployment tests

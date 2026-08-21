@@ -18,7 +18,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 ## 3. Run Migrations
 
-Run every file in `supabase/migrations/` in numeric order in the Supabase SQL Editor (or with the Supabase CLI). Do not deploy the Edge Functions until the migrations have completed. In particular, the current extraction flow requires migrations 115-120, including `120_reconcile_extraction_metadata.sql`, which repairs environments where the function was deployed before the extraction metadata schema.
+Run every file in `supabase/migrations/` in numeric order in the Supabase SQL Editor (or with the Supabase CLI). Do not deploy the Edge Functions until the migrations have completed. In particular, the current extraction flow requires migrations 115-121, including `120_reconcile_extraction_metadata.sql` and `121_set_current_model_profile_default.sql`, which repair environments where the function was deployed before the extraction metadata schema.
 
 Afterward, verify the columns required by the extraction function:
 
