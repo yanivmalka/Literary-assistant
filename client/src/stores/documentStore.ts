@@ -362,6 +362,15 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       },
     })
 
+    if (total === 0) {
+      console.error('[DIAGNOSTIC] triggerEntityExtraction() - No document chunks available for extraction - versionId:', versionId)
+      set({
+        extractionInProgress: false,
+        extractionError: 'ui.documents.extractionError',
+      })
+      return
+    }
+
     let totalEntities = 0
     let totalEvents = 0
     let totalPersisted = 0
@@ -422,8 +431,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           break
         }
 
-        done = data.done
-        offset = data.next_offset
+        const nextOffset = Number(data.next_offset ?? offset + BATCH_SIZE)
+        // The server historically marks a full final batch as done=false because
+        // it cannot distinguish it from a non-final full batch. Use the exact
+        // chunk count already queried above to avoid requesting an empty batch.
+        done = Boolean(data.done) || nextOffset >= total
+        offset = nextOffset
 
         const summary = data.summary ?? {}
         const batchEntities = Number(summary.entities_saved ?? 0)
