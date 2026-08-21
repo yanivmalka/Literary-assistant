@@ -11,13 +11,15 @@ from pathlib import Path
 from datetime import datetime
 import subprocess
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 # Supabase credentials (anon key - for extraction trigger only)
 SUPABASE_URL = "https://lqfqfzqcrqluxanhnjwu.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxZnFmenFjcnFsdXhhbmhuand1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NTgwODEsImV4cCI6MjEwMjUzNDA4MX0.D27T3yEG8rbp7eQMKxG-L7Z62PPaKzDYD3q4SCLjoww"
 
 # Test project
 TEST_PROJECT_ID = "6c4b7b92-214a-4785-ad66-e62527ee68d6"
-TEST_DOCUMENT_PATH = "CONTROLLED_TEST_DOCUMENT.md"
+TEST_DOCUMENT_PATH = PROJECT_ROOT / "tests" / "fixtures" / "CONTROLLED_TEST_DOCUMENT.md"
 
 def run_command(cmd, description):
     """Run a shell command and return output"""
@@ -32,7 +34,7 @@ def query_database(query, description):
     """Query the database via Supabase CLI"""
     print(f"\n📌 {description}...")
     cmd = f'supabase db query --linked "{query}"'
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd="c:\\Users\\yanivm\\Literary assistant")
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=PROJECT_ROOT)
     
     if result.returncode != 0:
         print(f"⚠️  Query failed: {result.stderr[:200]}")
@@ -45,7 +47,7 @@ def main():
     print("CONTROLLED EXTRACTION VERIFICATION TEST")
     print("=" * 80)
     print(f"\nTest Project: {TEST_PROJECT_ID}")
-    print(f"Test Document: {TEST_DOCUMENT_PATH}")
+    print(f"Test Document: {TEST_DOCUMENT_PATH.relative_to(PROJECT_ROOT)}")
     print(f"Execution Time: {datetime.now().isoformat()}")
     print(f"Commit: 8597629")
     
@@ -277,8 +279,9 @@ def main():
        - Check: All branch_id = NULL (first extraction)
        - Expected: No overlays in knowledge_branch_entities
     
-    For detailed verification, run the SQL queries from CONTROLLED_TEST_DOCUMENT.md
-    and compare results to expected outcomes.
+    For detailed verification, run the SQL queries from
+    supabase/sql/verification/../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql and compare
+    results to expected outcomes.
     """)
     
     return True

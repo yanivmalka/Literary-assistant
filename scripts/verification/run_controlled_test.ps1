@@ -13,7 +13,8 @@ param(
     [string]$DocumentId = ""
 )
 
-$OutputDir = "./CONTROLLED_TEST_OUTPUT"
+$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+$OutputDir = Join-Path $ProjectRoot "tests/results/CONTROLLED_TEST_OUTPUT"
 if (-not (Test-Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir | Out-Null
 }

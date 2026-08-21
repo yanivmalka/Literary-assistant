@@ -6,7 +6,7 @@ Queries the Supabase database to verify test results
 
 import os
 import sys
-import json
+from pathlib import Path
 from typing import Optional, Dict, List, Any
 
 try:
@@ -19,6 +19,8 @@ except ImportError:
 # Configuration
 SUPABASE_URL = "https://lqfqfzqcrqluxanhnjwu.supabase.co"
 PROJECT_ID = "6c4b7b92-214a-4785-ad66-e62527ee68d6"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+REPORT_PATH = PROJECT_ROOT / "tests" / "results" / "VERIFICATION_REPORT.json"
 
 def init_client() -> Optional[Client]:
     """Initialize Supabase client"""
@@ -575,11 +577,12 @@ def main():
     
     report = generate_report(results)
     
-    # Save report
-    with open('VERIFICATION_REPORT.json', 'w') as f:
+    # Save report in the repository's test-results directory
+    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with REPORT_PATH.open('w', encoding='utf-8') as f:
         json.dump(report, f, indent=2)
     
-    print(f"\n📄 Report saved to VERIFICATION_REPORT.json")
+    print(f"\n📄 Report saved to {REPORT_PATH}")
     
     sys.exit(0 if report['failed'] == 0 else 1)
 

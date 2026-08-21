@@ -24,9 +24,12 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const projectRoot = path.resolve(__dirname, '../..');
+const testDocumentPath = path.join(projectRoot, 'tests', 'fixtures', 'CONTROLLED_TEST_DOCUMENT.md');
+const resultsDirectory = path.join(projectRoot, 'tests', 'results', 'EXTRACTION_TEST_OUTPUT');
 
 async function readTestDocument() {
-  const docPath = path.join(__dirname, 'CONTROLLED_TEST_DOCUMENT.md');
+  const docPath = testDocumentPath;
   if (!fs.existsSync(docPath)) {
     throw new Error(`Test document not found: ${docPath}`);
   }
@@ -205,7 +208,7 @@ async function queryEntitiesAfter(project, user) {
 }
 
 async function saveResults(project, extraction, rawExtraction, entitiesBefore, entitiesAfter) {
-  const outputDir = path.join(__dirname, 'EXTRACTION_TEST_OUTPUT');
+  const outputDir = resultsDirectory;
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
@@ -244,7 +247,7 @@ async function saveResults(project, extraction, rawExtraction, entitiesBefore, e
     extraction_summary: extraction.summary,
     entities_before: entitiesBefore.count,
     entities_after: entitiesAfter.count,
-    test_document_path: 'CONTROLLED_TEST_DOCUMENT.md',
+    test_document_path: path.relative(projectRoot, testDocumentPath),
   };
   fs.writeFileSync(
     path.join(outputDir, `summary_${timestamp}.json`),

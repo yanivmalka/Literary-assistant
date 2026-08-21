@@ -74,7 +74,7 @@ You need at least one extraction in the database. Do this via the web app:
 ### Step 2: Run The Diagnostic
 
 ```bash
-node diagnostic_extraction_analysis.mjs
+node ../../scripts/diagnostics/diagnostic_extraction_analysis.mjs
 ```
 
 ### Step 3: Interpret Results

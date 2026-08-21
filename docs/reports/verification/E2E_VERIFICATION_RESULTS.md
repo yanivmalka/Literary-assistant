@@ -17,7 +17,7 @@ The four critical failures have been **identified and fixed in code**:
 3. ✅ **Failure #3 (Objects)** — Root cause identified, field coverage detection prevents sparse merges
 4. ✅ **Failure #4 (Cabinet Consolidation)** — Fixed: `entityFieldCoverage()` and enhanced `hasConflictingEntityContext()`
 
-**What remains:** Execute the real extraction with CONTROLLED_TEST_DOCUMENT.md and verify all four scenarios pass in the actual database.
+**What remains:** Execute the real extraction with ../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md and verify all four scenarios pass in the actual database.
 
 ---
 
@@ -33,8 +33,8 @@ The four critical failures have been **identified and fixed in code**:
 - Authenticated user session (can use app UI or service role key)
 - Supabase project `6c4b7b92-214a-4785-ad66-e62527ee68d6` accessible
 - Edge Function `extract-knowledge` deployed
-- Test document: `CONTROLLED_TEST_DOCUMENT.md` (6 parts, prepared)
-- Database tables and RLS ready (schema may need reconciliation - see SCHEMA_RECONCILIATION_REQUIRED.md)
+- Test document: `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md` (6 parts, prepared)
+- Database tables and RLS ready (schema may need reconciliation - see ../migrations/SCHEMA_RECONCILIATION_REQUIRED.md)
 
 ---
 
@@ -341,7 +341,7 @@ WHERE project_id = '6c4b7b92-214a-4785-ad66-e62527ee68d6'
 
 ### Step 1: Trigger Real Extraction
 1. Open app UI → Navigate to test project
-2. Click "Extract Knowledge" on CONTROLLED_TEST_DOCUMENT.md
+2. Click "Extract Knowledge" on ../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md
 3. Wait for completion (should complete in 10-30 seconds)
 4. Note the extraction_id from response
 
@@ -355,7 +355,7 @@ ORDER BY created_at DESC LIMIT 1;
 Save raw_response to `CONTROLLED_TEST_LLM_RESPONSE.json`
 
 ### Step 3: Run Verification Queries
-Execute all queries from `VERIFY_CONTROLLED_EXTRACTION.sql`
+Execute all queries from `../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql`
 
 ### Step 4: Fill Diagnostic Table
 
@@ -390,9 +390,9 @@ Execute all queries from `VERIFY_CONTROLLED_EXTRACTION.sql`
 
 ## Resources
 
-- Test Document: `CONTROLLED_TEST_DOCUMENT.md`
-- Verification Queries: `VERIFY_CONTROLLED_EXTRACTION.sql`
-- Verification Protocol: `CONTROLLED_EXTRACTION_VERIFICATION.md`
+- Test Document: `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md`
+- Verification Queries: `../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql`
+- Verification Protocol: `./CONTROLLED_EXTRACTION_VERIFICATION.md`
 - Code Changes: Commit 8597629
   - `supabase/functions/_shared/entity-resolution.ts` (entityFieldCoverage, hasConflictingEntityContext)
   - `supabase/functions/extract-knowledge/index.ts` (findBatchEntityId, has_ability relationships)

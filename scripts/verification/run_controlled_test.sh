@@ -10,7 +10,9 @@ PROJECT_ID="${1:?PROJECT_ID required}"
 USER_ID="${2:?USER_ID required}"
 DOCUMENT_ID="${3:-}"
 
-OUTPUT_DIR="./CONTROLLED_TEST_OUTPUT"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
+OUTPUT_DIR="$PROJECT_ROOT/tests/results/CONTROLLED_TEST_OUTPUT"
 mkdir -p "$OUTPUT_DIR"
 
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")

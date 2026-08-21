@@ -18,7 +18,7 @@ This package contains everything needed to verify the controlled extraction test
 | **[VERIFICATION_EXECUTION_GUIDE.md](VERIFICATION_EXECUTION_GUIDE.md)** | Complete how-to guide | Understanding how to run tests |
 | **[VERIFICATION_PACKAGE_SUMMARY.md](VERIFICATION_PACKAGE_SUMMARY.md)** | Executive summary | Quick overview of test package |
 | **[VERIFICATION_INDEX.md](VERIFICATION_INDEX.md)** | This file | Navigation and quick reference |
-| **[CONTROLLED_TEST_DOCUMENT.md](CONTROLLED_TEST_DOCUMENT.md)** | Test input document | Understanding what's being extracted |
+| **[../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md](../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md)** | Test input document | Understanding what's being extracted |
 
 ---
 
@@ -47,7 +47,7 @@ This package contains everything needed to verify the controlled extraction test
 ```bash
 npm install  # Install dependencies if needed
 export SUPABASE_SERVICE_ROLE_KEY="your_service_role_key"
-node run_verification_queries.mjs
+node ../../../scripts/verification/run_verification_queries.mjs
 ```
 
 **Time:** ~2 minutes  
@@ -59,7 +59,7 @@ node run_verification_queries.mjs
 ```bash
 pip install supabase
 export SUPABASE_SERVICE_ROLE_KEY="your_service_role_key"
-python3 run_verification.py
+python3 ../../../scripts/verification/run_verification.py
 ```
 
 **Time:** ~2 minutes  
@@ -137,11 +137,11 @@ verification/
 ├── VERIFICATION_QUERIES_EXECUTABLE.md ......... SQL queries (START HERE)
 ├── VERIFICATION_EXECUTION_GUIDE.md ........... How-to guide
 ├── VERIFICATION_PACKAGE_SUMMARY.md ........... Executive summary
-├── CONTROLLED_TEST_DOCUMENT.md ............... Test input
-├── run_verification_queries.mjs .............. Node.js script
-├── run_verification.py ....................... Python script
+├── ../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md ............... Test input
+├── ../../../scripts/verification/run_verification_queries.mjs .............. Node.js script
+├── ../../../scripts/verification/run_verification.py ....................... Python script
 └── [Output files - generated after running]
-    ├── VERIFICATION_REPORT.json .............. Automated report
+    ├── ../../../tests/results/VERIFICATION_REPORT.json .............. Automated report
     └── VERIFICATION_RESULTS.txt .............. Manual results
 ```
 
@@ -182,7 +182,7 @@ MAIN_LAYER      7    Expected: 7     ✅
 
 ### Automated Method
 
-Results automatically saved to `VERIFICATION_REPORT.json`
+Results automatically saved to `../../../tests/results/VERIFICATION_REPORT.json`
 
 ---
 
@@ -248,7 +248,7 @@ This query MUST show:
 
 ### Before You Start
 1. ✅ Read [VERIFICATION_PACKAGE_SUMMARY.md](VERIFICATION_PACKAGE_SUMMARY.md) for context
-2. ✅ Review [CONTROLLED_TEST_DOCUMENT.md](CONTROLLED_TEST_DOCUMENT.md) to understand test data
+2. ✅ Review [../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md](../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md) to understand test data
 3. ✅ Choose verification method (Manual recommended first time)
 
 ### During Verification
@@ -308,14 +308,14 @@ Abilities stored as separate entities with `has_ability` relationship type, NOT 
 **Before asking for help:**
 1. ✅ Run the quick diagnostic query (see above)
 2. ✅ Check troubleshooting section in [VERIFICATION_EXECUTION_GUIDE.md](VERIFICATION_EXECUTION_GUIDE.md)
-3. ✅ Review [FAILURE_ANALYSIS_AND_FIXES.md](../FAILURE_ANALYSIS_AND_FIXES.md) for known issues
+3. ✅ Review [./FAILURE_ANALYSIS_AND_FIXES.md](./FAILURE_ANALYSIS_AND_FIXES.md) for known issues
 
 **Common Issues & Solutions:**
 
 | Issue | Solution |
 |-------|----------|
 | "Project not found" | Verify ID: `6c4b7b92-214a-4785-ad66-e62527ee68d6` |
-| 1 Cabinet (should be 2) | Failure #4 bug - see FAILURE_ANALYSIS_AND_FIXES.md |
+| 1 Cabinet (should be 2) | Failure #4 bug - see ./FAILURE_ANALYSIS_AND_FIXES.md |
 | No entities | Run extraction first |
 | NULL fields | Failure #1 - check raw LLM response |
 
@@ -323,10 +323,10 @@ Abilities stored as separate entities with `has_ability` relationship type, NOT 
 
 ## 📖 Related Documents
 
-- `CONTROLLED_TEST_DOCUMENT.md` - Test input data
-- `FAILURE_ANALYSIS_AND_FIXES.md` - Known failures and solutions
-- `IMPLEMENTATION_SUMMARY.md` - System architecture
-- `MIGRATION_111_COMPLETE_REFERENCE.md` - Database schema
+- `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md` - Test input data
+- `./FAILURE_ANALYSIS_AND_FIXES.md` - Known failures and solutions
+- `../implementation/IMPLEMENTATION_SUMMARY.md` - System architecture
+- `../migrations/MIGRATION_111_COMPLETE_REFERENCE.md` - Database schema
 
 ---
 

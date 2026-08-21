@@ -28,3 +28,8 @@ npm-debug.log*
 tsconfig.tsbuildinfo
 client/tsconfig.tsbuildinfo
 
+
+# Verification and extraction outputs
+tests/results/CONTROLLED_TEST_OUTPUT/
+tests/results/EXTRACTION_TEST_OUTPUT/
+tests/results/VERIFICATION_REPORT.json

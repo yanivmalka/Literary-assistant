@@ -2,7 +2,7 @@
 
 **Created:** 2024  
 **Project ID:** `6c4b7b92-214a-4785-ad66-e62527ee68d6`  
-**Test Document:** `CONTROLLED_TEST_DOCUMENT.md`
+**Test Document:** `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md`
 
 ---
 
@@ -21,11 +21,11 @@
 ```bash
 # Option A: Python (if Python installed)
 export SUPABASE_SERVICE_ROLE_KEY="your_service_role_key"
-python3 run_verification.py
+python3 ../../../scripts/verification/run_verification.py
 
 # Option B: Node.js
 export SUPABASE_SERVICE_ROLE_KEY="your_service_role_key"
-node run_verification_queries.mjs
+node ../../../scripts/verification/run_verification_queries.mjs
 ```
 
 ---
@@ -231,13 +231,13 @@ psql -h lqfqfzqcrqluxanhnjwu.db.supabase.co \
 export SUPABASE_SERVICE_ROLE_KEY="eyJhbGc..."  # Your service role key
 
 # 2. Run verification
-python3 run_verification.py
+python3 ../../../scripts/verification/run_verification.py
 
 # 3. View results
-cat VERIFICATION_REPORT.json
+cat ../../../tests/results/VERIFICATION_REPORT.json
 ```
 
-**Output:** Generates `VERIFICATION_REPORT.json` with all results
+**Output:** Generates `../../../tests/results/VERIFICATION_REPORT.json` with all results
 
 ---
 
@@ -255,7 +255,7 @@ cat VERIFICATION_REPORT.json
 export SUPABASE_SERVICE_ROLE_KEY="eyJhbGc..."
 
 # 2. Run verification
-node run_verification_queries.mjs
+node ../../../scripts/verification/run_verification_queries.mjs
 
 # 3. Check output in terminal
 ```
@@ -489,10 +489,10 @@ MAIN_LAYER           7
 
 | File | Purpose | Usage |
 |------|---------|-------|
-| `CONTROLLED_TEST_DOCUMENT.md` | Test input document | Reference for what was extracted |
+| `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md` | Test input document | Reference for what was extracted |
 | `VERIFICATION_QUERIES_EXECUTABLE.md` | SQL queries | Manual execution in Supabase |
-| `run_verification_queries.mjs` | Node.js script | Automated verification |
-| `run_verification.py` | Python script | Automated verification |
+| `../../../scripts/verification/run_verification_queries.mjs` | Node.js script | Automated verification |
+| `../../../scripts/verification/run_verification.py` | Python script | Automated verification |
 | `VERIFICATION_EXECUTION_GUIDE.md` | This file | How to run tests |
 
 ---
@@ -501,7 +501,7 @@ MAIN_LAYER           7
 
 If tests fail consistently:
 
-1. **Review test document** - `CONTROLLED_TEST_DOCUMENT.md`
+1. **Review test document** - `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md`
 2. **Check extraction logs** - Supabase Edge Function logs
 3. **Verify consolidation logic** - See `FAILURE_ANALYSIS_AND_FIXES.md`
 4. **Test with simpler data** - Verify basic functionality first

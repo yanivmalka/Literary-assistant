@@ -54,7 +54,7 @@ The fixes cannot be considered complete based on unit tests alone. The real test
 
 ## Exactly What Will Be Tested
 
-### Test Document: CONTROLLED_TEST_DOCUMENT.md
+### Test Document: ../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md
 
 6 parts, specifically designed to trigger all four failure scenarios:
 
@@ -72,25 +72,25 @@ The fixes cannot be considered complete based on unit tests alone. The real test
 ## Four Verification Scenarios
 
 ### Scenario 1: CHARACTER FIELDS
-**Database queries:** VERIFY_CONTROLLED_EXTRACTION.sql (Query 1.1, 1.2)  
+**Database queries:** ../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql (Query 1.1, 1.2)  
 **Expected:** Leo Frostborne entity with height="6 feet 2 inches", hair_color="black", eye_color="blue"  
 **PASS if:** All fields present and synced to knowledge_entity_values  
 **FAIL if:** Any field null, missing, or not synced
 
 ### Scenario 2: ABILITIES & OBJECTS
-**Database queries:** VERIFY_CONTROLLED_EXTRACTION.sql (Query 2.1-2.4)  
+**Database queries:** ../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql (Query 2.1-2.4)  
 **Expected:** 4 ability entities + 4 has_ability relationships + 2 Cabinet objects  
 **PASS if:** All entities created with relationships properly formed  
 **FAIL if:** < 4 abilities, no has_ability relationships, != 2 Cabinets
 
 ### Scenario 3: CABINET IDENTITY (Core Fix #4)
-**Database queries:** VERIFY_CONTROLLED_EXTRACTION.sql (Query 3.1-3.3)  
+**Database queries:** ../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql (Query 3.1-3.3)  
 **Expected:** 2 Cabinets with different UUIDs (wood vs glass)  
 **PASS if:** UUID_A ≠ UUID_B, different materials  
 **FAIL if:** Only 1 Cabinet, both same materials, UUID_A = UUID_B
 
 ### Scenario 4: MAIN/BRANCH ISOLATION
-**Database queries:** VERIFY_CONTROLLED_EXTRACTION.sql (Query 4.1-4.4)  
+**Database queries:** ../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql (Query 4.1-4.4)  
 **Expected:** All entities layer='main', branch_id=NULL, no overlays  
 **PASS if:** Perfect isolation with no spurious duplication  
 **FAIL if:** Any layer='branch', any branch_id set, overlays present
@@ -101,7 +101,7 @@ The fixes cannot be considered complete based on unit tests alone. The real test
 
 ### Step 1: Prepare
 - Verify test project `6c4b7b92-214a-4785-ad66-e62527ee68d6` is accessible
-- Have CONTROLLED_TEST_DOCUMENT.md content ready
+- Have ../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md content ready
 - Have authentication available (app UI or CLI)
 
 ### Step 2: Execute
@@ -114,7 +114,7 @@ The fixes cannot be considered complete based on unit tests alone. The real test
 - Save raw_response to file for analysis
 
 ### Step 4: Verify
-- Run all queries from VERIFY_CONTROLLED_EXTRACTION.sql
+- Run all queries from ../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql
 - Fill diagnostic table with results
 - Compare to expected outcomes
 
@@ -139,16 +139,16 @@ The fixes cannot be considered complete based on unit tests alone. The real test
 - `supabase/functions/extract-knowledge/entity-resolution.test.ts` (6 tests, all passing)
 
 ### Test Materials
-- `CONTROLLED_TEST_DOCUMENT.md` — 6-part test document
-- `VERIFY_CONTROLLED_EXTRACTION.sql` — All queries needed for verification
-- `CONTROLLED_EXTRACTION_VERIFICATION.md` — Detailed step-by-step protocol
+- `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md` — 6-part test document
+- `../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql` — All queries needed for verification
+- `./CONTROLLED_EXTRACTION_VERIFICATION.md` — Detailed step-by-step protocol
 - `E2E_VERIFICATION_RESULTS.md` — Diagnostic framework
 - `run_controlled_extraction.py` — Automated helper (when Python available)
 
 ### Documentation
-- `TASK_COMPLETION_REPORT.md` — Summary of implementation
-- `IMPLEMENTATION_SUMMARY.md` — Technical details
-- `FAILURE_ANALYSIS_AND_FIXES.md` — Root cause analysis
+- `../implementation/TASK_COMPLETION_REPORT.md` — Summary of implementation
+- `../implementation/IMPLEMENTATION_SUMMARY.md` — Technical details
+- `./FAILURE_ANALYSIS_AND_FIXES.md` — Root cause analysis
 - `READY_FOR_REAL_EXTRACTION_TESTING.md` — Execution guide
 
 ---
@@ -245,13 +245,13 @@ This is why the central verification is **Scenario 3 (Cabinet identity)**.
    - Should take 10-30 seconds
 
 3. **Run verification queries**
-   - Copy queries from VERIFY_CONTROLLED_EXTRACTION.sql
+   - Copy queries from ../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql
    - Paste into Supabase dashboard or CLI
    - Save results
 
 4. **Fill diagnostic table**
    - Create a markdown table with results
-   - Compare to "Expected" column in VERIFY_CONTROLLED_EXTRACTION.sql
+   - Compare to "Expected" column in ../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql
 
 5. **Report findings**
    - Share results of all 4 scenarios
@@ -263,7 +263,7 @@ This is why the central verification is **Scenario 3 (Cabinet identity)**.
 
 **Test Project ID:** `6c4b7b92-214a-4785-ad66-e62527ee68d6`  
 **Core Fix Commit:** `8597629`  
-**Verification Protocol:** `VERIFY_CONTROLLED_EXTRACTION.sql`  
+**Verification Protocol:** `../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql`  
 **Expected Entities:** 1 Leo + 2 Cabinets + 4 Abilities = 7 total  
 **Expected Relationships:** 4 has_ability (character→ability)  
 **Expected Main/Branch:** All Main, all branch_id=NULL (first extraction)
@@ -277,7 +277,7 @@ Before executing:
 - [ ] Test document ready
 - [ ] Authentication available
 - [ ] Supabase dashboard or CLI available
-- [ ] VERIFY_CONTROLLED_EXTRACTION.sql queries copied
+- [ ] ../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql queries copied
 
 After extraction:
 - [ ] LLM response captured

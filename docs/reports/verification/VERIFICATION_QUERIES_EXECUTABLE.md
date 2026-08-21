@@ -2,7 +2,7 @@
 
 **Project ID:** `6c4b7b92-214a-4785-ad66-e62527ee68d6`  
 **Supabase URL:** `https://lqfqfzqcrqluxanhnjwu.supabase.co`  
-**Test Document:** `CONTROLLED_TEST_DOCUMENT.md`
+**Test Document:** `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md`
 
 ---
 

@@ -72,7 +72,7 @@ A **production-ready knowledge extraction system** that safely extracts entities
    - Quick reference
 
 ### Pre-Deployment (30 minutes)
-2. **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)**
+2. **[../../guides/DEPLOYMENT_CHECKLIST.md](../../guides/DEPLOYMENT_CHECKLIST.md)**
    - Prerequisites before deployment
    - Testing steps
    - Post-deployment validation
@@ -230,7 +230,7 @@ Tests cover: first extraction, multi-batch, cross-batch, branch mode, failures, 
 
 ### Estimated Time: 30-45 minutes
 
-### See: [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)
+### See: [../../guides/DEPLOYMENT_CHECKLIST.md](../../guides/DEPLOYMENT_CHECKLIST.md)
 
 ---
 
@@ -294,7 +294,7 @@ Confidence < 70%  → NO ACTION (false negative, revisit later)
 |----------|---------|-----------|
 | README_DELIVERY.md | This summary | 5 min |
 | TASKS_COMPLETED.md | Task reference | 10 min |
-| DEPLOYMENT_CHECKLIST.md | Pre-deployment | 30 min |
+| ../../guides/DEPLOYMENT_CHECKLIST.md | Pre-deployment | 30 min |
 | IMPLEMENTATION_SUMMARY.md | Design details | 45 min |
 | ARCHITECTURE_COMPLETION_REPORT.md | Full architecture | 60 min |
 | DELIVERY_INDEX.md | Navigation guide | 5 min |
@@ -329,7 +329,7 @@ Confidence < 70%  → NO ACTION (false negative, revisit later)
 Read [TASKS_COMPLETED.md](TASKS_COMPLETED.md) for overview
 
 ### 2️⃣ Prepare (1-2 days)
-Follow [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)
+Follow [../../guides/DEPLOYMENT_CHECKLIST.md](../../guides/DEPLOYMENT_CHECKLIST.md)
 
 ### 3️⃣ Deploy (30-45 min)
 Execute deployment steps
@@ -362,7 +362,7 @@ ML-based scoring, UI for suggestions
 ## 📞 Questions?
 
 - **Architecture:** See ARCHITECTURE_COMPLETION_REPORT.md
-- **Deployment:** See DEPLOYMENT_CHECKLIST.md
+- **Deployment:** See ../../guides/DEPLOYMENT_CHECKLIST.md
 - **Tasks:** See TASKS_COMPLETED.md
 - **Design:** See IMPLEMENTATION_SUMMARY.md
 

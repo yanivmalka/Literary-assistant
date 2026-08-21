@@ -14,7 +14,7 @@
 - **[ARCHITECTURE_COMPLETION_REPORT.md](ARCHITECTURE_COMPLETION_REPORT.md)** - Detailed architecture documentation
 
 ### Deployment Guides
-- **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)** - Pre/post-deployment verification
+- **[../../guides/DEPLOYMENT_CHECKLIST.md](../../guides/DEPLOYMENT_CHECKLIST.md)** - Pre/post-deployment verification
 - **[DELIVERY_INDEX.md](DELIVERY_INDEX.md)** - This document
 
 ---
@@ -347,6 +347,6 @@ This system ensures this does NOT happen by:
 
 ### Quick Links
 - [TASKS_COMPLETED.md](TASKS_COMPLETED.md) - 5-minute overview
-- [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) - What to do before deploying
+- [DEPLOYMENT_CHECKLIST.md](../../guides/DEPLOYMENT_CHECKLIST.md) - What to do before deploying
 - [ARCHITECTURE_COMPLETION_REPORT.md](ARCHITECTURE_COMPLETION_REPORT.md) - Full details
 - [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md) - Design & rationale

@@ -320,5 +320,5 @@ Deploying it would result in:
 
 For detailed findings, see:
 - STRICT_VERIFICATION_PLAN.md - Detailed code analysis
-- CRITICAL_INTEGRATION_GAPS_REPORT.md - Gap-by-gap remediation guide
+- ../implementation/CRITICAL_INTEGRATION_GAPS_REPORT.md - Gap-by-gap remediation guide
 

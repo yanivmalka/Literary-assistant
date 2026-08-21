@@ -32,10 +32,10 @@ Run an extraction via the web app:
 
 ```bash
 # Automated analysis (easiest)
-node diagnostic_extraction_analysis.mjs
+node ../../scripts/diagnostics/diagnostic_extraction_analysis.mjs
 
 # Or manual SQL queries
-# See DIAGNOSTIC_SQL_QUERIES.sql
+# See ../../supabase/sql/diagnostics/DIAGNOSTIC_SQL_QUERIES.sql
 ```
 
 ### 3. Read The Results
@@ -56,9 +56,9 @@ Then check **Recommendations** section for next steps.
 
 ## Tools Included
 
-### 1. `diagnostic_extraction_analysis.mjs` (Recommended)
+### 1. `../../scripts/diagnostics/diagnostic_extraction_analysis.mjs` (Recommended)
 **What it does**: Automated analysis of the last 3 extractions  
-**How to run**: `node diagnostic_extraction_analysis.mjs`  
+**How to run**: `node ../../scripts/diagnostics/diagnostic_extraction_analysis.mjs`  
 **Output**: Terminal report + JSON file  
 **Best for**: Quick diagnosis with clear recommendations  
 
@@ -69,7 +69,7 @@ Features:
 - ✓ Saves detailed report
 - ✓ Clear action items
 
-### 2. `DIAGNOSTIC_SQL_QUERIES.sql`
+### 2. `../../supabase/sql/diagnostics/DIAGNOSTIC_SQL_QUERIES.sql`
 **What it does**: SQL queries for manual inspection  
 **How to use**: Copy-paste into Supabase SQL Editor  
 **Output**: Query results in Supabase UI  
@@ -93,9 +93,9 @@ Covers:
 - ✓ What the prompt expects
 - ✓ Next steps per diagnosis
 
-### 4. `run_extraction_for_diagnostic.mjs`
+### 4. `../../scripts/diagnostics/run_extraction_for_diagnostic.mjs`
 **What it does**: Helper to set up test data  
-**How to run**: `node run_extraction_for_diagnostic.mjs`  
+**How to run**: `node ../../scripts/diagnostics/run_extraction_for_diagnostic.mjs`  
 **Output**: Instructions for creating test data  
 **Best for**: First-time setup  
 
@@ -182,7 +182,7 @@ Contains:
 ### Step 1: Verify You Have Data
 
 ```bash
-node diagnostic_extraction_analysis.mjs
+node ../../scripts/diagnostics/diagnostic_extraction_analysis.mjs
 ```
 
 Expected output: Either diagnostic results or "No extractions found"
@@ -190,7 +190,7 @@ Expected output: Either diagnostic results or "No extractions found"
 ### Step 2: If No Data, Create It
 
 ```bash
-node run_extraction_for_diagnostic.mjs
+node ../../scripts/diagnostics/run_extraction_for_diagnostic.mjs
 ```
 
 This shows you how to add data via the web app.
@@ -318,7 +318,7 @@ This tells you:
 
 ## Alternative: Using SQL Directly
 
-If you prefer raw SQL, use `DIAGNOSTIC_SQL_QUERIES.sql`:
+If you prefer raw SQL, use `../../supabase/sql/diagnostics/DIAGNOSTIC_SQL_QUERIES.sql`:
 
 ```sql
 -- See the last raw response
@@ -340,11 +340,11 @@ ORDER BY created_at DESC LIMIT 1;
 
 | File | Purpose | Usage |
 |------|---------|-------|
-| `diagnostic_extraction_analysis.mjs` | Main diagnostic | `node diagnostic_extraction_analysis.mjs` |
+| `../../scripts/diagnostics/diagnostic_extraction_analysis.mjs` | Main diagnostic | `node ../../scripts/diagnostics/diagnostic_extraction_analysis.mjs` |
 | `DIAGNOSTIC_GUIDE.md` | Detailed docs | Read for interpretation help |
-| `DIAGNOSTIC_SQL_QUERIES.sql` | Manual queries | Copy-paste to SQL editor |
+| `../../supabase/sql/diagnostics/DIAGNOSTIC_SQL_QUERIES.sql` | Manual queries | Copy-paste to SQL editor |
 | `DIAGNOSTIC_README.md` | This file | Quick reference |
-| `run_extraction_for_diagnostic.mjs` | Setup helper | `node run_extraction_for_diagnostic.mjs` |
+| `../../scripts/diagnostics/run_extraction_for_diagnostic.mjs` | Setup helper | `node ../../scripts/diagnostics/run_extraction_for_diagnostic.mjs` |
 
 ---
 
@@ -376,7 +376,7 @@ ORDER BY created_at DESC LIMIT 1;
 ## Questions?
 
 - Read `DIAGNOSTIC_GUIDE.md` for detailed explanations
-- Check `DIAGNOSTIC_SQL_QUERIES.sql` for alternative queries
+- Check `../../supabase/sql/diagnostics/DIAGNOSTIC_SQL_QUERIES.sql` for alternative queries
 - Review example outputs above
 - Check the recommendation section in diagnostic output
 

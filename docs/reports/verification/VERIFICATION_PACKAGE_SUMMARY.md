@@ -41,7 +41,7 @@ Comprehensive guide covering:
 
 **Use this for:** Understanding how to execute tests and what results mean
 
-### 3. **run_verification_queries.mjs** (Node.js)
+### 3. **../../../scripts/verification/run_verification_queries.mjs** (Node.js)
 
 Automated verification script that:
 - Connects to Supabase via service role key
@@ -51,7 +51,7 @@ Automated verification script that:
 
 **Use this for:** Automated testing if API key available
 
-### 4. **run_verification.py** (Python)
+### 4. **../../../scripts/verification/run_verification.py** (Python)
 
 Python implementation of verification that:
 - Connects using Supabase Python client
@@ -61,7 +61,7 @@ Python implementation of verification that:
 
 **Use this for:** Python-based automation or scripting
 
-### 5. **CONTROLLED_TEST_DOCUMENT.md**
+### 5. **../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md**
 
 The test input document containing:
 - Part 1: Character introduction (Leo Frostborne)
@@ -152,10 +152,10 @@ Quick reference guide to all verification materials
 export SUPABASE_SERVICE_ROLE_KEY="your_key_here"
 
 # Run Python verification
-python3 run_verification.py
+python3 ../../../scripts/verification/run_verification.py
 
 # Or Node.js
-node run_verification_queries.mjs
+node ../../../scripts/verification/run_verification_queries.mjs
 ```
 
 ---
@@ -211,11 +211,11 @@ RESULT: ✅ CONTROLLED EXTRACTION TEST PASSES
 
 ## Files Checklist
 
-- [ ] `CONTROLLED_TEST_DOCUMENT.md` - Test input document
+- [ ] `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md` - Test input document
 - [ ] `VERIFICATION_QUERIES_EXECUTABLE.md` - Main SQL queries
 - [ ] `VERIFICATION_EXECUTION_GUIDE.md` - How-to guide
-- [ ] `run_verification_queries.mjs` - Node.js automation
-- [ ] `run_verification.py` - Python automation
+- [ ] `../../../scripts/verification/run_verification_queries.mjs` - Node.js automation
+- [ ] `../../../scripts/verification/run_verification.py` - Python automation
 - [ ] `VERIFICATION_PACKAGE_SUMMARY.md` - This file
 
 ---
@@ -238,7 +238,7 @@ RESULT: ✅ CONTROLLED EXTRACTION TEST PASSES
 ### Step 3: Record Results
 
 - **Manual:** Use template in `VERIFICATION_EXECUTION_GUIDE.md`
-- **Automated:** Script generates `VERIFICATION_REPORT.json`
+- **Automated:** Script generates `../../../tests/results/VERIFICATION_REPORT.json`
 
 ### Step 4: Analyze
 
@@ -311,7 +311,7 @@ The Cabinet identity bug (Failure #4) showed that the system incorrectly merged 
 
 ## Verification Checklist for Tester
 
-- [ ] Read `CONTROLLED_TEST_DOCUMENT.md` to understand test data
+- [ ] Read `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md` to understand test data
 - [ ] Choose verification method (Manual recommended for first run)
 - [ ] Execute all queries in `VERIFICATION_QUERIES_EXECUTABLE.md`
 - [ ] Record results in `VERIFICATION_RESULTS.txt`
@@ -360,10 +360,10 @@ The Cabinet identity bug (Failure #4) showed that the system incorrectly merged 
 
 ## References
 
-- **Test Document:** `CONTROLLED_TEST_DOCUMENT.md`
-- **Known Issues:** `FAILURE_ANALYSIS_AND_FIXES.md`
-- **Architecture:** `IMPLEMENTATION_SUMMARY.md`
-- **Database Schema:** `MIGRATION_111_COMPLETE_REFERENCE.md`
+- **Test Document:** `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md`
+- **Known Issues:** `./FAILURE_ANALYSIS_AND_FIXES.md`
+- **Architecture:** `../implementation/IMPLEMENTATION_SUMMARY.md`
+- **Database Schema:** `../migrations/MIGRATION_111_COMPLETE_REFERENCE.md`
 
 ---
 
@@ -373,7 +373,7 @@ For detailed information about:
 - **How to run queries:** See `VERIFICATION_EXECUTION_GUIDE.md`
 - **Expected results:** See `VERIFICATION_QUERIES_EXECUTABLE.md`
 - **Database schema:** Check project documentation
-- **Known failures:** See `FAILURE_ANALYSIS_AND_FIXES.md`
+- **Known failures:** See `./FAILURE_ANALYSIS_AND_FIXES.md`
 
 ---
 

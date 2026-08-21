@@ -22,14 +22,14 @@ Time: ~15 min | Difficulty: Easy
 OPTION B: Python Script
 ──────────────────────
 export SUPABASE_SERVICE_ROLE_KEY="your_key"
-python3 run_verification.py
+python3 ../../../scripts/verification/run_verification.py
 
 Time: ~2 min | Difficulty: Medium
 
 OPTION C: Node.js Script
 ────────────────────────
 export SUPABASE_SERVICE_ROLE_KEY="your_key"
-node run_verification_queries.mjs
+node ../../../scripts/verification/run_verification_queries.mjs
 
 Time: ~2 min | Difficulty: Medium
 
@@ -173,9 +173,9 @@ VERIFICATION_INDEX.md ........................ Navigation (read first)
 VERIFICATION_QUERIES_EXECUTABLE.md ......... SQL queries (main file)
 VERIFICATION_EXECUTION_GUIDE.md ........... How-to guide
 VERIFICATION_PACKAGE_SUMMARY.md ........... Executive summary
-CONTROLLED_TEST_DOCUMENT.md ............... Test input document
-run_verification_queries.mjs ............... Node.js automation
-run_verification.py ....................... Python automation
+../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md ............... Test input document
+../../../scripts/verification/run_verification_queries.mjs ............... Node.js automation
+../../../scripts/verification/run_verification.py ....................... Python automation
 VERIFICATION_QUICK_REFERENCE.txt .......... This file
 
 ================================================================================
@@ -250,7 +250,7 @@ Read This First:      VERIFICATION_INDEX.md
 Main SQL Queries:     VERIFICATION_QUERIES_EXECUTABLE.md
 How-To Guide:         VERIFICATION_EXECUTION_GUIDE.md
 Known Failures:       FAILURE_ANALYSIS_AND_FIXES.md
-Test Data:            CONTROLLED_TEST_DOCUMENT.md
+Test Data:            ../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md
 
 ================================================================================
 CONTACT & NEXT STEPS

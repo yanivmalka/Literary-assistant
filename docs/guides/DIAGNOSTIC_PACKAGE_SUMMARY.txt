@@ -24,7 +24,7 @@ QUICK START
    - Click Extract
 
 2. Run diagnostic
-   node diagnostic_extraction_analysis.mjs
+   ../../scripts/diagnostics/diagnostic_extraction_analysis.mjs
 
 3. Read results (especially DIAGNOSTIC SUMMARY section)
 
@@ -51,9 +51,9 @@ PACKAGE CONTENTS
    └─ Automated analysis
    └─ Generates JSON report
    └─ Clear recommendations
-   └─ Run: node diagnostic_extraction_analysis.mjs
+   └─ Run: ../../scripts/diagnostics/diagnostic_extraction_analysis.mjs
 
-💾 DIAGNOSTIC_SQL_QUERIES.sql
+💾 ../../supabase/sql/diagnostics/DIAGNOSTIC_SQL_QUERIES.sql
    └─ 15 manual SQL queries
    └─ For Supabase SQL editor
    └─ Alternative to Node.js script
@@ -182,7 +182,7 @@ If Hypothesis C (Wrong Format):
 EXAMPLE: RUNNING THE DIAGNOSTIC
 ════════════════════════════════════════════════════════════════════════════════
 
-$ node diagnostic_extraction_analysis.mjs
+$ ../../scripts/diagnostics/diagnostic_extraction_analysis.mjs
 
 ╔════════════════════════════════════════════════════════════════════════════╗
 ║                    EXTRACTION DIAGNOSTIC TOOL                              ║
@@ -241,7 +241,7 @@ Q: "raw_response is NULL"
 A: Extraction failed. Check server logs or browser network tab
 
 Q: What if I can't run Node.js?
-A: Use DIAGNOSTIC_SQL_QUERIES.sql in Supabase SQL Editor instead
+A: Use ../../supabase/sql/diagnostics/DIAGNOSTIC_SQL_QUERIES.sql in Supabase SQL Editor instead
 
 Q: How do I save the diagnostic output?
 A: Diagnostic automatically saves JSON report:
@@ -269,7 +269,7 @@ diagnostic_extraction_analysis.mjs
   - Generates recommendations
   RUN THIS to diagnose issues
 
-DIAGNOSTIC_SQL_QUERIES.sql
+../../supabase/sql/diagnostics/DIAGNOSTIC_SQL_QUERIES.sql
   - 15 SQL queries for manual inspection
   - Copy-paste into Supabase SQL editor
   - For alternative analysis
@@ -290,7 +290,7 @@ NEXT STEPS AFTER DIAGNOSIS
 3. Check the RECOMMENDATIONS section for specific actions
 4. Find the relevant code file mentioned in "WHERE TO LOOK IN CODE" above
 5. Make the fix
-6. Rerun diagnostic to verify: node diagnostic_extraction_analysis.mjs
+6. Rerun diagnostic to verify: ../../scripts/diagnostics/diagnostic_extraction_analysis.mjs
 7. Confirm the issue is resolved
 
 ════════════════════════════════════════════════════════════════════════════════

@@ -746,10 +746,10 @@ bash run_controlled_test.sh <PROJECT_ID> <USER_ID> <DOCUMENT_ID>
 ```
 
 ### Step 2: Capture Output
-- Raw LLM JSON: `CONTROLLED_TEST_OUTPUT/llm_response_*.json`
-- Entity results: `CONTROLLED_TEST_OUTPUT/cabinet_entities_*.txt`
-- Leo results: `CONTROLLED_TEST_OUTPUT/leo_entities_*.txt`
-- Comparison report: `CONTROLLED_TEST_OUTPUT/comparison_report_*.txt`
+- Raw LLM JSON: `../../tests/results/CONTROLLED_TEST_OUTPUT/llm_response_*.json`
+- Entity results: `../../tests/results/CONTROLLED_TEST_OUTPUT/cabinet_entities_*.txt`
+- Leo results: `../../tests/results/CONTROLLED_TEST_OUTPUT/leo_entities_*.txt`
+- Comparison report: `../../tests/results/CONTROLLED_TEST_OUTPUT/comparison_report_*.txt`
 
 ### Step 3: Verify Against Trace
 
