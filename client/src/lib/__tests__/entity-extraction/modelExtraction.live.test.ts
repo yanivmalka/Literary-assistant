@@ -24,6 +24,7 @@ type LiveExtraction = GeminiExtraction & {
   relationships?: unknown[]
 }
 
+const runtimeProcess = (globalThis as unknown as {
   process?: { env?: Record<string, string | undefined> }
 }).process
 const geminiApiKey = runtimeProcess?.env?.GEMINI_API_KEY

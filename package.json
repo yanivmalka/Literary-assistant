@@ -8,6 +8,9 @@
     "dev:server": "npm run dev --prefix server",
     "build": "npm run build --prefix client && npm run build --prefix server",
     "test:entities": "npm --prefix client run test:entities",
+    "test:entities:offline": "npm --prefix client run test:entities:offline",
+    "test:entities:models": "npm --prefix client run test:entities:models",
+    "test:entities:all": "npm --prefix client run test:entities:all",
     "install:all": "npm install && npm install --prefix client && npm install --prefix server"
   },
   "devDependencies": {

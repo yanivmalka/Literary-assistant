@@ -42,6 +42,7 @@ import {
 } from "../_shared/entity-resolution.ts";
 import { normalizeEntities as normalizeEntitiesForExtraction } from "./normalization.ts";
 import { parseExtractionJson, validateExtractionMode } from "./testable-pipeline.ts";
+import { buildAbilityLinks } from "../_shared/ability-links.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1399,55 +1400,45 @@ Deno.serve(async (req) => {
     }
 
     // Create character → ability relationships from top-level ability entities.
-    // The current extraction schema stores the character names in ability.users,
-    // while the legacy path stores ability names on character.attributes.abilities.
-    // Support both representations so the UI can query one relationship model.
-    for (const { entity: abilityEntity, id: abilityId } of entityIdEntries) {
-      if (abilityEntity.entity_type !== "ability" && abilityEntity.entity_type !== "magic_ability") continue;
+    // The tested helper resolves both canonical names and aliases, and supports
+    // Gemini's array or comma-separated users representation.
+    const abilityLinks = buildAbilityLinks(
+      entityIdEntries.map(({ entity, id }) => ({
+        id,
+        canonical_name: entity.canonical_name,
+        entity_type: entity.entity_type,
+        aliases: entity.aliases,
+        attributes: entity.attributes,
+      })),
+    );
 
-      const rawUsers = abilityEntity.attributes?.users;
-      const userNames = Array.isArray(rawUsers)
-        ? rawUsers.filter((user): user is string => typeof user === "string")
-        : typeof rawUsers === "string"
-          ? rawUsers.split(",").map((user) => user.trim()).filter(Boolean)
-          : [];
+    for (const link of abilityLinks) {
+      const abilityEntity = entityIdEntries.find(({ id }) => id === link.abilityId)?.entity;
+      if (!abilityEntity) continue;
 
-      for (const userName of userNames) {
-        const userKey = normalizeKey(stripNikud(userName.trim()));
-        if (!userKey) continue;
+      const { error: relError } = await supabase
+        .from("knowledge_entity_relationships")
+        .upsert(
+          {
+            project_id: body.project_id,
+            document_id: body.document_id,
+            version_id: body.version_id,
+            source_entity_id: link.characterId,
+            target_entity_id: link.abilityId,
+            relationship_type: link.relationshipType,
+            evidence: null,
+            chunk_position: abilityEntity.chunk_positions?.[0] || null,
+            raw_extraction_id: rawExtractionId,
+            branch_id: targetBranchId || null,
+            operation: targetLayer === "main" ? null : "add",
+            review_status: targetLayer === "main" ? null : "pending",
+            base_exists: false,
+          },
+          { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" },
+        );
 
-        const matchingCharacters = entityIdEntries.filter(({ entity }) => {
-          if (entity.entity_type !== "character") return false;
-          return normalizeKey(entity.canonical_name) === userKey ||
-            entity.aliases.some((alias) => normalizeKey(alias) === userKey);
-        });
-        const characterIds = [...new Set(matchingCharacters.map(({ id }) => id))];
-        if (characterIds.length !== 1) continue;
-
-        const { error: relError } = await supabase
-          .from("knowledge_entity_relationships")
-          .upsert(
-            {
-              project_id: body.project_id,
-              document_id: body.document_id,
-              version_id: body.version_id,
-              source_entity_id: characterIds[0],
-              target_entity_id: abilityId,
-              relationship_type: "has_ability",
-              evidence: null,
-              chunk_position: abilityEntity.chunk_positions?.[0] || null,
-              raw_extraction_id: rawExtractionId,
-              branch_id: targetBranchId || null,
-              operation: targetLayer === "main" ? null : "add",
-              review_status: targetLayer === "main" ? null : "pending",
-              base_exists: false,
-            },
-            { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" },
-          );
-
-        if (relError) {
-          console.warn(`Failed to create ability relationship '${userName}' → '${abilityEntity.canonical_name}':`, relError.message);
-        }
+      if (relError) {
+        console.warn(`Failed to create ability relationship '${link.userName}' → '${link.abilityName}':`, relError.message);
       }
     }
 
