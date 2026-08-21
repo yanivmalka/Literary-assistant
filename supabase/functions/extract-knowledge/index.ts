@@ -1196,6 +1196,7 @@ Deno.serve(async (req) => {
                 entity_types: merged.entity_types,
                 description: merged.description,
                 attributes: merged.attributes,
+                structured_fields: merged.structured_fields,
                 overrides: {
                   canonical_name: merged.canonical_name,
                   entity_type: merged.entity_type,
@@ -1306,6 +1307,7 @@ Deno.serve(async (req) => {
                 entity_types: entity.entity_types,
                 description: entity.description,
                 attributes: entity.attributes,
+                structured_fields: entity.structured_fields,
                 overrides: {
                   canonical_name: entity.canonical_name,
                   entity_type: entity.entity_type,
@@ -1461,6 +1463,17 @@ Deno.serve(async (req) => {
           }
         }
       }
+    }
+
+    if (persistenceErrors.length > 0) {
+      // Do not save relationships/events or report a successful batch when an
+      // entity was only partially persisted. This prevents the misleading
+      // "0 entities, 1 event" result and makes the database error actionable.
+      return errorResponse(
+        `Entity persistence failed for ${persistenceErrors.length} item(s).`,
+        500,
+        persistenceErrors.join("\n"),
+      );
     }
 
     // Create character → ability relationships from top-level ability entities.
