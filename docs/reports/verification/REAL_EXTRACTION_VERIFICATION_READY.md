@@ -18,21 +18,20 @@ All four critical failures have been fixed in code with minimum, focused changes
 3. ✅ **Failure #3 (Objects)** — Root cause identified: Field coverage detection prevents sparse merges
 4. ✅ **Failure #4 (Cabinet Consolidation)** — FIXED: `entityFieldCoverage()` correctly distinguishes sparse entities
 
-**What's ready:**
-- Production code deployed (Edge Function updated)
-- 6 unit tests passing
-- TypeScript build successful
-- No breaking changes
-- Comprehensive real-world test protocol
+**What's ready:"
+- Local production code validated with client and Deno tests
+- Canonical schema v2, backward-compatible normalization, and graph/timeline persistence changes are implemented
+- Controlled Markdown fixture is available at `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md`
+- SQL verification protocol remains ready for a real Supabase run
 
-**What's next:**
-- Execute real extraction on test document
-- Verify all four scenarios pass in actual database
-- Confirm no regressions
+**What's not yet proven:"
+- Gemini live output on the controlled fixture
+- Remote Supabase persistence after migration/deployment
+- The four database scenarios below
 
 ---
 
-## The Challenge: Four Failures Requiring Different Evidence
+**Current implementation note:** The active `extract-knowledge` handler persists relationships and events in the selected target layer. Main bootstrap rows use `branch_id=NULL` and approved graph state; Branch rows use the active branch and pending review state. The older reports that describe Main as entities-only are historical and are not acceptance criteria for the current implementation.
 
 The fixes cannot be considered complete based on unit tests alone. The real test is whether they work with actual Gemini LLM output and actual database persistence.
 
@@ -91,9 +90,9 @@ The fixes cannot be considered complete based on unit tests alone. The real test
 
 ### Scenario 4: MAIN/BRANCH ISOLATION
 **Database queries:** ../../../supabase/sql/verification/VERIFY_CONTROLLED_EXTRACTION.sql (Query 4.1-4.4)  
-**Expected:** All entities layer='main', branch_id=NULL, no overlays  
-**PASS if:** Perfect isolation with no spurious duplication  
-**FAIL if:** Any layer='branch', any branch_id set, overlays present
+**Expected:** First bootstrap extraction stores entities in Main with `branch_id=NULL`, no overlays, and stores extracted relationships/events in Main with approved status.  
+**PASS if:** Entity layer isolation is correct and any graph/timeline rows also use `branch_id=NULL`, `operation='add'`, and `review_status='approved'`.  
+**FAIL if:** Branch entities or overlays appear during the first bootstrap without an explicit branch extraction.
 
 ---
 

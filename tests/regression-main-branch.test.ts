@@ -3,7 +3,9 @@
 // Verify bootstrap mode, branch mode, and multi-extraction scenarios
 // ============================================
 
-import { describe, it, expect, beforeAll, afterAll } from "https://deno.land/std@0.208.0/testing/bdd.ts";
+import { describe, it } from "https://deno.land/std@0.208.0/testing/bdd.ts";
+import { assert, assertEquals, assertMatch } from "https://deno.land/std@0.208.0/assert/mod.ts";
+import { validateExtractionMode } from "../supabase/functions/extract-knowledge/testable-pipeline.ts";
 
 interface RegressionScenario {
   name: string;
@@ -38,8 +40,8 @@ const regressionScenarios: RegressionScenario[] = [
       }
     ],
     expectedFinalEntities: new Set(["ליאו", "דברניה"]),
-    expectedStagingBehavior: "entities staged in bootstrap_entity_staging, then promoted to main",
-    criticalCheck: "Both entities in main entities table with bootstrap_stage_id set"
+    expectedStagingBehavior: "active handler writes bootstrap entities directly to Main; graph/timeline rows use branch_id=null and approved status",
+    criticalCheck: "Both entities in main entities table; graph/timeline rows use branch_id=null and approved status"
   },
 
   {
@@ -66,7 +68,7 @@ const regressionScenarios: RegressionScenario[] = [
       }
     ],
     expectedFinalEntities: new Set(["ליאו", "דברניה"]),
-    expectedStagingBehavior: "All batches use same bootstrap_stage_id, cross-batch resolution via extraction-state.ts",
+    expectedStagingBehavior: "all batches use the same extraction_run_id; references resolve against persisted Main/Branch entities",
     criticalCheck: "extraction_mode and extraction_run_id consistent across all batches"
   },
 
@@ -88,7 +90,7 @@ const regressionScenarios: RegressionScenario[] = [
       }
     ],
     expectedFinalEntities: new Set(["ליאו"]),
-    expectedStagingBehavior: "findPriorBatchEntity() returns batch 1 entity; no duplicate created",
+    expectedStagingBehavior: "persisted Main entity lookup; no staging table is used by the active handler",
     criticalCheck: "Only one ליאו UUID in final table; cross-batch resolution succeeded"
   },
 
@@ -104,7 +106,7 @@ const regressionScenarios: RegressionScenario[] = [
       }
     ],
     expectedFinalEntities: new Set(["ליאו", "דברניה"]),
-    expectedStagingBehavior: "branch mode: no staging, entities resolved against existing main",
+    expectedStagingBehavior: "branch mode: no staging, entities resolved against existing Main",
     criticalCheck: "Existing entities from main preserved; no duplicates created"
   },
 
@@ -120,7 +122,7 @@ const regressionScenarios: RegressionScenario[] = [
       }
     ],
     expectedFinalEntities: new Set(["רימון"]),
-    expectedStagingBehavior: "branch mode: new entity created with branch_version_id",
+    expectedStagingBehavior: "branch mode: new entity created with layer=branch and target branch id",
     criticalCheck: "New entity inserted; existing entities from main remain unchanged"
   },
 
@@ -136,8 +138,8 @@ const regressionScenarios: RegressionScenario[] = [
       }
     ],
     expectedFinalEntities: new Set([]),
-    expectedStagingBehavior: "bootstrap_stage marked as failed; rollbackBootstrap() executed",
-    criticalCheck: "bootstrap_entity_staging entries deleted; main entities table untouched"
+    expectedStagingBehavior: "direct Main persistence; failed-batch rollback requires database integration verification",
+    criticalCheck: "Failed request is returned; partial-write behavior requires isolated database verification"
   },
 
   {
@@ -152,35 +154,35 @@ const regressionScenarios: RegressionScenario[] = [
       }
     ],
     expectedFinalEntities: new Set(["ליאו"]),
-    expectedStagingBehavior: "New bootstrap_stage_id created; extraction proceeds normally",
+    expectedStagingBehavior: "new bootstrap run writes directly to Main after the empty-Main guard",
     criticalCheck: "Only one ליאו in final table; failed run does not interfere"
   }
 ];
 
 describe("Regression Tests - Main/Branch Architecture", () => {
   for (const scenario of regressionScenarios) {
-    it(scenario.name, async () => {
-      // Verify scenario structure
-      expect(scenario.mode).toMatch(/bootstrap|branch/);
-      expect(scenario.batches.length).toBeGreaterThan(0);
-      expect(scenario.expectedFinalEntities).toBeDefined();
-      expect(scenario.expectedStagingBehavior).toBeDefined();
-      expect(scenario.criticalCheck).toBeDefined();
+    it(`${scenario.name} has a valid executable scenario contract`, () => {
+      assertMatch(scenario.mode, /^(bootstrap|branch)$/);
+      assert(scenario.batches.length > 0, `${scenario.name}: at least one batch is required`);
+      assert(scenario.expectedFinalEntities instanceof Set, `${scenario.name}: expectedFinalEntities must be a Set`);
+      assert(scenario.expectedStagingBehavior.trim().length > 0, `${scenario.name}: persistence behavior is required`);
+      assert(scenario.criticalCheck.trim().length > 0, `${scenario.name}: critical check is required`);
 
-      console.log(`
-Scenario: ${scenario.name}
-Mode: ${scenario.mode}
-Batches: ${scenario.batches.length}
-Critical Check: ${scenario.criticalCheck}
-      `);
+      for (const batch of scenario.batches) {
+        assert(batch.batchNum > 0, `${scenario.name}: batch numbers must be positive`);
+        assert(batch.input.trim().length > 0, `${scenario.name}: batch input is required`);
+        assert(Array.isArray(batch.expectedNewEntities), `${scenario.name}: expectedNewEntities must be an array`);
+        assert(Array.isArray(batch.expectedMerges), `${scenario.name}: expectedMerges must be an array`);
+      }
 
-      // In a real test, this would:
-      // 1. Set up extraction with mode=${scenario.mode}
-      // 2. Process each batch in sequence
-      // 3. Verify expectedNewEntities and expectedMerges
-      // 4. Check final entity count matches expectedFinalEntities
-      // 5. Verify staging behavior
-      // 6. Run criticalCheck assertion
+      const request = scenario.mode === "bootstrap"
+        ? { extraction_mode: "bootstrap" as const }
+        : { extraction_mode: "branch" as const, target_branch_id: "test-branch" };
+      const validation = validateExtractionMode(request);
+      assert(validation.ok, `${scenario.name}: mode request should be valid`);
+      if (validation.ok) assertEquals(validation.mode, scenario.mode);
+
+      console.log(`\nScenario: ${scenario.name}\nMode: ${scenario.mode}\nBatches: ${scenario.batches.length}\nCritical Check: ${scenario.criticalCheck}`);
     });
   }
 });
@@ -195,18 +197,18 @@ export const architectureCheckList = {
   },
   
   "Cross-batch entity resolution": {
-    description: "findPriorBatchEntity() searches extraction_run_state for prior entities",
-    verification: "Same entity in batch 2 resolves to batch 1 UUID; no duplicate"
+    description: "Relationship and participant references can resolve against persisted Main/Branch entities when a batch-local match is absent.",
+    verification: "Run an E2E multi-batch extraction and verify same-entity UUID reuse."
   },
   
   "Bootstrap staging": {
-    description: "New entities staged in bootstrap_entity_staging before promoting to main",
-    verification: "bootstrap_stage_id set; promoteBootstrapToMain() transfers records"
+    description: "The current handler writes directly to Main; bootstrap-staging modules are not active in production extraction.",
+    verification: "Do not claim staging/promotion without a separate integration test that imports and invokes those modules."
   },
   
-  "Bootstrap corruption prevention": {
-    description: "Partial bootstrap failure rolls back; main entities never partially initialized",
-    verification: "Corrupt batch 1 triggers rollbackBootstrap(); main remains empty"
+  "Bootstrap failure safety": {
+    description: "A failed batch must be verified against the deployed database behavior; the active handler does not provide transaction rollback.",
+    verification: "Run an isolated E2E extraction and verify whether partial Main rows remain after failure."
   },
   
   "False merge prevention": {
@@ -225,8 +227,8 @@ export const architectureCheckList = {
   },
   
   "Alias resolution": {
-    description: "Aliases detected and linked to primary entity within same extraction",
-    verification: "Batch 1: 'ليو' -> 'ليو فروست'; Batch 2: 'الساحر' -> same UUID"
+    description: "Aliases detected and linked to the primary entity within a batch; cross-batch identity resolution is database-backed.",
+    verification: "Run an E2E extraction and verify aliases and UUID reuse."
   },
   
   "Multi-batch relationships": {
@@ -244,11 +246,11 @@ export const architectureCheckList = {
  * Known limitations (documented, not bugs)
  */
 export const knownLimitations = [
-  "In-memory entity resolution within a batch (cross-batch requires database)",
-  "Alias detection limited to same batch or prior batches in same run",
-  "Relationship extraction depends on co-mention in same chunk",
+  "Database-backed cross-batch reference resolution is not covered by these offline tests",
+  "Relationship/event persistence and participant resolution require a Supabase integration run",
   "Confidence scoring is heuristic-based (not ML model)",
-  "Generic entity filtering is rule-based (not semantic)"
+  "Generic entity filtering is rule-based (not semantic)",
+  "Bootstrap staging modules exist but are not wired into the active extraction handler",
 ];
 
 /**

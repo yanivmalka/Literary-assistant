@@ -106,12 +106,12 @@ verify "$([ -n "$BRANCH_ID_1" ] && echo true || echo false)" "Response branch_id
 ENTITIES_SAVED_1=$(echo "$RESPONSE_1" | grep -o '"entities_saved": [0-9]*' | grep -o '[0-9]*$' | head -1)
 echo "Entities saved in Main bootstrap: $ENTITIES_SAVED_1"
 
-# Check relationships and events (should be 0/skipped)
+# Check relationships and events persisted in the target layer
 RELATIONSHIPS_1=$(echo "$RESPONSE_1" | grep -o '"relationships_saved": [0-9]*' | grep -o '[0-9]*$' | head -1)
 EVENTS_1=$(echo "$RESPONSE_1" | grep -o '"events_saved": [0-9]*' | grep -o '[0-9]*$' | head -1)
 
-verify "$([ "$RELATIONSHIPS_1" = "0" ] && echo true || echo false)" "Main bootstrap skips relationships (saved=0)"
-verify "$([ "$EVENTS_1" = "0" ] && echo true || echo false)" "Main bootstrap skips events (saved=0)"
+verify "$([ -n "$RELATIONSHIPS_1" ] && echo true || echo false)" "Main reports relationships_saved"
+verify "$([ -n "$EVENTS_1" ] && echo true || echo false)" "Main reports events_saved"
 
 #==============================================
 # TEST 2: Second Extraction (Branch Mode)

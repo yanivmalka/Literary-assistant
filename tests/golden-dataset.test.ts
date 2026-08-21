@@ -3,8 +3,17 @@
 // Tests real-world extraction scenarios with expected outcomes
 // ============================================
 
-import { describe, it, expect, beforeAll, afterAll } from "https://deno.land/std@0.208.0/testing/bdd.ts";
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { describe, it } from "https://deno.land/std@0.208.0/testing/bdd.ts";
+import { assert, assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
+import {
+  normalizeEntities,
+  type GeminiExtraction,
+} from "../supabase/functions/extract-knowledge/normalization.ts";
+import {
+  normalizeExtractionPayload,
+  parseExtractionJson,
+  validateExtractionPayload,
+} from "../supabase/functions/extract-knowledge/testable-pipeline.ts";
 
 interface TestCase {
   name: string;
@@ -178,36 +187,101 @@ const goldenDataset: TestCase[] = [
 ];
 
 describe("Golden Dataset - Entity Extraction", () => {
-  let supabase: SupabaseClient;
-  let projectId: string;
-  let documentId: string;
-  let versionId: string;
-
-  beforeAll(async () => {
-    // Initialize test database connection
-    // This would connect to a test Supabase instance
-    console.log("Initializing golden dataset tests...");
-  });
-
-  afterAll(async () => {
-    console.log("Cleaning up test data...");
-  });
-
   for (const testCase of goldenDataset) {
-    it(testCase.name, async () => {
-      // This is a placeholder test structure
-      // In a real scenario, this would:
-      // 1. Extract entities from testCase.input
-      // 2. Query the database for extracted entities
-      // 3. Verify against expectedEntities
-      // 4. Check precautions
+    it(`${testCase.name} has a valid extraction contract`, () => {
+      assert(Array.isArray(testCase.expectedEntities), `${testCase.name}: expectedEntities must be an array`);
+      assert(Array.isArray(testCase.precautions), `${testCase.name}: precautions must be an array`);
 
-      expect(testCase.expectedEntities).toBeDefined();
-      expect(testCase.precautions).toBeDefined();
+      for (const entity of testCase.expectedEntities) {
+        assert(entity.name.trim().length > 0, `${testCase.name}: entity name must not be empty`);
+        assert(entity.type.trim().length > 0, `${testCase.name}: entity type must not be empty`);
+        if (entity.aliases) {
+          assert(entity.aliases.every((alias) => alias.trim().length > 0), `${testCase.name}: aliases must not be empty`);
+        }
+      }
 
-      console.log(`✓ ${testCase.name}`);
+      for (const relationship of testCase.expectedRelationships || []) {
+        assert(relationship.characterA.trim().length > 0, `${testCase.name}: relationship source is required`);
+        assert(relationship.characterB.trim().length > 0, `${testCase.name}: relationship target is required`);
+        assert(relationship.type.trim().length > 0, `${testCase.name}: relationship type is required`);
+      }
+
+      for (const event of testCase.expectedEvents || []) {
+        assert(event.trim().length > 0, `${testCase.name}: event name must not be empty`);
+      }
     });
   }
+
+  it("normalizes the canonical schema v2 through the production pipeline", () => {
+    const parsed = parseExtractionJson<unknown>(JSON.stringify({
+      schema_version: "2",
+      entities: [
+        {
+          name: "ליאו פרוסט",
+          type: "character",
+          description: "קוסם צעיר",
+          aliases: ["ליאו"],
+          attributes: { abilities: ["רונת אש"] },
+          name_uncertainty: {
+            is_uncertain: true,
+            confidence: 0.62,
+            reason: "כינוי מול שם מלא",
+          },
+          source_references: [{ chunk_position: 2, quote: "ליאו פרוסט הגיע" }],
+          field_evidence: { description: ["קוסם צעיר"] },
+        },
+        { name: "טרונהיים", type: "location", description: "עיר עתיקה" },
+        { name: "רונת אש", type: "magic_ability", description: "יכולת קסומה" },
+      ],
+      relationships: [{
+        source: { name: "ליאו פרוסט", type: "character" },
+        target: { name: "טרונהיים", type: "location" },
+        type: "located_in",
+        source_references: [{ chunk_position: 2, quote: "הגיע לטרונהיים" }],
+      }],
+      events: [{
+        name: "הגעה לטרונהיים",
+        description: "ליאו הגיע לעיר",
+        participants: [{ name: "ליאו פרוסט", type: "character" }],
+        location: { name: "טרונהיים", type: "location" },
+        chunk_positions: [2],
+      }],
+    }));
+
+    const extraction = normalizeExtractionPayload<GeminiExtraction>(parsed);
+    assert(extraction !== null, "canonical schema should be recognized");
+
+    const validation = validateExtractionPayload(extraction);
+    assert(validation.valid, `canonical schema should validate: ${validation.errors.join(", ")}`);
+    assertEquals(validation.itemCount, 5);
+
+    const normalized = normalizeEntities(extraction, new Map([
+      [2, { id: "chunk-2", page: 4 }],
+    ]));
+    assertEquals(normalized.length, 3);
+
+    const character = normalized.find((entity) => entity.entity_type === "character");
+    assert(character !== undefined, "character should be normalized");
+    assertEquals(character?.canonical_name, "ליאו פרוסט");
+    assertEquals(character?.aliases, ["ליאו"]);
+    assertEquals(character?.chunk_ids, ["chunk-2"]);
+    assertEquals(character?.attributes.extraction_meta, {
+      schema_version: "2",
+      name_uncertainty: {
+        is_uncertain: true,
+        confidence: 0.62,
+        reason: "כינוי מול שם מלא",
+      },
+      source_references: [{ chunk_position: 2, quote: "ליאו פרוסט הגיע" }],
+    });
+  });
+
+  it("rejects generic locations through the production filtering rules", () => {
+    const normalized = normalizeEntities({
+      locations: [{ name: "יער", description: "מקום כללי" }],
+    }, new Map());
+    assertEquals(normalized, []);
+  });
 });
 
 /**

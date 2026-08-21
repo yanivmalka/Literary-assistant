@@ -1,5 +1,5 @@
--- CONTROLLED EXTRACTION VERIFICATION QUERIES
--- Run these queries after executing the extraction on ../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md
+# Controlled Extraction Test - Verification Queries
+-- Fixture: `tests/fixtures/CONTROLLED_TEST_DOCUMENT.md` (text fixture used by the runner)
 -- Date: August 20, 2026
 -- Commit: 8597629
 -- Test Project ID: 6c4b7b92-214a-4785-ad66-e62527ee68d6

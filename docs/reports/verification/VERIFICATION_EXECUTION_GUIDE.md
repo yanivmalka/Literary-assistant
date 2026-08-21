@@ -2,7 +2,7 @@
 
 **Created:** 2024  
 **Project ID:** `6c4b7b92-214a-4785-ad66-e62527ee68d6`  
-**Test Document:** `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md`
+**Test Document:** `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md` (text fixture; the original PDF is also retained in the same directory)
 
 ---
 

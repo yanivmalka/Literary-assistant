@@ -47,7 +47,7 @@ async function main() {
 
     // Step 3: Read test document
     console.log("3️⃣  Reading test document...");
-    const docPath = path.join(__dirname, "../CONTROLLED_TEST_DOCUMENT.md");
+    const docPath = path.join(__dirname, "../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md");
     const docContent = fs.readFileSync(docPath, "utf-8");
     console.log(`✓ Read ${docContent.length} bytes\n`);
 

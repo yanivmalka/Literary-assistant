@@ -150,23 +150,14 @@ Apply all migrations in `supabase/migrations/` in numeric order. The current ext
 
 ## Testing Before Production
 
-### Unit Tests
-- [ ] Run golden dataset tests (15 cases)
+- [ ] Run Deno contract/normalization tests
   ```bash
-  deno test tests/golden-dataset.test.ts
+  npm run test:verification
   ```
-  - [ ] All test cases pass
-  - [ ] Expected metrics met (precision ≥95%, recall ≥85%)
+  - [ ] Golden dataset contract and production normalization tests pass
+  - [ ] Main/Branch mode contract tests pass
 
-- [ ] Run regression tests (7 scenarios)
-  ```bash
-  deno test tests/regression-main-branch.test.ts
-  ```
-  - [ ] All scenarios pass
-  - [ ] Bootstrap staging verified
-  - [ ] Rollback scenarios verified
-
-### Integration Tests
+- [ ] Run a real database verification separately (requires Supabase access)
 - [ ] Test single-batch extraction (bootstrap mode)
   - [ ] Extract document chunk
   - [ ] Verify entities created in main_entities

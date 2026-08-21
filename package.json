@@ -11,6 +11,9 @@
     "test:entities:offline": "npm --prefix client run test:entities:offline",
     "test:entities:models": "npm --prefix client run test:entities:models",
     "test:entities:all": "npm --prefix client run test:entities:all",
+    "test:golden": "deno test --no-prompt --allow-net tests/golden-dataset.test.ts",
+    "test:regression": "deno test --no-prompt --allow-net tests/regression-main-branch.test.ts",
+    "test:verification": "npm run test:golden && npm run test:regression",
     "install:all": "npm install && npm install --prefix client && npm install --prefix server"
   },
   "devDependencies": {
