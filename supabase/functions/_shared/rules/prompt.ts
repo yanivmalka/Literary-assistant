@@ -20,15 +20,63 @@ export function buildExtractionPrompt(chunks: { position: number; content: strin
   return `You are a literary entity extractor for Hebrew fiction. Extract meaningful entities from these text chunks.
 
 === OUTPUT FORMAT ===
-Return JSON with these arrays (omit empty arrays):
+Return exactly one JSON object and nothing else. Do not return Markdown, code fences, commentary, or a second object.
+Use schema_version "2" and one unified entities array. Omit empty arrays, but always include entities, relationships, and events.
 
-- characters: [{name, aliases[], age, gender, height, hair_color, eye_color, face_structure, common_clothing, scars, tattoos, description, narrative_role, evidence[], chunk_positions[], field_evidence: {field_name: ["quote supporting this field"], ...}}]
-- locations: [{name, aliases[], location_type, parent_location, description, continent, country, region, city, narrative_importance, related_characters, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
-- objects: [{name, aliases[], object_type, description, appearance, materials, special_properties, origin, current_location, owners, narrative_importance, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
-- abilities: [{name, aliases[], ability_type, description, mechanism, activation_conditions, limitations, cost, power_level, users, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
-- magic_abilities: [{name, aliases[], ability_type, description, mechanism, activation_conditions, limitations, cost, power_level, users, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
-- events: [{description, name, participants[], location, what_happened, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
-- relationships: [{character_a, character_b, relationship_type, evidence[], chunk_positions[], field_evidence: {field_name: ["quote"], ...}}]
+{
+  "schema_version": "2",
+  "entities": [
+    {
+      "name": "exact name from the text",
+      "type": "character | location | object | ability | magic_ability | organization",
+      "description": "short description grounded in the text",
+      "aliases": [],
+      "attributes": {},
+      "name_uncertainty": {
+        "is_uncertain": false,
+        "confidence": 0.0,
+        "reason": null
+      },
+      "evidence": [],
+      "source_references": [
+        {
+          "chunk_position": 0,
+          "quote": "short exact quote supporting the extraction",
+          "position_start": null,
+          "position_end": null
+        }
+      ],
+      "chunk_positions": [],
+      "field_evidence": { "field_name": ["exact supporting quote"] }
+    }
+  ],
+  "relationships": [
+    {
+      "source": { "name": "entity name", "type": "character" },
+      "target": { "name": "entity name", "type": "location" },
+      "type": "located_in",
+      "description": "short grounded explanation",
+      "evidence": [],
+      "source_references": [],
+      "chunk_positions": []
+    }
+  ],
+  "events": [
+    {
+      "name": "short event name",
+      "description": "what happened",
+      "participants": [{ "name": "entity name", "type": "character" }],
+      "location": { "name": "location name", "type": "location" },
+      "evidence": [],
+      "source_references": [],
+      "chunk_positions": []
+    }
+  ]
+}
+
+Every entity MUST have a non-empty name and type. Every relationship MUST have source, target, and type. Every event MUST have name or description. Use name_uncertainty when a nickname, title, or partial name may not be the canonical identity; do not invent a full name. Confidence is a number from 0 to 1 and represents model certainty, not a fact from the text.
+
+The persistence layer also accepts the older characters/locations/objects/abilities/magic_abilities format for backward compatibility, but you must emit the schema above.
 
 === FIELD-SPECIFIC EVIDENCE REQUIREMENT ===
 **CRITICAL: For important fields, you MUST provide supporting evidence from the text.**
@@ -154,22 +202,18 @@ DO extract:
 
 === ABILITIES ===
 
-Extract abilities into TWO SEPARATE ARRAYS. This is MANDATORY.
+Extract every ability as a first-class entity. Use `type: "ability"` for physical/combat abilities and `type: "magic_ability"` for magical/supernatural abilities.
 
-**abilities[]** — Physical/combat abilities:
+Physical examples:
 - "קריאת שפתיים"
 - "לחימה בשתי חרבות"
 - "ריפוי אנרגטי"
 
-**magic_abilities[]** — Magical/supernatural abilities:
+Magical examples:
 - "טלקינזיס"
 - "רונת אש"
 
-When you find these named abilities in the text, extract them immediately as first-class entities.
-
-If the text mentions: "בעל יכולת X" or "לחימה בX" or "טכניקת X" → extract X as an ability.
-
-Look for the keyword "יכולת" - whenever you see it, the thing after it is an ability to extract.
+When you find these named abilities in the text, extract them immediately and record the user in attributes.users or the ability's users field. If the text mentions "בעל יכולת X", "לחימה ב-X", or "טכניקת X", extract X only when the context identifies it as a meaningful ability.
 
 === CONTEXT AWARENESS ===
 - If a word can be either a character name or a concept (e.g., "רונה" could be a person or a type of magic), decide based on context.

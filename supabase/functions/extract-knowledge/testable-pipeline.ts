@@ -1,3 +1,9 @@
+import {
+  isCanonicalExtractionPayload,
+  referenceName,
+  sourceReferencesToLegacyFields,
+} from '../_shared/extraction-contract.ts';
+
 export type ExtractionMode = 'bootstrap' | 'branch';
 
 export interface ExtractionModeRequest {
@@ -108,12 +114,110 @@ function normalizeGenericEntityList(items: unknown[]): Record<string, unknown[]>
   return grouped
 }
 
+function canonicalEntityToLegacy(entity: Record<string, unknown>): Record<string, unknown> | null {
+  const name = typeof entity.name === 'string' ? entity.name.trim() : ''
+  const type = typeof entity.type === 'string' ? entity.type.trim() : ''
+  if (!name || !type) return null
+
+  const attributes = entity.attributes && typeof entity.attributes === 'object'
+    ? entity.attributes as Record<string, unknown>
+    : {}
+  const provenance = sourceReferencesToLegacyFields(
+    Array.isArray(entity.source_references) ? entity.source_references : undefined,
+    Array.isArray(entity.evidence) ? entity.evidence.filter((item): item is string => typeof item === 'string') : undefined,
+    Array.isArray(entity.chunk_positions) ? entity.chunk_positions.filter((item): item is number => typeof item === 'number') : undefined,
+  )
+
+  return {
+    ...entity,
+    ...attributes,
+    name,
+    type,
+    aliases: Array.isArray(entity.aliases) ? entity.aliases : [],
+    evidence: provenance.evidence || [],
+    chunk_positions: provenance.chunk_positions || [],
+  }
+}
+
+function canonicalRelationshipToLegacy(relationship: Record<string, unknown>): Record<string, unknown> | null {
+  const source = referenceName(relationship.source ?? relationship.character_a)
+  const target = referenceName(relationship.target ?? relationship.character_b)
+  const type = typeof (relationship.type ?? relationship.relationship_type) === 'string'
+    ? String(relationship.type ?? relationship.relationship_type).trim()
+    : ''
+  if (!source || !target || !type) return null
+
+  const provenance = sourceReferencesToLegacyFields(
+    Array.isArray(relationship.source_references) ? relationship.source_references : undefined,
+    Array.isArray(relationship.evidence) ? relationship.evidence.filter((item): item is string => typeof item === 'string') : undefined,
+    Array.isArray(relationship.chunk_positions) ? relationship.chunk_positions.filter((item): item is number => typeof item === 'number') : undefined,
+  )
+
+  return {
+    ...relationship,
+    character_a: source,
+    character_b: target,
+    relationship_type: type,
+    evidence: provenance.evidence || [],
+    chunk_positions: provenance.chunk_positions || [],
+  }
+}
+
+function canonicalEventToLegacy(event: Record<string, unknown>): Record<string, unknown> | null {
+  const name = typeof event.name === 'string' ? event.name.trim() : ''
+  const description = typeof event.description === 'string' ? event.description.trim() : ''
+  if (!name && !description) return null
+
+  const participants = Array.isArray(event.participants)
+    ? event.participants.map(referenceName).filter(Boolean)
+    : []
+  const location = referenceName(event.location) || null
+  const provenance = sourceReferencesToLegacyFields(
+    Array.isArray(event.source_references) ? event.source_references : undefined,
+    Array.isArray(event.evidence) ? event.evidence.filter((item): item is string => typeof item === 'string') : undefined,
+    Array.isArray(event.chunk_positions) ? event.chunk_positions.filter((item): item is number => typeof item === 'number') : undefined,
+  )
+
+  return {
+    ...event,
+    name: name || description,
+    description: description || name,
+    participants,
+    location,
+    what_happened: description || name,
+    evidence: provenance.evidence || [],
+    chunk_positions: provenance.chunk_positions || [],
+  }
+}
+
+function normalizeCanonicalPayload(record: Record<string, unknown>): Record<string, unknown[]> | null {
+  if (!isCanonicalExtractionPayload(record)) return null
+
+  const grouped: Record<string, unknown[]> = {}
+  for (const entity of record.entities) {
+    const legacy = canonicalEntityToLegacy(entity as unknown as Record<string, unknown>)
+    if (!legacy) continue
+    const type = String(legacy.type).toLowerCase().replace(/[\\s-]+/g, '_')
+    const bucket = normalizeExtractionType(type)
+    if (bucket && bucket !== 'events' && bucket !== 'relationships') (grouped[bucket] ||= []).push(legacy)
+  }
+
+  const relationships = Array.isArray(record.relationships)
+    ? record.relationships.map((item) => canonicalRelationshipToLegacy(item as unknown as Record<string, unknown>)).filter(Boolean)
+    : []
+  const events = Array.isArray(record.events)
+    ? record.events.map((item) => canonicalEventToLegacy(item as unknown as Record<string, unknown>)).filter(Boolean)
+    : []
+  if (relationships.length > 0) grouped.relationships = relationships as unknown[]
+  if (events.length > 0) grouped.events = events as unknown[]
+
+  return Object.keys(grouped).length > 0 ? grouped : null
+}
+
 /**
- * Normalize common model wrappers into the extraction contract expected by
- * the persistence pipeline. Models sometimes wrap the JSON in `result`,
- * `data`, or an `entities` array even when the prompt asks for top-level
- * arrays. Returning null for an unknown shape prevents silent zero-entity
- * successes.
+ * Normalize the canonical schema_version=2 payload and legacy model payloads
+ * into the persistence contract. Invalid items are retained for explicit
+ * validation rather than silently discarded.
  */
 export function normalizeExtractionPayload<T>(payload: unknown): T | null {
   if (Array.isArray(payload)) {
@@ -131,6 +235,9 @@ export function normalizeExtractionPayload<T>(payload: unknown): T | null {
       if (wrapped) return wrapped as T
     }
   }
+
+  const canonical = normalizeCanonicalPayload(record)
+  if (canonical) return canonical as T
 
   const aliases: Record<string, string[]> = {
     characters: ['characters', 'character', 'people', 'persons'],
@@ -167,6 +274,65 @@ export function normalizeExtractionPayload<T>(payload: unknown): T | null {
   }
 
   return recognized ? normalized as T : null
+}
+
+export interface ExtractionValidationResult {
+  valid: boolean;
+  errors: string[];
+  itemCount: number;
+}
+
+/** Validates the normalized extraction contract before any database writes. */
+export function validateExtractionPayload(payload: unknown): ExtractionValidationResult {
+  const errors: string[] = []
+  let itemCount = 0
+  if (!payload || typeof payload !== 'object') return { valid: false, errors: ['payload must be an object'], itemCount }
+
+  const record = payload as Record<string, unknown>
+  for (const bucket of ['characters', 'locations', 'objects', 'abilities', 'magic_abilities', 'organizations']) {
+    const items = record[bucket]
+    if (items == null) continue
+    if (!Array.isArray(items)) {
+      errors.push(`${bucket} must be an array`)
+      continue
+    }
+    items.forEach((item, index) => {
+      itemCount++
+      const name = item && typeof item === 'object' ? (item as Record<string, unknown>).name : null
+      if (typeof name !== 'string' || !name.trim()) errors.push(`${bucket}[${index}].name is required`)
+    })
+  }
+
+  const relationships = record.relationships
+  if (relationships != null) {
+    if (!Array.isArray(relationships)) errors.push('relationships must be an array')
+    else relationships.forEach((item, index) => {
+      itemCount++
+      const value = item as Record<string, unknown>
+      const source = value.character_a
+      const target = value.character_b
+      const type = value.relationship_type
+      if (typeof source !== 'string' || !source.trim()) errors.push(`relationships[${index}].source is required`)
+      if (typeof target !== 'string' || !target.trim()) errors.push(`relationships[${index}].target is required`)
+      if (typeof type !== 'string' || !type.trim()) errors.push(`relationships[${index}].type is required`)
+    })
+  }
+
+  const events = record.events
+  if (events != null) {
+    if (!Array.isArray(events)) errors.push('events must be an array')
+    else events.forEach((item, index) => {
+      itemCount++
+      const value = item as Record<string, unknown>
+      const name = value.name
+      const description = value.description ?? value.what_happened
+      if ((typeof name !== 'string' || !name.trim()) && (typeof description !== 'string' || !description.trim())) {
+        errors.push(`events[${index}].name or description is required`)
+      }
+    })
+  }
+
+  return { valid: errors.length === 0 && itemCount > 0, errors, itemCount }
 }
 
 /** Validates the same Main/Branch combinations accepted by the Edge Function. */

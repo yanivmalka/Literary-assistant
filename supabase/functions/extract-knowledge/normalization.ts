@@ -5,6 +5,7 @@ import {
   hasConflictingEntityContext,
   type EntityResolutionRecord,
 } from "../_shared/entity-resolution.ts";
+import type { ExtractionNameUncertainty, ExtractionSourceReference } from "../_shared/extraction-contract.ts";
 
 export interface ExtractedEntity {
   name: string;
@@ -54,6 +55,26 @@ export interface ExtractedEntity {
   power_level?: string | null;
   magic_system?: string | null;
   source?: string | null;
+  name_uncertainty?: ExtractionNameUncertainty | null;
+  source_references?: ExtractionSourceReference[];
+}
+
+export interface ExtractedEvent {
+  description?: string;
+  name?: string;
+  participants?: string[];
+  location?: string | null;
+  what_happened?: string;
+  evidence?: string[];
+  chunk_positions?: number[];
+}
+
+export interface ExtractedRelationship {
+  character_a: string;
+  character_b: string;
+  relationship_type: string;
+  evidence?: string[];
+  chunk_positions?: number[];
 }
 
 export interface GeminiExtraction {
@@ -63,6 +84,8 @@ export interface GeminiExtraction {
   abilities?: ExtractedEntity[];
   magic_abilities?: ExtractedEntity[];
   organizations?: ExtractedEntity[];
+  events?: ExtractedEvent[];
+  relationships?: ExtractedRelationship[];
 }
 
 export interface NormalizedEntity {
@@ -165,6 +188,15 @@ function computeFieldConfidence(
   return confidence;
 }
 
+function buildExtractionMetadata(entity: ExtractedEntity): Record<string, unknown> | null {
+  if (!entity.name_uncertainty && !entity.source_references) return null;
+  return {
+    schema_version: "2",
+    name_uncertainty: entity.name_uncertainty || null,
+    source_references: entity.source_references || [],
+  };
+}
+
 /**
  * Normalizes the exact Gemini extraction contract used by extract-knowledge.
  * It is pure: chunk metadata is supplied by the caller and no database client is used.
@@ -202,6 +234,13 @@ export function normalizeEntities(
     if (existing) {
       if (!existing.entity_types.includes(type)) existing.entity_types.push(type);
       if (entity.attributes) existing.attributes = { ...existing.attributes, ...entity.attributes };
+      const extractionMetadata = buildExtractionMetadata(entity);
+      if (extractionMetadata) {
+        existing.attributes.extraction_meta = {
+          ...((existing.attributes.extraction_meta as Record<string, unknown> | undefined) || {}),
+          ...extractionMetadata,
+        };
+      }
       if (entity.evidence) {
         for (const evidence of entity.evidence) {
           if (!existing.evidence.includes(evidence)) existing.evidence.push(evidence);
@@ -240,6 +279,8 @@ export function normalizeEntities(
       }
     } else {
       const attributes: Record<string, unknown> = { ...(entity.attributes || {}) };
+      const extractionMetadata = buildExtractionMetadata(entity);
+      if (extractionMetadata) attributes.extraction_meta = extractionMetadata;
       if (entity.abilities && entity.abilities.length > 0) attributes.abilities = entity.abilities;
       if (entity.relationships && entity.relationships.length > 0) attributes.relationships = entity.relationships;
       if (entity.users && entity.users.length > 0) attributes.users = entity.users;
