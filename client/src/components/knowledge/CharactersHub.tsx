@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch, Plus } from 'lucide-react'
 import { useBranchStore } from '@/stores/branchStore'
@@ -23,12 +23,18 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
   const { currentBranch } = useBranchStore()
   const { createEntity, fetchEntities: fetchEntitiesStore, getMainOnlyEntities, getEffectiveBranchEntities } = useEntityStore()
 
-  const [selectedVersion, setSelectedVersion] = useState<VersionType>('main')
+  const [selectedVersion, setSelectedVersion] = useState<VersionType>(
+    modelProfile === 'development' ? 'branch' : 'main',
+  )
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedCharacter, setSelectedCharacter] = useState<Entity | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const createInProgressRef = useRef(false)
+
+  useEffect(() => {
+    setSelectedVersion(modelProfile === 'development' ? 'branch' : 'main')
+  }, [modelProfile])
 
   // Get characters for selected version (Main or Branch)
   const mainCharacters = getMainOnlyEntities({ type: 'character' })

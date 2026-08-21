@@ -7,8 +7,11 @@ import { useBranchStore } from '@/stores/branchStore'
 import CharactersHub from '@/components/knowledge/CharactersHub'
 import LocationsHub from '@/components/knowledge/LocationsHub'
 import TimelineHub from '@/components/knowledge/TimelineHub'
-import type { ExtractionModelProfile } from '@/lib/extractionModels'
-import { getStoredExtractionModelProfile } from '@/lib/extractionModels'
+import {
+  EXTRACTION_MODEL_PROFILE_CHANGED_EVENT,
+  getStoredExtractionModelProfile,
+  type ExtractionModelProfile,
+} from '@/lib/extractionModels'
 
 type TabType = 'characters' | 'locations' | 'timeline'
 
@@ -23,7 +26,9 @@ export default function KnowledgeHubPage() {
 
   const { entities, fetchEntities } = useEntityStore()
   const { fetchCurrentBranch } = useBranchStore()
-  const [modelProfile] = useState<ExtractionModelProfile>(() => getStoredExtractionModelProfile())
+  const [modelProfile, setModelProfile] = useState<ExtractionModelProfile>(
+    getStoredExtractionModelProfile,
+  )
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const requestedTab = searchParams.get('tab')
     return isTabType(requestedTab) ? requestedTab : 'characters'
@@ -34,6 +39,16 @@ export default function KnowledgeHubPage() {
     const requestedTab = searchParams.get('tab')
     setActiveTab(isTabType(requestedTab) ? requestedTab : 'characters')
   }, [searchParams])
+
+  useEffect(() => {
+    const syncModelProfile = () => setModelProfile(getStoredExtractionModelProfile())
+    window.addEventListener(EXTRACTION_MODEL_PROFILE_CHANGED_EVENT, syncModelProfile)
+    window.addEventListener('storage', syncModelProfile)
+    return () => {
+      window.removeEventListener(EXTRACTION_MODEL_PROFILE_CHANGED_EVENT, syncModelProfile)
+      window.removeEventListener('storage', syncModelProfile)
+    }
+  }, [])
 
   useEffect(() => {
     if (projectId) {

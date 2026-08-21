@@ -5,8 +5,8 @@ import { useDocumentStore, type Document } from '@/stores/documentStore'
 import ProcessingStatus from './ProcessingStatus'
 import ExtractionProgress from './ExtractionProgress'
 import {
-  DEFAULT_EXTRACTION_MODEL_PROFILE,
   EXTRACTION_MODEL_PROFILES,
+  getStoredExtractionModelProfile,
   setStoredExtractionModelProfile,
   type ExtractionModelProfile,
 } from '@/lib/extractionModels'
@@ -29,7 +29,7 @@ const PROCESSING_STATUSES = new Set([
 export default function DocumentList({ projectId }: DocumentListProps) {
   const { t } = useTranslation()
   const [selectedModelProfile, setSelectedModelProfile] = useState<ExtractionModelProfile>(
-    DEFAULT_EXTRACTION_MODEL_PROFILE,
+    getStoredExtractionModelProfile,
   )
   const {
     documents,
