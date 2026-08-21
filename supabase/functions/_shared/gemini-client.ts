@@ -9,6 +9,7 @@ import {
   type GeminiModelConfig,
   GEMINI_API_BASE,
   MODEL_COOLDOWN_MS,
+  COOLDOWN_FAILURE_THRESHOLD,
   isRetriableError,
 } from "./gemini-config.ts";
 
@@ -73,6 +74,18 @@ function recordModelFailure(modelId: string): void {
       cooldownUntil: Date.now() + MODEL_COOLDOWN_MS,
     });
   }
+}
+
+function isModelInCooldown(modelId: string): boolean {
+  const entry = cooldownMap.get(modelId);
+  if (!entry) return false;
+
+  if (Date.now() >= entry.cooldownUntil) {
+    cooldownMap.delete(modelId);
+    return false;
+  }
+
+  return entry.failureCount >= COOLDOWN_FAILURE_THRESHOLD;
 }
 
 /** Exposed for testing: reset all cooldowns */
@@ -176,7 +189,17 @@ export async function callGeminiWithFallback(
   for (let modelIndex = 0; modelIndex < modelsToTry.length; modelIndex++) {
     const modelId = modelsToTry[modelIndex].id;
 
-    // Note: Cooldown is not used in serverless edge functions (no persistent state between invocations)
+    if (isModelInCooldown(modelId)) {
+      fallbackChain.push({
+        model: modelId,
+        status: null,
+        skipped: true,
+        reason: "model cooldown",
+        timestampMs: Date.now(),
+      });
+      console.log(`[Gemini Fallback] Skipping model in cooldown: ${modelId}`);
+      continue;
+    }
 
     const url = `${GEMINI_API_BASE}/${modelId}:generateContent?key=${apiKey}`;
     const startTime = Date.now();

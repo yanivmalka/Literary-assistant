@@ -47,10 +47,10 @@ describe('Entity Extraction model matrix contract (offline)', () => {
     it(`[model:${model.id}] sends the extraction prompt and normalizes its JSON response`, async () => {
       let requestedUrl = ''
       let requestedPayload = ''
-      globalThis.fetch = async (input, init) => {
+      globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
         requestedUrl = typeof input === 'string'
           ? input
-          : input instanceof Request
+          : 'url' in input
             ? input.url
             : input.toString()
         requestedPayload = String(init?.body || '')
