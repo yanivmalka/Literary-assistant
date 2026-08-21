@@ -31,6 +31,29 @@ async function checkTable(tableName) {
 async function main() {
   console.log(`\n📊 DATABASE INVENTORY\n`);
 
+  const email = process.env.SUPABASE_DIAGNOSTIC_EMAIL;
+  const password = process.env.SUPABASE_DIAGNOSTIC_PASSWORD;
+
+  if (!email || !password) {
+    console.error('❌ Missing authentication variables.');
+    console.error('Set SUPABASE_DIAGNOSTIC_EMAIL and SUPABASE_DIAGNOSTIC_PASSWORD in this PowerShell session, then run the script again.');
+    process.exitCode = 1;
+    return;
+  }
+
+  const { data, error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (signInError || !data.user) {
+    console.error(`❌ Supabase sign-in failed: ${signInError?.message || 'no user returned'}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`✓ Authenticated as ${data.user.email}`);
+
   const tables = [
     'projects',
     'documents',
@@ -44,7 +67,11 @@ async function main() {
     await checkTable(table);
   }
 
+  await supabase.auth.signOut();
   console.log(`\n`);
 }
 
-main();
+main().catch((error) => {
+  console.error(`❌ Diagnostic failed: ${error.message}`);
+  process.exitCode = 1;
+});
