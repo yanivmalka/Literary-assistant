@@ -81,23 +81,29 @@ export default function DocumentList({ projectId }: DocumentListProps) {
 
   return (
     <div className="space-y-3">
-      {documents.map(doc => (
-        <div key={doc.id} className="border rounded-lg p-4 bg-card">
+      {documents.map(doc => {
+        const isReady = doc.latest_version?.status === 'ready'
+        const processing = isProcessing(doc)
+
+        return (
+        <div
+          key={doc.id}
+          className={`border rounded-lg p-4 bg-card ${processing ? 'document-tile-processing' : ''}`}
+        >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <FileText className={`h-5 w-5 flex-shrink-0 ${isReady ? 'text-green-600' : 'text-muted-foreground'}`} />
               <div>
-                <h4 className={`font-medium text-sm ${
-                  doc.latest_version?.status === 'ready'
-                    ? 'text-green-600'
-                    : isProcessing(doc)
-                      ? 'document-name-shimmer'
-                      : ''
-                }`}>{doc.name}</h4>
+                <h4 className={`font-medium text-sm ${isReady ? 'text-green-600' : ''}`}>{doc.name}</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {doc.file_type.toUpperCase()} • v{doc.version_count}
+                  <span className={isReady ? 'text-green-600' : ''}>{doc.file_type.toUpperCase()}</span>
                   {doc.latest_version?.file_size && (
-                    <> • {(doc.latest_version.file_size / 1024 / 1024).toFixed(1)} MB</>
+                    <>
+                      {' • '}
+                      <span className={isReady ? 'text-green-600' : ''}>
+                        {(doc.latest_version.file_size / 1024 / 1024).toFixed(1)} MB
+                      </span>
+                    </>
                   )}
                 </p>
               </div>
@@ -144,7 +150,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
               )}
               <button
                 onClick={() => handleDelete(doc.id)}
-                className="p-1.5 text-muted-foreground hover:text-destructive rounded transition-colors"
+                className="relative z-20 p-1.5 text-red-600 hover:text-red-700 rounded transition-colors"
                 title={t('common.delete')}
               >
                 <Trash2 className="h-4 w-4" />
@@ -174,7 +180,8 @@ export default function DocumentList({ projectId }: DocumentListProps) {
             </div>
           )}
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

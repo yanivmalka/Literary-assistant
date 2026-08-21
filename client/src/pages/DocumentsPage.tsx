@@ -26,7 +26,7 @@ export default function DocumentsPage() {
       const status = d.latest_version?.status
       if (!status) return false
       // Active processing states
-      if (['uploaded', 'extracting', 'extracted', 'chunking', 'chunked', 'indexing', 'analyzing'].includes(status)) {
+      if (['uploaded', 'extracting', 'extracted', 'chunking', 'chunked', 'indexing', 'indexed', 'analyzing'].includes(status)) {
         // Check if stuck: if processing started more than 120s ago, consider it failed
         const startedAt = d.latest_version?.processing_started_at
         if (startedAt) {

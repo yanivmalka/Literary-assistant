@@ -62,26 +62,33 @@
     background: hsl(var(--muted-foreground) / 0.5);
   }
 
-  /* A subtle green light sweep over documents while they are processing. */
-  .document-name-shimmer {
-    color: transparent;
-    background-image: linear-gradient(
+  /* A green light sweep over the entire document tile while it is processing. */
+  .document-tile-processing {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .document-tile-processing::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+    background: linear-gradient(
       110deg,
-      #16a34a 0%,
-      #16a34a 38%,
-      #bbf7d0 50%,
-      #16a34a 62%,
-      #16a34a 100%
+      transparent 0%,
+      rgba(22, 163, 74, 0.08) 35%,
+      rgba(187, 247, 208, 0.75) 50%,
+      rgba(22, 163, 74, 0.08) 65%,
+      transparent 100%
     );
     background-size: 250% 100%;
     background-position: 200% 0;
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: document-name-shimmer 1.8s ease-in-out infinite;
+    animation: document-tile-processing 1.8s ease-in-out infinite;
   }
 
-  @keyframes document-name-shimmer {
+  @keyframes document-tile-processing {
     0% {
       background-position: 200% 0;
     }
@@ -91,10 +98,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .document-name-shimmer {
-      color: #16a34a;
-      background: none;
-      -webkit-text-fill-color: currentColor;
+    .document-tile-processing::after {
+      background: rgba(187, 247, 208, 0.35);
       animation: none;
     }
   }
