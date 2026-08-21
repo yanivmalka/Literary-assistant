@@ -40,6 +40,8 @@ import {
   resolveExtractionCandidate,
   type EntityResolutionRecord,
 } from "../_shared/entity-resolution.ts";
+import { normalizeEntities as normalizeEntitiesForExtraction } from "./normalization.ts";
+import { parseExtractionJson, validateExtractionMode } from "./testable-pipeline.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
