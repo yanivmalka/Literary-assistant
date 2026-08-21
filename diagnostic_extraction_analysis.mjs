@@ -187,6 +187,28 @@ async function main() {
   `);
 
   try {
+    const email = process.env.SUPABASE_DIAGNOSTIC_EMAIL;
+    const password = process.env.SUPABASE_DIAGNOSTIC_PASSWORD;
+
+    if (!email || !password) {
+      console.error('❌ Missing authentication variables.');
+      console.error('Set SUPABASE_DIAGNOSTIC_EMAIL and SUPABASE_DIAGNOSTIC_PASSWORD in this PowerShell session, then run the script again.');
+      process.exitCode = 1;
+      return;
+    }
+
+    const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError || !authData.user) {
+      console.error(`❌ Supabase sign-in failed: ${signInError?.message || 'no user returned'}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    console.log(`✓ Authenticated as ${authData.user.email}`);
     console.log(`\n📥 Fetching last 3 extractions...\n`);
     
     const { data: extractions, error } = await supabase
