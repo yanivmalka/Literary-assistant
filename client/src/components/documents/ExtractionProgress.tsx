@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Brain, CheckCircle, XCircle, AlertTriangle, X, Loader2 } from 'lucide-react'
 import { useDocumentStore } from '@/stores/documentStore'
@@ -16,6 +16,16 @@ export default function ExtractionProgress() {
     cancelExtraction,
     dismissExtractionStatus,
   } = useDocumentStore()
+
+  useEffect(() => {
+    if (!extractionDone) return
+
+    const timeoutId = window.setTimeout(() => {
+      dismissExtractionStatus()
+    }, 5000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [extractionDone, dismissExtractionStatus])
 
   // Nothing to show
   if (!extractionInProgress && !extractionDone && !extractionCancelled && !extractionError) {
@@ -55,13 +65,6 @@ export default function ExtractionProgress() {
             <CheckCircle className="h-5 w-5" />
             <span className="text-sm font-medium">{t('documents.extraction.completed')}</span>
           </div>
-          <button
-            onClick={handleDismiss}
-            className="p-1 text-green-600 hover:text-green-800 rounded transition-colors"
-            title={t('documents.extraction.dismiss')}
-          >
-            <X className="h-4 w-4" />
-          </button>
         </div>
         {progress && (
           <p className="text-xs text-green-600 ps-7">
