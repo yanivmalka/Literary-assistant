@@ -1047,11 +1047,12 @@ Deno.serve(async (req) => {
     console.log(`[extract-knowledge] Model: ${modelUsed}, Response length: ${responseText.length}, Parts: ${parts.length}, TextParts: ${textParts.length}`);
 
     if (!responseText || responseText.trim().length === 0) {
-      console.error(`[extract-knowledge] Empty response from ${modelUsed}.`);
-      const done = chunks.length < limit;
-      return new Response(
-        JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, model_profile: modelProfile, latency_ms: latencyMs }, summary: { entities_saved: 0, normalized_entity_count: 0 } }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      const message = `Gemini returned an empty response from ${modelUsed}.`;
+      console.error(`[extract-knowledge] ${message}`);
+      return errorResponse(
+        message,
+        502,
+        `model=${modelUsed}, parts=${parts.length}, text_parts=${textParts.length}`,
       );
     }
     const usage = (geminiData as Record<string, unknown>)?.usageMetadata || {};
@@ -1061,17 +1062,41 @@ Deno.serve(async (req) => {
     }
 
     // ==============================
-    // Step 3: Parse JSON — skip batch on failure
+    // Step 3: Parse and validate JSON
     // ==============================
-    const extraction = parseExtractionJson<GeminiExtraction>(responseText);
+    const parsedExtraction = parseExtractionJson<unknown>(responseText);
+    const extraction = normalizeExtractionPayload<GeminiExtraction>(parsedExtraction);
     if (!extraction) {
-      console.warn(`[extract-knowledge] Skipping batch offset=${offset}: unparseable JSON`);
-      const done = chunks.length < limit;
-      return new Response(
-        JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, model_profile: modelProfile, latency_ms: latencyMs, skipped: true }, summary: { entities_saved: 0, skipped_parse_error: true } }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      const message = "Gemini returned JSON that does not match the extraction schema.";
+      console.error(`[extract-knowledge] ${message} offset=${offset}`);
+      return errorResponse(
+        message,
+        502,
+        `model=${modelUsed}, response_length=${responseText.length}`,
       );
     }
+
+    const extractedItemCount = [
+      extraction.characters,
+      extraction.locations,
+      extraction.objects,
+      extraction.abilities,
+      extraction.magic_abilities,
+      extraction.organizations,
+      extraction.events,
+      extraction.relationships,
+    ].reduce((total, items) => total + (items?.length || 0), 0);
+
+    if (extractedItemCount === 0) {
+      const message = "Gemini returned a valid extraction response with no extractable items.";
+      console.warn(`[extract-knowledge] ${message} offset=${offset}`);
+      return errorResponse(
+        message,
+        422,
+        `model=${modelUsed}, response_length=${responseText.length}`,
+      );
+    }
+
 
     // ==============================
     // Step 4: Save raw extraction

@@ -33,6 +33,81 @@ export function parseExtractionJson<T>(responseText: string): T | null {
   }
 }
 
+type NormalizedExtractionBucket =
+  | 'characters'
+  | 'locations'
+  | 'objects'
+  | 'abilities'
+  | 'magic_abilities'
+  | 'organizations'
+  | 'events'
+  | 'relationships'
+
+function normalizeExtractionType(value: unknown): NormalizedExtractionBucket | null {
+  const rawType = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+
+  switch (rawType) {
+    case 'character':
+    case 'person':
+    case 'people':
+      return 'characters'
+    case 'location':
+    case 'place':
+    case 'places':
+      return 'locations'
+    case 'object':
+    case 'item':
+    case 'artifact':
+      return 'objects'
+    case 'ability':
+    case 'skill':
+    case 'power':
+      return 'abilities'
+    case 'magic_ability':
+    case 'magical_ability':
+    case 'magic_power':
+    case 'spell':
+      return 'magic_abilities'
+    case 'organization':
+    case 'group':
+    case 'faction':
+      return 'organizations'
+    case 'event':
+      return 'events'
+    case 'relationship':
+      return 'relationships'
+    default:
+      return null
+  }
+}
+
+function mergeExtractionBuckets(
+  target: Record<string, unknown[]>,
+  source: Record<string, unknown[]>,
+): void {
+  for (const [key, values] of Object.entries(source)) {
+    target[key] = [...(target[key] || []), ...values]
+  }
+}
+
+function normalizeGenericEntityList(items: unknown[]): Record<string, unknown[]> {
+  const grouped: Record<string, unknown[]> = {}
+
+  for (const item of items) {
+    if (!item || typeof item !== 'object') continue
+    const record = item as Record<string, unknown>
+    const bucket = normalizeExtractionType(
+      record.entity_type ?? record.entityType ?? record.kind ?? record.category ?? record.type,
+    )
+    if (bucket) (grouped[bucket] ||= []).push(item)
+  }
+
+  return grouped
+}
+
 /**
  * Normalize common model wrappers into the extraction contract expected by
  * the persistence pipeline. Models sometimes wrap the JSON in `result`,
@@ -42,36 +117,18 @@ export function parseExtractionJson<T>(responseText: string): T | null {
  */
 export function normalizeExtractionPayload<T>(payload: unknown): T | null {
   if (Array.isArray(payload)) {
-    const grouped: Record<string, unknown[]> = {}
-    for (const item of payload) {
-      if (!item || typeof item !== 'object') continue
-      const record = item as Record<string, unknown>
-      const rawType = String(record.entity_type ?? record.type ?? '').toLowerCase()
-      const type = rawType === 'character' || rawType === 'person' || rawType === 'people'
-        ? 'characters'
-        : rawType === 'location' || rawType === 'place' || rawType === 'places'
-          ? 'locations'
-          : rawType === 'object' || rawType === 'item' || rawType === 'artifact'
-            ? 'objects'
-            : rawType === 'ability' || rawType === 'skill'
-              ? 'abilities'
-              : rawType === 'magic_ability' || rawType === 'magical_ability'
-                ? 'magic_abilities'
-                : rawType === 'organization' || rawType === 'group'
-                  ? 'organizations'
-                  : null
-      if (type) (grouped[type] ||= []).push(item)
-    }
+    const grouped = normalizeGenericEntityList(payload)
     return Object.keys(grouped).length > 0 ? grouped as T : null
   }
 
   if (!payload || typeof payload !== 'object') return null
   const record = payload as Record<string, unknown>
   const wrapperKeys = ['result', 'data', 'extraction', 'output', 'response', 'knowledge']
+
   for (const wrapperKey of wrapperKeys) {
     if (record[wrapperKey] && typeof record[wrapperKey] === 'object') {
-      const wrapped = normalizeExtractionPayload<T>(record[wrapperKey])
-      if (wrapped) return wrapped
+      const wrapped = normalizeExtractionPayload<Record<string, unknown[]>>(record[wrapperKey])
+      if (wrapped) return wrapped as T
     }
   }
 
@@ -96,13 +153,15 @@ export function normalizeExtractionPayload<T>(payload: unknown): T | null {
     recognized = true
   }
 
-  const entityList = record.entities
-  if (Array.isArray(entityList)) {
-    const grouped = normalizeExtractionPayload<Record<string, unknown[]>>(entityList)
+  const genericEntities = record.entities ?? record.entity_list ?? record.knowledge_entities
+  if (Array.isArray(genericEntities)) {
+    const grouped = normalizeGenericEntityList(genericEntities)
+    mergeExtractionBuckets(normalized, grouped)
+    recognized = recognized || Object.keys(grouped).length > 0
+  } else if (genericEntities && typeof genericEntities === 'object') {
+    const grouped = normalizeExtractionPayload<Record<string, unknown[]>>(genericEntities)
     if (grouped) {
-      for (const [key, values] of Object.entries(grouped)) {
-        normalized[key] = [...(normalized[key] || []), ...values]
-      }
+      mergeExtractionBuckets(normalized, grouped)
       recognized = true
     }
   }
