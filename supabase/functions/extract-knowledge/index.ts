@@ -611,29 +611,6 @@ type ExtractionEntityCandidate = EntityResolutionRecord & {
   overlayBaseValues?: Record<string, unknown>;
 };
 
-/**
- * Find an entity ID in the current batch by name.
- * Used to resolve relationships and links between entities within the same extraction.
- * Returns the entity's UUID if found, null otherwise.
- */
-function findBatchEntityId(
-  name: string,
-  entries: Array<{ entity: NormalizedEntity; id: string }>,
-): string | null {
-  if (!name || !name.trim()) return null;
-  const key = normalizeKey(stripNikud(name.trim()));
-  if (!key) return null;
-
-  for (const { entity, id } of entries) {
-    const entityKey = normalizeKey(entity.canonical_name);
-    if (entityKey === key) return id;
-    for (const alias of entity.aliases || []) {
-      if (normalizeKey(alias) === key) return id;
-    }
-  }
-
-  return null;
-}
 async function loadEntityAliases(
   supabase: any,
   entityIds: string[],
