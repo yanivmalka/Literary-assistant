@@ -140,12 +140,21 @@ function canonicalEntityToLegacy(entity: Record<string, unknown>): Record<string
 }
 
 function canonicalRelationshipToLegacy(relationship: Record<string, unknown>): Record<string, unknown> | null {
-  const source = referenceName(relationship.source ?? relationship.character_a)
-  const target = referenceName(relationship.target ?? relationship.character_b)
+  const sourceValue = relationship.source ?? relationship.character_a
+  const targetValue = relationship.target ?? relationship.character_b
+  const source = referenceName(sourceValue)
+  const target = referenceName(targetValue)
   const type = typeof (relationship.type ?? relationship.relationship_type) === 'string'
     ? String(relationship.type ?? relationship.relationship_type).trim()
     : ''
   if (!source || !target || !type) return null
+
+  const sourceType = sourceValue && typeof sourceValue === 'object'
+    ? (sourceValue as Record<string, unknown>).type
+    : null
+  const targetType = targetValue && typeof targetValue === 'object'
+    ? (targetValue as Record<string, unknown>).type
+    : null
 
   const provenance = sourceReferencesToLegacyFields(
     Array.isArray(relationship.source_references) ? relationship.source_references : undefined,
@@ -157,6 +166,8 @@ function canonicalRelationshipToLegacy(relationship: Record<string, unknown>): R
     ...relationship,
     character_a: source,
     character_b: target,
+    source_type: typeof sourceType === 'string' ? sourceType : null,
+    target_type: typeof targetType === 'string' ? targetType : null,
     relationship_type: type,
     evidence: provenance.evidence || [],
     chunk_positions: provenance.chunk_positions || [],
@@ -276,14 +287,14 @@ export function normalizeExtractionPayload<T>(payload: unknown): T | null {
   return recognized ? normalized as T : null
 }
 
-export interface ExtractionValidationResult {
+export interface ExtractionPayloadValidationResult {
   valid: boolean;
   errors: string[];
   itemCount: number;
 }
 
 /** Validates the normalized extraction contract before any database writes. */
-export function validateExtractionPayload(payload: unknown): ExtractionValidationResult {
+export function validateExtractionPayload(payload: unknown): ExtractionPayloadValidationResult {
   const errors: string[] = []
   let itemCount = 0
   if (!payload || typeof payload !== 'object') return { valid: false, errors: ['payload must be an object'], itemCount }

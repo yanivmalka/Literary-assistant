@@ -202,7 +202,7 @@ DO extract:
 
 === ABILITIES ===
 
-Extract every ability as a first-class entity. Use `type: "ability"` for physical/combat abilities and `type: "magic_ability"` for magical/supernatural abilities.
+Extract every ability as a first-class entity. Use the field "type" with value "ability" for physical/combat abilities and value "magic_ability" for magical/supernatural abilities.
 
 Physical examples:
 - "קריאת שפתיים"

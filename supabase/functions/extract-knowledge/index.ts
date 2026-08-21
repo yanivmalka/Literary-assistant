@@ -87,9 +87,7 @@ interface ExtractedEntity {
   users?: string[];
   members?: string[];
   purpose?: string | null;
-  // NEW: Field-specific evidence
   field_evidence?: Record<string, string[]>;
-  // Character fields
   age?: string | null;
   gender?: string | null;
   height?: string | null;
@@ -100,7 +98,6 @@ interface ExtractedEntity {
   scars?: string | null;
   tattoos?: string | null;
   narrative_role?: string | null;
-  // Location fields
   location_type?: string | null;
   parent_location?: string | null;
   continent?: string | null;
@@ -109,7 +106,6 @@ interface ExtractedEntity {
   city?: string | null;
   narrative_importance?: string | null;
   related_characters?: string | null;
-  // Object fields
   object_type?: string | null;
   appearance?: string | null;
   materials?: string | null;
@@ -117,7 +113,6 @@ interface ExtractedEntity {
   origin?: string | null;
   current_location?: string | null;
   owners?: string | null;
-  // Ability fields
   ability_type?: string | null;
   mechanism?: string | null;
   activation_conditions?: string | null;
@@ -126,36 +121,34 @@ interface ExtractedEntity {
   power_level?: string | null;
   magic_system?: string | null;
   source?: string | null;
+  name_uncertainty?: ExtractionNameUncertainty | null;
+  source_references?: ExtractionSourceReference[];
 }
 
 interface ExtractedEvent {
-  description: string;
+  description?: string;
   name?: string;
   participants?: string[];
   location?: string | null;
   what_happened?: string;
   evidence?: string[];
   chunk_positions?: number[];
+  uncertainty?: number | null;
+  source_references?: ExtractionSourceReference[];
 }
 
 interface ExtractedRelationship {
   character_a: string;
   character_b: string;
   relationship_type: string;
+  description?: string | null;
+  source_type?: string | null;
+  target_type?: string | null;
+  uncertainty?: number | null;
   evidence?: string[];
+  source_references?: ExtractionSourceReference[];
   chunk_positions?: number[];
 }
-
-const INITIAL_RELATIONSHIP_TYPES = new Set([
-  "owns",
-  "uses",
-  "located_in",
-  "knows",
-  "parent_of",
-  "involves",
-  "occurs_at",
-  "contained_in",
-]);
 
 interface GeminiExtraction {
   characters?: ExtractedEntity[];
@@ -166,6 +159,16 @@ interface GeminiExtraction {
   organizations?: ExtractedEntity[];
   events?: ExtractedEvent[];
   relationships?: ExtractedRelationship[];
+}
+
+function normalizeRelationshipType(value: string | null | undefined): string | null {
+  const normalized = value
+    ?.trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/[^\p{L}\p{N}_]/gu, "")
+    .slice(0, 100);
+  return normalized || null;
 }
 
 // ============================================
@@ -779,6 +782,61 @@ function findBatchEntityId(
   return ids.length === 1 ? ids[0] : null;
 }
 
+async function findPersistedEntityId(
+  supabase: any,
+  projectId: string,
+  userId: string,
+  branchId: string | null,
+  name: string,
+  entityType?: string | null,
+  batchEntries: Array<{ entity: NormalizedEntity; id: string }> = [],
+): Promise<string | null> {
+  const batchId = findBatchEntityId(name, batchEntries);
+  if (batchId) return batchId;
+  const key = normalizeKey(name);
+  if (!key) return null;
+
+  const mainQuery = supabase
+    .from("knowledge_entities")
+    .select("id, canonical_name, entity_type, entity_types")
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .eq("layer", "main");
+  const branchQuery = branchId
+    ? supabase
+      .from("knowledge_entities")
+      .select("id, canonical_name, entity_type, entity_types")
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .eq("layer", "branch")
+      .eq("branch_id", branchId)
+    : Promise.resolve({ data: [], error: null });
+
+  const [mainResult, branchResult] = await Promise.all([mainQuery, branchQuery]);
+  if (mainResult.error) throw new Error(`Failed to resolve Main entity reference: ${mainResult.error.message}`);
+  if (branchResult.error) throw new Error(`Failed to resolve Branch entity reference: ${branchResult.error.message}`);
+
+  const rows = [...(mainResult.data || []), ...(branchResult.data || [])] as Array<{
+    id: string;
+    canonical_name: string;
+    entity_type: string;
+    entity_types?: string[];
+  }>;
+  const aliases = await loadEntityAliases(
+    supabase,
+    rows.map((row) => row.id),
+    branchId,
+  );
+  const matches = rows.filter((row) => {
+    const types = [row.entity_type, ...(row.entity_types || [])];
+    if (entityType && !types.includes(entityType)) return false;
+    return normalizeKey(row.canonical_name) === key ||
+      (aliases.get(row.id) || []).some((alias) => normalizeKey(alias) === key);
+  });
+  const ids = [...new Set(matches.map((row) => row.id))];
+  return ids.length === 1 ? ids[0] : null;
+}
+
 // ============================================
 // Main Handler
 // ============================================
@@ -1075,6 +1133,20 @@ Deno.serve(async (req) => {
         502,
         `model=${modelUsed}, response_length=${responseText.length}`,
       );
+    }
+
+    const extractionValidation = validateExtractionPayload(extraction);
+    if (!extractionValidation.valid) {
+      const message = "Gemini returned an invalid extraction payload.";
+      console.error(`[extract-knowledge] ${message}`, extractionValidation.errors);
+      return errorResponse(
+        message,
+        502,
+        extractionValidation.errors.slice(0, 20).join("; "),
+      );
+    }
+    if (extractionValidation.errors.length > 0) {
+      console.warn("[extract-knowledge] Extraction payload warnings:", extractionValidation.errors);
     }
 
     const extractedItemCount = [
@@ -1477,8 +1549,8 @@ Deno.serve(async (req) => {
                 chunk_position: entity.chunk_positions?.[0] || null,
                 raw_extraction_id: rawExtractionId,
                 branch_id: targetBranchId || null,
-                operation: targetLayer === "main" ? null : "add",
-                review_status: targetLayer === "main" ? null : "pending",
+                operation: "add",
+                review_status: targetLayer === "main" ? "approved" : "pending",
                 base_exists: false,
               },
               { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" }
@@ -1533,8 +1605,8 @@ Deno.serve(async (req) => {
             chunk_position: abilityEntity.chunk_positions?.[0] || null,
             raw_extraction_id: rawExtractionId,
             branch_id: targetBranchId || null,
-            operation: targetLayer === "main" ? null : "add",
-            review_status: targetLayer === "main" ? null : "pending",
+            operation: "add",
+            review_status: targetLayer === "main" ? "approved" : "pending",
             base_exists: false,
           },
           { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" },
@@ -1546,21 +1618,35 @@ Deno.serve(async (req) => {
     }
 
     // ==============================
-    // Step 6: Save relationships (Branch mode only)
+    // Step 6: Save relationships in the target layer
     // ==============================
-    // In Main bootstrap mode, relationships are not saved yet (only entities)
     let relationshipsSaved = 0;
-    if (targetLayer === "branch") {
-      for (const rel of extraction.relationships || []) {
-        const relationshipType = rel.relationship_type?.trim();
-        if (!relationshipType || !INITIAL_RELATIONSHIP_TYPES.has(relationshipType)) continue;
+    for (const rel of extraction.relationships || []) {
+      const relationshipType = normalizeRelationshipType(rel.relationship_type);
+      if (!relationshipType) continue;
 
-        const sourceId = findBatchEntityId(rel.character_a?.trim() || "", entityIdEntries);
-        const targetId = findBatchEntityId(rel.character_b?.trim() || "", entityIdEntries);
-        if (!sourceId || !targetId) continue;
+      const sourceId = await findPersistedEntityId(
+        supabase,
+        body.project_id,
+        body.user_id,
+        targetBranchId,
+        rel.character_a?.trim() || "",
+        rel.source_type,
+        entityIdEntries,
+      );
+      const targetId = await findPersistedEntityId(
+        supabase,
+        body.project_id,
+        body.user_id,
+        targetBranchId,
+        rel.character_b?.trim() || "",
+        rel.target_type,
+        entityIdEntries,
+      );
+      if (!sourceId || !targetId || sourceId === targetId) continue;
 
-        // A Branch proposal records whether the same edge existed in Main at the
-        // time of extraction. Main is queried only; it is never updated here.
+      let baseExists = false;
+      if (targetLayer === "branch") {
         const { data: baseRelationship, error: baseError } = await supabase
           .from("knowledge_entity_relationships")
           .select("id")
@@ -1576,88 +1662,123 @@ Deno.serve(async (req) => {
           console.error(`Failed to inspect Main relationship '${relationshipType}':`, baseError.message);
           continue;
         }
-
-        const { error: relationshipError } = await supabase
-          .from("knowledge_entity_relationships")
-          .upsert(
-            {
-              project_id: body.project_id,
-              document_id: body.document_id,
-              version_id: body.version_id,
-              source_entity_id: sourceId,
-              target_entity_id: targetId,
-              relationship_type: relationshipType,
-              evidence: rel.evidence?.join(" | ")?.slice(0, 1000) || null,
-              chunk_position: rel.chunk_positions?.[0] || null,
-              raw_extraction_id: rawExtractionId,
-              branch_id: targetBranchId!,
-              operation: "add",
-              review_status: "pending",
-              base_exists: Boolean(baseRelationship),
-            },
-            { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" }
-          );
-
-        if (relationshipError) {
-          console.error(`Failed to save Branch relationship '${relationshipType}':`, relationshipError.message);
-          continue;
-        }
-        relationshipsSaved++;
+        baseExists = Boolean(baseRelationship);
       }
+
+      const { error: relationshipError } = await supabase
+        .from("knowledge_entity_relationships")
+        .upsert(
+          {
+            project_id: body.project_id,
+            document_id: body.document_id,
+            version_id: body.version_id,
+            source_entity_id: sourceId,
+            target_entity_id: targetId,
+            relationship_type: relationshipType,
+            evidence: rel.evidence?.join(" | ")?.slice(0, 1000) || null,
+            chunk_position: rel.chunk_positions?.[0] || null,
+            metadata: {
+              description: rel.description || null,
+              uncertainty: rel.uncertainty ?? null,
+              source_references: rel.source_references || [],
+            },
+            raw_extraction_id: rawExtractionId,
+            branch_id: targetBranchId,
+            operation: "add",
+            review_status: targetLayer === "main" ? "approved" : "pending",
+            base_exists: baseExists,
+          },
+          { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" },
+        );
+
+      if (relationshipError) {
+        console.error(`Failed to save ${targetLayer} relationship '${relationshipType}':`, relationshipError.message);
+        continue;
+      }
+      relationshipsSaved++;
     }
 
     // ==============================
-    // Step 7: Save events (Branch mode only)
+    // Step 7: Save events in the target layer
     // ==============================
-    // In Main bootstrap mode, events are not saved (relationships aren't either)
     let eventsSaved = 0;
     let eventMentionsSaved = 0;
     let eventParticipantsSaved = 0;
-    if (targetLayer === "branch") {
-      for (const event of extraction.events || []) {
-        const eventName = (event.description || event.name || "unnamed event").slice(0, 200);
+    for (const event of extraction.events || []) {
+      const eventName = (event.name || event.description || event.what_happened || "unnamed event").trim().slice(0, 200);
+      const eventDescription = event.what_happened || event.description || event.name || null;
+      const eventBranchId = targetBranchId;
 
-        const { data: upsertedEvent, error: eventError } = await supabase
-          .from("knowledge_events")
-          .upsert(
-            {
-              project_id: body.project_id,
-              document_id: body.document_id,
-              version_id: body.version_id,
-              user_id: body.user_id,
-              name: eventName,
-              description: event.what_happened || event.description || null,
-              attributes: { location: event.location || null, participants: event.participants || [] },
-              raw_extraction_id: rawExtractionId,
-              branch_id: targetBranchId!,
+      const { data: upsertedEvent, error: eventError } = await supabase
+        .from("knowledge_events")
+        .upsert(
+          {
+            project_id: body.project_id,
+            document_id: body.document_id,
+            version_id: body.version_id,
+            user_id: body.user_id,
+            name: eventName,
+            description: eventDescription,
+            attributes: {
+              location: event.location || null,
+              participants: event.participants || [],
+              extraction_meta: {
+                uncertainty: event.uncertainty ?? null,
+                source_references: event.source_references || [],
+              },
             },
-            { onConflict: "version_id,name,branch_id" }
-          )
-          .select("id")
-          .single();
+            metadata: {
+              uncertainty: event.uncertainty ?? null,
+              source_references: event.source_references || [],
+            },
+            raw_extraction_id: rawExtractionId,
+            branch_id: eventBranchId,
+          },
+          { onConflict: "version_id,name,branch_id" },
+        )
+        .select("id")
+        .single();
 
-        if (eventError || !upsertedEvent) continue;
-        eventsSaved++;
-        const eventId = upsertedEvent.id;
+      if (eventError || !upsertedEvent) {
+        console.error(`Failed to save ${targetLayer} event '${eventName}':`, eventError?.message || "no row returned");
+        continue;
+      }
+      eventsSaved++;
+      const eventId = upsertedEvent.id;
 
-        for (const pos of event.chunk_positions || []) {
-          const ev = event.evidence?.length ? event.evidence[0]?.slice(0, 500) : null;
-          await supabase.from("knowledge_event_mentions").upsert(
-            { event_id: eventId, branch_id: targetBranchId!, chunk_position: pos, evidence: ev },
-            { onConflict: "event_id,chunk_position,evidence,branch_id" }
-          );
-          eventMentionsSaved++;
-        }
+      for (const pos of event.chunk_positions || []) {
+        const chunkInfo = chunkLookup.get(pos);
+        const ev = event.evidence?.length ? event.evidence[0]?.slice(0, 500) : null;
+        await supabase.from("knowledge_event_mentions").upsert(
+          {
+            event_id: eventId,
+            branch_id: eventBranchId,
+            chunk_position: pos,
+            evidence: ev,
+            chunk_id: chunkInfo?.id || null,
+            page_number: chunkInfo?.page || null,
+          },
+          { onConflict: "event_id,chunk_position,evidence,branch_id" },
+        );
+        eventMentionsSaved++;
+      }
 
-        for (const participantName of event.participants || []) {
-          const participantId = findBatchEntityId(participantName.trim(), entityIdEntries);
-          if (!participantId) continue;
-          await supabase.from("knowledge_event_participants").upsert(
-            { event_id: eventId, entity_id: participantId, role: null },
-            { onConflict: "event_id,entity_id" }
-          );
-          eventParticipantsSaved++;
-        }
+      for (const participantName of event.participants || []) {
+        const participantId = await findPersistedEntityId(
+          supabase,
+          body.project_id,
+          body.user_id,
+          targetBranchId,
+          participantName.trim(),
+          null,
+          entityIdEntries,
+        );
+        if (!participantId) continue;
+        await supabase.from("knowledge_event_participants").upsert(
+          { event_id: eventId, entity_id: participantId, role: null },
+          { onConflict: "event_id,entity_id" },
+        );
+        eventParticipantsSaved++;
       }
     }
 
