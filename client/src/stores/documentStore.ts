@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import { useEntityStore } from '@/stores/entityStore'
 import { buildExtractionRequest, hasMainEntities, getOrCreateActiveBranch } from '@/lib/extractionBranching'
 import { DEFAULT_EXTRACTION_MODEL_PROFILE, type ExtractionModelProfile } from '@/lib/extractionModels'
 

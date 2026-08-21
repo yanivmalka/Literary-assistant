@@ -1316,12 +1316,10 @@ Deno.serve(async (req) => {
             continue;
           }
           branchEntitiesSaved++;
-        } else {
-          // Main bootstrap: count entity directly
-          entitiesSaved++;
         }
       }
 
+      // Count every successfully persisted entity exactly once, regardless of layer.
       entityIdEntries.push({ entity, id: entityId });
       entitiesSaved++;
 

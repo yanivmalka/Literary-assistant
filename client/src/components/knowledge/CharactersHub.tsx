@@ -29,9 +29,9 @@ export default function CharactersHub({ projectId }: CharactersHubProps) {
   const createInProgressRef = useRef(false)
 
   // Get characters for selected version (Main or Branch)
-  const characters = selectedVersion === 'main'
-    ? getMainOnlyEntities({ type: 'character' })
-    : getEffectiveBranchEntities({ type: 'character' })
+  const mainCharacters = getMainOnlyEntities({ type: 'character' })
+  const branchCharacters = getEffectiveBranchEntities({ type: 'character' })
+  const characters = selectedVersion === 'main' ? mainCharacters : branchCharacters
 
   const handleCharacterClick = (character: Entity) => {
     setSelectedCharacter(character)

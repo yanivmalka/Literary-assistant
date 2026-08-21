@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import { type EntityType } from '@/lib/entityTypes'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
 
 export interface Entity {
   id: string

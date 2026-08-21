@@ -120,7 +120,7 @@ interface BranchState {
 
   // Actions
   fetchBranches: (projectId: string) => Promise<void>
-  fetchCurrentBranch: (projectId: string) => Promise<Branch | null>
+  fetchCurrentBranch: (projectId: string, profile?: ExtractionModelProfile) => Promise<Branch | null>
   createBranch: (projectId: string, name?: string) => Promise<Branch | null>
   fetchBranchEntities: (branchId: string) => Promise<void>
   fetchMainEntities: (projectId: string) => Promise<void>

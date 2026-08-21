@@ -25,9 +25,9 @@ export default function LocationsHub({ projectId }: LocationsHubProps) {
   const [selectedLocation, setSelectedLocation] = useState<Entity | null>(null)
 
   // Get locations for selected version (Main or Branch)
-  const locations = selectedVersion === 'main'
-    ? getMainOnlyEntities({ type: 'location' })
-    : getEffectiveBranchEntities({ type: 'location' })
+  const mainLocations = getMainOnlyEntities({ type: 'location' })
+  const branchLocations = getEffectiveBranchEntities({ type: 'location' })
+  const locations = selectedVersion === 'main' ? mainLocations : branchLocations
 
   const handleEditLocation = (location: Entity) => {
     setSelectedLocation(location)
