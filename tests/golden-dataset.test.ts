@@ -258,7 +258,7 @@ describe("Golden Dataset - Entity Extraction", () => {
     const normalized = normalizeEntities(extraction, new Map([
       [2, { id: "chunk-2", page: 4 }],
     ]));
-    assertEquals(normalized.length, 3);
+    assertEquals(normalized.length, 4);
 
     const character = normalized.find((entity) => entity.entity_type === "character");
     assert(character !== undefined, "character should be normalized");
@@ -274,6 +274,7 @@ describe("Golden Dataset - Entity Extraction", () => {
       },
       source_references: [{ chunk_position: 2, quote: "ליאו פרוסט הגיע" }],
     });
+    assert(normalized.some((entity) => entity.entity_type === "magic_ability" && entity.canonical_name === "רונת אש"), "magic ability should remain first-class");
   });
 
   it("rejects generic locations through the production filtering rules", () => {

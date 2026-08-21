@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { describe, expect, it } from 'vitest'
 import { buildAbilityLinks, type AbilityLinkEntity } from '../../../../../supabase/functions/_shared/ability-links'
 
 function entity(overrides: Partial<AbilityLinkEntity>): AbilityLinkEntity {
@@ -62,6 +61,26 @@ describe('ability relationship extraction', () => {
 
     expect(links).toHaveLength(1)
     expect(links[0]).toMatchObject({ characterId: 'leo', abilityId: 'lip-reading' })
+  })
+
+  it('links embedded life and magic skills after promotion to ability entities', () => {
+    const links = buildAbilityLinks([
+      entity({
+        id: 'maya',
+        canonical_name: 'מאיה',
+        attributes: {
+          abilities: ['קריאת שפתיים'],
+          magic_abilities: ['טלקינזיס'],
+        },
+      }),
+      entity({ id: 'reading', canonical_name: 'קריאת שפתיים', entity_type: 'ability' }),
+      entity({ id: 'telekinesis', canonical_name: 'טלקינזיס', entity_type: 'magic_ability' }),
+    ])
+
+    expect(links).toEqual([
+      expect.objectContaining({ characterId: 'maya', abilityId: 'reading', relationshipType: 'has_ability' }),
+      expect.objectContaining({ characterId: 'maya', abilityId: 'telekinesis', relationshipType: 'has_ability' }),
+    ])
   })
 
   it('does not create an ambiguous character link', () => {
