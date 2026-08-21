@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:entities:offline": "vitest run --reporter=verbose src/lib/__tests__/entity-extraction/entityExtraction.test.ts src/lib/__tests__/entity-extraction/modelExtraction.contract.test.ts",
+    "test:entities:offline": "vitest run --reporter=verbose src/lib/__tests__/entity-extraction/entityExtraction.test.ts src/lib/__tests__/entity-extraction/abilityLinks.test.ts src/lib/__tests__/entity-extraction/modelExtraction.contract.test.ts",
     "test:entities:models": "vitest run --reporter=verbose src/lib/__tests__/entity-extraction/modelExtraction.live.test.ts",
     "test:entities:all": "npm run test:entities:offline && npm run test:entities:models",
     "test:entities": "npm run test:entities:all"
