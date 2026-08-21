@@ -16,7 +16,10 @@
 CREATE TABLE IF NOT EXISTS entity_resolution_suggestions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  -- Keep ownership as a UUID, consistent with the extraction tables. The
+  -- deployed database does not contain the optional public.profiles table;
+  -- project ownership is enforced by the RLS policies below.
+  user_id UUID NOT NULL,
   -- The two entities being considered for consolidation
   entity_a_id UUID NOT NULL REFERENCES knowledge_entities(id) ON DELETE CASCADE,
   entity_b_id UUID NOT NULL REFERENCES knowledge_entities(id) ON DELETE CASCADE,
