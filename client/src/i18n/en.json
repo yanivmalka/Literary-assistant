@@ -253,6 +253,7 @@
       },
       "magicSkills": {
         "label": "Magic Skills",
+        "categoryDescription": "Magic abilities, spells, and magical powers",
         "title": "No magic skills were found for this character yet.",
         "description": "Magic skills identified in your documents and linked to this character will appear here."
       }

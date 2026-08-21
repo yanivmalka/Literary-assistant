@@ -207,10 +207,10 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
         >
           <div className="flex items-center gap-3 mb-4">
             <Sparkles className="h-6 w-6 text-purple-500" />
-            <h3 className="text-lg font-semibold">Magic Skills</h3>
+            <h3 className="text-lg font-semibold">{t('entities.emptyStates.magicSkills.label')}</h3>
           </div>
           <p className="text-sm text-muted-foreground">
-            Magic abilities, spells, and magical powers
+            {t('entities.emptyStates.magicSkills.categoryDescription')}
           </p>
         </button>
       </div>
