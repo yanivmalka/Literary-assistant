@@ -6,6 +6,7 @@
 import { describe, it } from "https://deno.land/std@0.208.0/testing/bdd.ts";
 import { assert, assertEquals, assertMatch } from "https://deno.land/std@0.208.0/assert/mod.ts";
 import { validateExtractionMode } from "../supabase/functions/extract-knowledge/testable-pipeline.ts";
+import { buildAbilityLinks, mergeAbilityLinkEntries, type AbilityLinkEntity } from "../supabase/functions/_shared/ability-links.ts";
 
 interface RegressionScenario {
   name: string;
@@ -185,6 +186,38 @@ describe("Regression Tests - Main/Branch Architecture", () => {
       console.log(`\nScenario: ${scenario.name}\nMode: ${scenario.mode}\nBatches: ${scenario.batches.length}\nCritical Check: ${scenario.criticalCheck}`);
     });
   }
+});
+
+it("creates physical and magical ability links across persisted batches", () => {
+  const character: AbilityLinkEntity = {
+    id: "character-nora",
+    canonical_name: "נורה",
+    entity_type: "character",
+    aliases: [],
+    attributes: {},
+  };
+  const abilities: AbilityLinkEntity[] = [
+    {
+      id: "ability-survival",
+      canonical_name: "הישרדות במדבר",
+      entity_type: "ability",
+      aliases: [],
+      attributes: { users: ["נורה"] },
+    },
+    {
+      id: "ability-spellcraft",
+      canonical_name: "עיצוב קסם",
+      entity_type: "magic_ability",
+      aliases: [],
+      attributes: { users: ["נורה"] },
+    },
+  ];
+
+  const links = buildAbilityLinks(mergeAbilityLinkEntries([character], abilities));
+  assertEquals(links.map((link) => [link.characterId, link.abilityId]), [
+    ["character-nora", "ability-survival"],
+    ["character-nora", "ability-spellcraft"],
+  ]);
 });
 
 /**
