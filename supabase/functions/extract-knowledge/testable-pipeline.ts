@@ -6,14 +6,14 @@ export interface ExtractionModeRequest {
   use_main?: boolean;
 }
 
-export interface ExtractionValidationResult {
+export type ExtractionValidationResult = {
   ok: true;
   mode: ExtractionMode;
   branchId: string | null;
 } | {
   ok: false;
   error: string;
-}
+};
 
 /** Mirrors the handler's JSON cleanup and fallback object extraction without I/O. */
 export function parseExtractionJson<T>(responseText: string): T | null {

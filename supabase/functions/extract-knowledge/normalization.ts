@@ -295,7 +295,7 @@ export function normalizeEntities(
 
       let score = 0;
       if (isPrefixMatch(entityA.canonical_name, entityB.canonical_name) || isPrefixMatch(entityB.canonical_name, entityA.canonical_name)) {
-        score += CONSOLIDATION_THRESHOLDS.EVIDENCE_SCORES.prefix_match;
+        score += CONSOLIDATION_THRESHOLDS.EVIDENCE_SCORES["prefix_match"];
       }
       const commonChunks = entityA.chunk_positions.filter((position) => entityB.chunk_positions.includes(position));
       if (commonChunks.length > 0) score += CONSOLIDATION_THRESHOLDS.EVIDENCE_SCORES.co_location;

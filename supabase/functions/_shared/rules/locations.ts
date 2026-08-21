@@ -6,7 +6,7 @@
 // Now supports multiple languages (Hebrew, English, Arabic, French, etc.)
 // ============================================
 
-import { getMultilingualLocationBlockWords, type LanguageCode } from './language-rules.ts';
+import { getMultilingualLocationBlockWords } from './language-rules.ts';
 
 export const LOCATION_RULES = {
   /**

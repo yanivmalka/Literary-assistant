@@ -11,7 +11,7 @@
 import { CHARACTER_RULES } from "./characters.ts";
 import { LOCATION_RULES } from "./locations.ts";
 import { normalizeKey, stripNikud } from "./normalization.ts";
-import { detectLanguage, getCharacterBlockingPatterns, getLocationBlockingWords, type LanguageCode } from "./language-rules.ts";
+import { detectLanguage, getCharacterBlockingPatterns, getLocationBlockingWords } from "./language-rules.ts";
 
 /**
  * Minimal entity shape needed for filtering decisions.

@@ -1,0 +1,70 @@
+export const extractionFixture = {
+  characters: [{
+    name: 'לִיאוֹ פְרוֹסְט',
+    aliases: ['ליאו'],
+    age: '25',
+    hair_color: 'שחור',
+    eye_color: 'כחול',
+    description: 'קוסם צעיר',
+    narrative_role: 'גיבור',
+    evidence: ['שערו השחור'],
+    chunk_positions: [0],
+    field_evidence: { age: ['בן עשרים וחמש'], hair_color: ['שערו השחור'] },
+  }],
+  locations: [{
+    name: 'יער אירויין',
+    location_type: 'יער',
+    narrative_importance: 'מקום סודי',
+    chunk_positions: [1],
+  }],
+  objects: [{
+    name: 'קלטון',
+    object_type: 'חפץ קסום',
+    materials: 'כסף',
+    special_properties: 'מפיק אור כחול',
+    chunk_positions: [2],
+  }],
+  abilities: [{
+    name: 'לחימה בשתי חרבות',
+    ability_type: 'physical',
+    mechanism: 'אימון',
+    users: ['ליאו פרוסט'],
+    chunk_positions: [3],
+  }],
+  magic_abilities: [{
+    name: 'רונת אש',
+    mechanism: 'הפעלת רונה',
+    power_level: 'גבוה',
+    users: ['ליאו פרוסט'],
+    chunk_positions: [4],
+  }],
+  organizations: [{
+    name: 'מסדר השחר',
+    members: ['ליאו פרוסט'],
+    chunk_positions: [5],
+  }],
+  events: [{
+    name: 'קרב ההרים',
+    description: 'קרב ההרים',
+    what_happened: 'הגיבורים ניצחו',
+    participants: ['ליאו פרוסט'],
+    location: 'יער אירויין',
+    chunk_positions: [6],
+  }],
+  relationships: [{
+    character_a: 'ליאו פרוסט',
+    character_b: 'קלטון',
+    relationship_type: 'owns',
+    chunk_positions: [2],
+  }],
+}
+
+export const chunkFixture = new Map<number, { id: string; page: number | null }>([
+  [0, { id: 'chunk-character', page: 10 }],
+  [1, { id: 'chunk-location', page: 11 }],
+  [2, { id: 'chunk-object', page: 12 }],
+  [3, { id: 'chunk-ability', page: 13 }],
+  [4, { id: 'chunk-magic-ability', page: 14 }],
+  [5, { id: 'chunk-organization', page: 15 }],
+  [6, { id: 'chunk-event', page: 16 }],
+]);

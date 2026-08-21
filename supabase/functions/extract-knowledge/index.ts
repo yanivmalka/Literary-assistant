@@ -804,30 +804,12 @@ Deno.serve(async (req) => {
     // ==============================
     const extractionMode = body.extraction_mode;
     const extractionRunId = body.extraction_run_id;
+    const modeValidation = validateExtractionMode(body);
+    if (!modeValidation.ok) return errorResponse(`Invalid extraction mode: ${modeValidation.error}`, 400);
 
     // For backward compatibility, fall back to legacy behavior if extraction_mode not provided
-    const useMainForExtraction = extractionMode === 'bootstrap' || (body.use_main === true && !extractionMode);
+    const useMainForExtraction = modeValidation.mode === 'bootstrap';
     const hasBranchId = !!body.target_branch_id;
-
-    // Invalid combinations
-    if (extractionMode === 'bootstrap' && hasBranchId) {
-      return errorResponse("Invalid: extraction_mode='bootstrap' cannot specify target_branch_id.", 400);
-    }
-
-    if (extractionMode === 'branch' && !hasBranchId) {
-      return errorResponse("Invalid: extraction_mode='branch' requires target_branch_id.", 400);
-    }
-
-    // Old-style validation for backward compatibility
-    if (!extractionMode) {
-      if (useMainForExtraction && hasBranchId) {
-        return errorResponse("Invalid: cannot specify both use_main=true and target_branch_id. Choose one.", 400);
-      }
-
-      if (!useMainForExtraction && !hasBranchId) {
-        return errorResponse("Invalid: must specify either use_main=true or target_branch_id. One is required.", 400);
-      }
-    }
 
     // ==============================
     // Authenticate user
@@ -1016,28 +998,14 @@ Deno.serve(async (req) => {
     // ==============================
     // Step 3: Parse JSON — skip batch on failure
     // ==============================
-    let extraction: GeminiExtraction;
-    try {
-      let jsonText = responseText.trim();
-      jsonText = jsonText.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "").trim();
-      extraction = JSON.parse(jsonText);
-    } catch {
-      try {
-        const start = responseText.indexOf("{");
-        const end = responseText.lastIndexOf("}");
-        if (start !== -1 && end > start) {
-          extraction = JSON.parse(responseText.slice(start, end + 1));
-        } else {
-          throw new Error("no JSON object found");
-        }
-      } catch {
-        console.warn(`[extract-knowledge] Skipping batch offset=${offset}: unparseable JSON`);
-        const done = chunks.length < limit;
-        return new Response(
-          JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, model_profile: modelProfile, latency_ms: latencyMs, skipped: true }, summary: { entities_saved: 0, skipped_parse_error: true } }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    const extraction = parseExtractionJson<GeminiExtraction>(responseText);
+    if (!extraction) {
+      console.warn(`[extract-knowledge] Skipping batch offset=${offset}: unparseable JSON`);
+      const done = chunks.length < limit;
+      return new Response(
+        JSON.stringify({ success: true, done, next_offset: offset + limit, telemetry: { model: modelUsed, model_profile: modelProfile, latency_ms: latencyMs, skipped: true }, summary: { entities_saved: 0, skipped_parse_error: true } }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // ==============================

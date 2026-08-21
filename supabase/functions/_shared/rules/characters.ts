@@ -5,7 +5,7 @@
 // characters should be extracted, filtered, and displayed.
 // ============================================
 
-import { getMultilingualCharacterPatterns, type LanguageCode } from './language-rules.ts';
+import { getMultilingualCharacterPatterns } from './language-rules.ts';
 
 export const CHARACTER_RULES = {
   /**
