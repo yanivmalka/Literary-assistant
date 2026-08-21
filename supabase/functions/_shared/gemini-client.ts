@@ -9,7 +9,6 @@ import {
   type GeminiModelConfig,
   GEMINI_API_BASE,
   MODEL_COOLDOWN_MS,
-  COOLDOWN_FAILURE_THRESHOLD,
   isRetriableError,
 } from "./gemini-config.ts";
 
@@ -62,19 +61,6 @@ interface CooldownEntry {
 }
 
 const cooldownMap = new Map<string, CooldownEntry>();
-
-function isModelInCooldown(modelId: string): boolean {
-  const entry = cooldownMap.get(modelId);
-  if (!entry) return false;
-
-  if (Date.now() >= entry.cooldownUntil) {
-    // Cooldown expired, reset
-    cooldownMap.delete(modelId);
-    return false;
-  }
-
-  return false; // Disabled: Edge Function isolates don't persist state between invocations
-}
 
 function recordModelFailure(modelId: string): void {
   const entry = cooldownMap.get(modelId);

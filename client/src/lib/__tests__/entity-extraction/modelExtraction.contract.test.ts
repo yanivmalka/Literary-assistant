@@ -48,7 +48,11 @@ describe('Entity Extraction model matrix contract (offline)', () => {
       let requestedUrl = ''
       let requestedPayload = ''
       globalThis.fetch = async (input, init) => {
-        requestedUrl = typeof input === 'string' ? input : input.url
+        requestedUrl = typeof input === 'string'
+          ? input
+          : input instanceof Request
+            ? input.url
+            : input.toString()
         requestedPayload = String(init?.body || '')
         return new Response(JSON.stringify(geminiResponseForExtraction(extractionFixture)), {
           status: 200,
