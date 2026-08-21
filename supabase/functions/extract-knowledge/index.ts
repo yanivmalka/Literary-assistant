@@ -1916,6 +1916,7 @@ Deno.serve(async (req) => {
           branch_id: targetBranchId || null,
           layer: targetLayer,
           normalized_entity_count: normalizedEntities.length,
+          persisted_items_saved: persistedItemCount,
           value_sync_errors: valueSyncErrors.length > 0 ? valueSyncErrors : undefined,
         },
       }),

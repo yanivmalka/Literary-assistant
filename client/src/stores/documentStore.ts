@@ -364,6 +364,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
     let totalEntities = 0
     let totalEvents = 0
+    let totalPersisted = 0
 
     while (!done) {
       // Check cancel flag
@@ -424,8 +425,19 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         done = data.done
         offset = data.next_offset
 
-        totalEntities += data.summary?.entities_saved || 0
-        totalEvents += data.summary?.events_saved || 0
+        const summary = data.summary ?? {}
+        const batchEntities = Number(summary.entities_saved ?? 0)
+        const batchEvents = Number(summary.events_saved ?? 0)
+        const batchRelationships = Number(summary.relationships_saved ?? 0)
+        const batchAbilityRelationships = Number(summary.ability_relationships_saved ?? 0)
+        const reportedPersisted = Number(summary.persisted_items_saved)
+        const batchPersisted = Number.isFinite(reportedPersisted)
+          ? reportedPersisted
+          : batchEntities + batchEvents + batchRelationships + batchAbilityRelationships
+
+        totalEntities += Number.isFinite(batchEntities) ? batchEntities : 0
+        totalEvents += Number.isFinite(batchEvents) ? batchEvents : 0
+        totalPersisted += Number.isFinite(batchPersisted) ? batchPersisted : 0
 
         const processedChunks = Math.min(offset, total)
         set({
@@ -455,13 +467,13 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       }
     }
 
-    // Only mark done if we completed without cancellation or error.
-    // A completed run with no saved entities or events is not a successful
-    // extraction from the user's perspective, so show the existing error state
-    // instead of reporting "0 entities and 0 events" as a success.
+    // A completed run is empty only when no persisted knowledge item was
+    // reported. Older Edge Function revisions do not have persisted_items_saved,
+    // so the client falls back to the individual entity/event/relationship
+    // counters above.
     if (done) {
-      if (totalEntities === 0 && totalEvents === 0) {
-        console.warn('[Knowledge] Extraction completed without extracting any entities or events')
+      if (totalPersisted === 0) {
+        console.warn('[Knowledge] Extraction completed without persisting any entities, relationships, or events')
         set({
           extractionInProgress: false,
           extractionDone: false,
