@@ -277,8 +277,27 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     documentId: string,
     modelProfile: ExtractionModelProfile = DEFAULT_EXTRACTION_MODEL_PROFILE,
   ) => {
+    // Update the UI before any authentication or branch lookups. These network
+    // calls can take several seconds, so the user should see immediate feedback.
+    set({
+      extractionInProgress: true,
+      extractionDone: false,
+      extractionCancelled: false,
+      extractionError: null,
+      extractionDocumentId: documentId,
+      extractionProgress: null,
+      _extractionCancelFlag: false,
+    })
+
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      // Do not leave the UI stuck in the in-progress state if the session expired.
+      set({
+        extractionInProgress: false,
+        extractionDocumentId: null,
+      })
+      return
+    }
 
     let activeBranch: { id: string } | null = null
     let extractionMode: 'bootstrap' | 'branch' | null = null
@@ -314,17 +333,6 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       })
       return
     }
-
-    // Reset state
-    set({
-      extractionInProgress: true,
-      extractionDone: false,
-      extractionCancelled: false,
-      extractionError: null,
-      extractionDocumentId: documentId,
-      extractionProgress: null,
-      _extractionCancelFlag: false,
-    })
 
     const BATCH_SIZE = 2
     let offset = 0
