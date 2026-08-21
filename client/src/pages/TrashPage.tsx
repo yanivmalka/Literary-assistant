@@ -1,15 +1,43 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Trash2, RotateCcw, XCircle } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
+import { toast } from '@/components/Toast'
 
 export default function TrashPage() {
   const { t } = useTranslation()
-  const { trashedProjects, loading, fetchTrashedProjects, restoreFromTrash, deletePermanently } = useProjectStore()
+  const {
+    trashedProjects,
+    loading,
+    fetchTrashedProjects,
+    restoreFromTrash,
+    deletePermanently,
+    emptyTrash,
+  } = useProjectStore()
+  const [emptyingTrash, setEmptyingTrash] = useState(false)
 
   useEffect(() => {
     fetchTrashedProjects()
   }, [fetchTrashedProjects])
+
+  const handleEmptyTrash = async () => {
+    if (trashedProjects.length === 0 || emptyingTrash) return
+    if (!window.confirm(t('ui.projects.confirmEmptyTrash'))) return
+
+    setEmptyingTrash(true)
+    try {
+      const result = await emptyTrash()
+      if (!result.success) {
+        toast('error', t('ui.projects.emptyTrashError'))
+        return
+      }
+
+      await fetchTrashedProjects()
+      toast('success', t('ui.projects.emptyTrashSuccess'))
+    } finally {
+      setEmptyingTrash(false)
+    }
+  }
 
   const getDaysRemaining = (deletedAt: string) => {
     const deleted = new Date(deletedAt)
@@ -21,9 +49,21 @@ export default function TrashPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="flex items-center gap-3 mb-8">
-        <Trash2 className="h-6 w-6 text-muted-foreground" />
-        <h2 className="text-2xl font-bold">{t('projects.trash')}</h2>
+      <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-3">
+          <Trash2 className="h-6 w-6 text-muted-foreground" />
+          <h2 className="text-2xl font-bold">{t('projects.trash')}</h2>
+        </div>
+        {trashedProjects.length > 0 && (
+          <button
+            onClick={handleEmptyTrash}
+            disabled={emptyingTrash}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {emptyingTrash ? t('ui.projects.emptyingTrash') : t('ui.projects.emptyTrash')}
+          </button>
+        )}
       </div>
 
       {loading ? (

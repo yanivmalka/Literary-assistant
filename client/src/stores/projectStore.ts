@@ -18,6 +18,7 @@ interface ProjectState {
   moveToTrash: (id: string) => Promise<void>
   restoreFromTrash: (id: string) => Promise<void>
   deletePermanently: (id: string) => Promise<void>
+  emptyTrash: () => Promise<{ success: boolean; error?: string }>
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -130,13 +131,38 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   deletePermanently: async (id) => {
-    await supabase
+    const { error } = await supabase
       .from('projects')
       .delete()
       .eq('id', id)
 
+    if (error) {
+      console.error('Failed to permanently delete project:', error)
+      return
+    }
+
     set({
       trashedProjects: get().trashedProjects.filter(p => p.id !== id),
     })
+  },
+
+  emptyTrash: async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('user_id', user.id)
+      .not('deleted_at', 'is', null)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    set({ trashedProjects: [] })
+    return { success: true }
   },
 }))

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import type { Entity } from '@/stores/entityStore'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import ObjectsPanel from './ObjectsPanel'
 import AbilitiesPanel from './AbilitiesPanel'
 
@@ -10,6 +11,8 @@ interface CharacterDetailModalProps {
   isOpen: boolean
   character: Entity
   projectId: string
+  modelProfile: ExtractionModelProfile
+  branchId: string | null
   onClose: () => void
 }
 
@@ -27,6 +30,8 @@ export default function CharacterDetailModal({
   isOpen,
   character,
   projectId,
+  modelProfile,
+  branchId,
   onClose,
 }: CharacterDetailModalProps) {
   const { t } = useTranslation()
@@ -232,6 +237,8 @@ export default function CharacterDetailModal({
             <AbilitiesPanel
               character={character}
               projectId={projectId}
+              modelProfile={modelProfile}
+              branchId={branchId}
               onBack={() => setView('detail')}
             />
           )}

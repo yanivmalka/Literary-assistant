@@ -501,7 +501,12 @@
       "namePlaceholder": "My Fantasy World",
       "descriptionPlaceholder": "Optional description...",
       "trashEmpty": "Trash is empty",
-      "confirmPermanentDelete": "Are you sure? This cannot be undone."
+      "confirmPermanentDelete": "Are you sure? This cannot be undone.",
+      "emptyTrash": "Empty Trash",
+      "emptyingTrash": "Emptying Trash...",
+      "confirmEmptyTrash": "Delete all projects in Trash permanently? This action cannot be undone.",
+      "emptyTrashSuccess": "All projects in Trash were permanently deleted.",
+      "emptyTrashError": "Could not empty the Trash. Please try again."
     },
     "maps": {
       "untitled": "Untitled Map",

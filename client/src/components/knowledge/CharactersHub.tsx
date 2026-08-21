@@ -4,6 +4,7 @@ import { GitBranch, Plus } from 'lucide-react'
 import { useBranchStore } from '@/stores/branchStore'
 import { useEntityStore } from '@/stores/entityStore'
 import type { Entity } from '@/stores/entityStore'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import CharacterTile from './CharacterTile'
 import CharacterDetailModal from './CharacterDetailModal'
 import CharacterEditModal from './CharacterEditModal'
@@ -11,11 +12,12 @@ import CharacterEditModal from './CharacterEditModal'
 interface CharactersHubProps {
   projectId: string
   entities: Entity[]
+  modelProfile: ExtractionModelProfile
 }
 
 type VersionType = 'main' | 'branch'
 
-export default function CharactersHub({ projectId }: CharactersHubProps) {
+export default function CharactersHub({ projectId, modelProfile }: CharactersHubProps) {
   const { t } = useTranslation()
 
   const { currentBranch } = useBranchStore()
@@ -31,6 +33,9 @@ export default function CharactersHub({ projectId }: CharactersHubProps) {
   // Get characters for selected version (Main or Branch)
   const mainCharacters = getMainOnlyEntities({ type: 'character' })
   const branchCharacters = getEffectiveBranchEntities({ type: 'character' })
+  const branchId = selectedVersion === 'branch' && currentBranch?.profile === modelProfile
+    ? currentBranch.id
+    : null
   const characters = selectedVersion === 'main' ? mainCharacters : branchCharacters
 
   const handleCharacterClick = (character: Entity) => {
@@ -177,6 +182,8 @@ export default function CharactersHub({ projectId }: CharactersHubProps) {
           isOpen={detailModalOpen}
           character={selectedCharacter}
           projectId={projectId}
+          modelProfile={modelProfile}
+          branchId={branchId}
           onClose={handleCloseDetailModal}
         />
       )}

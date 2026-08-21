@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Shield, Sparkles } from 'lucide-react'
+import { shouldUseAbilityFallback } from '@/lib/abilityProfile'
 import type { Entity } from '@/stores/entityStore'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import { supabase } from '@/lib/supabase'
 
 interface AbilitiesPanelProps {
   character: Entity
   projectId: string
+  modelProfile: ExtractionModelProfile
+  branchId: string | null
   onBack: () => void
 }
 
@@ -86,7 +90,13 @@ function abilityUsersMatchCharacter(entity: {
   return userNames.some(user => characterNames.includes(user.trim().toLocaleLowerCase()))
 }
 
-export default function AbilitiesPanel({ character, projectId, onBack }: AbilitiesPanelProps) {
+export default function AbilitiesPanel({
+  character,
+  projectId,
+  modelProfile,
+  branchId,
+  onBack,
+}: AbilitiesPanelProps) {
   const { t } = useTranslation()
   const [selectedCategory, setSelectedCategory] = useState<AbilityCategory | null>(null)
   const [abilities, setAbilities] = useState<Ability[]>([])
@@ -96,7 +106,9 @@ export default function AbilitiesPanel({ character, projectId, onBack }: Abiliti
   // Load abilities from database
   useEffect(() => {
     loadAbilities()
-  }, [character.id, projectId])
+  }, [character.id, projectId, modelProfile, branchId])
+
+  const allowDevelopmentFallback = shouldUseAbilityFallback(modelProfile)
 
   const loadAbilities = async () => {
     try {
@@ -105,6 +117,14 @@ export default function AbilitiesPanel({ character, projectId, onBack }: Abiliti
       const setEmbeddedState = () => {
         setAbilities(embeddedAbilities.filter(ability => ability.type === 'ability'))
         setMagicAbilities(embeddedAbilities.filter(ability => ability.type === 'magic_ability'))
+      }
+      const setFallbackState = () => {
+        if (allowDevelopmentFallback) {
+          setEmbeddedState()
+        } else {
+          setAbilities([])
+          setMagicAbilities([])
+        }
       }
       const applyAbilityEntities = (entities: Array<{
         id: string
@@ -136,10 +156,14 @@ export default function AbilitiesPanel({ character, projectId, onBack }: Abiliti
         return true
       }
       const loadAbilityEntitiesByUser = async () => {
+        if (!allowDevelopmentFallback || !branchId) return false
+
         const { data, error } = await supabase
           .from('knowledge_entities')
           .select('id, canonical_name, description, entity_type, attributes')
           .eq('project_id', projectId)
+          .eq('layer', 'branch')
+          .eq('branch_id', branchId)
           .in('entity_type', ['ability', 'magic_ability'])
 
         if (error) {
@@ -156,15 +180,18 @@ export default function AbilitiesPanel({ character, projectId, onBack }: Abiliti
       // Query relationships for this character. Relationships are canonical;
       // embedded attributes and ability.users are compatibility fallbacks for
       // extractions created before all links were persisted.
-      const { data: relationships, error: relError } = await supabase
+      const relationshipQuery = supabase
         .from('knowledge_entity_relationships')
         .select('target_entity_id, relationship_type')
         .eq('source_entity_id', character.id)
         .eq('relationship_type', 'has_ability')
+      const { data: relationships, error: relError } = modelProfile === 'development' && branchId
+        ? await relationshipQuery.eq('branch_id', branchId)
+        : await relationshipQuery
 
       if (relError) {
         console.error('Failed to fetch relationships:', relError)
-        if (!(await loadAbilityEntitiesByUser())) setEmbeddedState()
+        if (!(await loadAbilityEntitiesByUser())) setFallbackState()
         return
       }
 
@@ -179,11 +206,16 @@ export default function AbilitiesPanel({ character, projectId, onBack }: Abiliti
         if (entError) console.error('Failed to fetch ability entities:', entError)
       }
 
-      if (!(await loadAbilityEntitiesByUser())) setEmbeddedState()
+      if (!(await loadAbilityEntitiesByUser())) setFallbackState()
     } catch (error) {
       console.error('Error loading abilities:', error)
-      setAbilities(getEmbeddedAbilities(character).filter(ability => ability.type === 'ability'))
-      setMagicAbilities(getEmbeddedAbilities(character).filter(ability => ability.type === 'magic_ability'))
+      if (allowDevelopmentFallback) {
+        setAbilities(getEmbeddedAbilities(character).filter(ability => ability.type === 'ability'))
+        setMagicAbilities(getEmbeddedAbilities(character).filter(ability => ability.type === 'magic_ability'))
+      } else {
+        setAbilities([])
+        setMagicAbilities([])
+      }
     } finally {
       setLoading(false)
     }

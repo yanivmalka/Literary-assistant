@@ -7,6 +7,8 @@ import { useBranchStore } from '@/stores/branchStore'
 import CharactersHub from '@/components/knowledge/CharactersHub'
 import LocationsHub from '@/components/knowledge/LocationsHub'
 import TimelineHub from '@/components/knowledge/TimelineHub'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
+import { getStoredExtractionModelProfile } from '@/lib/extractionModels'
 
 type TabType = 'characters' | 'locations' | 'timeline'
 
@@ -21,6 +23,7 @@ export default function KnowledgeHubPage() {
 
   const { entities, fetchEntities } = useEntityStore()
   const { fetchCurrentBranch } = useBranchStore()
+  const [modelProfile] = useState<ExtractionModelProfile>(() => getStoredExtractionModelProfile())
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const requestedTab = searchParams.get('tab')
     return isTabType(requestedTab) ? requestedTab : 'characters'
@@ -36,11 +39,11 @@ export default function KnowledgeHubPage() {
     if (projectId) {
       setIsLoading(true)
       Promise.all([
-        fetchEntities(projectId),
-        fetchCurrentBranch(projectId),
+        fetchEntities(projectId, undefined, modelProfile),
+        fetchCurrentBranch(projectId, modelProfile),
       ]).finally(() => setIsLoading(false))
     }
-  }, [projectId, fetchEntities, fetchCurrentBranch])
+  }, [projectId, modelProfile, fetchEntities, fetchCurrentBranch])
 
   if (!projectId) {
     return <div className="text-center py-12">{t('common.loading')}</div>
@@ -91,7 +94,9 @@ export default function KnowledgeHubPage() {
           </div>
         ) : (
           <>
-            {activeTab === 'characters' && <CharactersHub projectId={projectId} entities={entities} />}
+            {activeTab === 'characters' && (
+              <CharactersHub projectId={projectId} entities={entities} modelProfile={modelProfile} />
+            )}
             {activeTab === 'locations' && <LocationsHub projectId={projectId} entities={entities} />}
             {activeTab === 'timeline' && <TimelineHub projectId={projectId} />}
           </>

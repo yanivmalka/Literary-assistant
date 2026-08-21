@@ -455,8 +455,21 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       }
     }
 
-    // Only mark done if we completed without cancellation or error
+    // Only mark done if we completed without cancellation or error.
+    // A completed run with no saved entities or events is not a successful
+    // extraction from the user's perspective, so show the existing error state
+    // instead of reporting "0 entities and 0 events" as a success.
     if (done) {
+      if (totalEntities === 0 && totalEvents === 0) {
+        console.warn('[Knowledge] Extraction completed without extracting any entities or events')
+        set({
+          extractionInProgress: false,
+          extractionDone: false,
+          extractionError: 'ui.documents.extractionError',
+        })
+        return
+      }
+
       set({
         extractionInProgress: false,
         extractionDone: true,

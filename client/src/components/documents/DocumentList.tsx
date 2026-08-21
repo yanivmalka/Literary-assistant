@@ -7,6 +7,7 @@ import ExtractionProgress from './ExtractionProgress'
 import {
   DEFAULT_EXTRACTION_MODEL_PROFILE,
   EXTRACTION_MODEL_PROFILES,
+  setStoredExtractionModelProfile,
   type ExtractionModelProfile,
 } from '@/lib/extractionModels'
 
@@ -71,6 +72,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
   const handleExtractKnowledge = async (doc: Document) => {
     if (!doc.latest_version || extractionInProgress) return
     console.log('[Knowledge] Manual extraction triggered for', doc.name)
+    setStoredExtractionModelProfile(selectedModelProfile)
     await triggerEntityExtraction(
       doc.latest_version.id,
       projectId,
@@ -118,7 +120,11 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                   <select
                     id={`extraction-model-${doc.id}`}
                     value={selectedModelProfile}
-                    onChange={event => setSelectedModelProfile(event.target.value as ExtractionModelProfile)}
+                    onChange={event => {
+                      const profile = event.target.value as ExtractionModelProfile
+                      setSelectedModelProfile(profile)
+                      setStoredExtractionModelProfile(profile)
+                    }}
                     disabled={extractionInProgress}
                     className="max-w-36 rounded border bg-background px-2 py-1 text-xs text-foreground disabled:opacity-50"
                     title={t('ui.documents.modelProfile')}

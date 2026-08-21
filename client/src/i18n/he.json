@@ -501,7 +501,12 @@
       "namePlaceholder": "העולם שלי",
       "descriptionPlaceholder": "תיאור אופציונלי...",
       "trashEmpty": "האשפה ריקה",
-      "confirmPermanentDelete": "האם אתה בטוח? לא ניתן לבטל פעולה זו."
+      "confirmPermanentDelete": "האם אתה בטוח? לא ניתן לבטל פעולה זו.",
+      "emptyTrash": "רוקן אשפה",
+      "emptyingTrash": "מרוקן אשפה...",
+      "confirmEmptyTrash": "למחוק לצמיתות את כל הפרויקטים שבאשפה? לא ניתן לבטל פעולה זו.",
+      "emptyTrashSuccess": "כל הפרויקטים שבאשפה נמחקו לצמיתות.",
+      "emptyTrashError": "לא ניתן לרוקן את האשפה. נסה שוב."
     },
     "maps": {
       "untitled": "מפה ללא שם",
