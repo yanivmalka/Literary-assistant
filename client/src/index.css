@@ -76,7 +76,7 @@
     z-index: 10;
     pointer-events: none;
     background: linear-gradient(
-      110deg,
+      -110deg,
       transparent 0%,
       rgba(96, 165, 250, 0.08) 35%,
       rgba(226, 232, 240, 0.8) 50%,
@@ -84,16 +84,16 @@
       transparent 100%
     );
     background-size: 250% 100%;
-    background-position: 200% 0;
-    animation: extraction-progress-processing 2.5s ease-in-out infinite;
+    background-position: -50% 0;
+    animation: extraction-progress-processing 3s ease-in-out infinite;
   }
 
   @keyframes extraction-progress-processing {
     0% {
-      background-position: 200% 0;
+      background-position: -50% 0;
     }
     100% {
-      background-position: -50% 0;
+      background-position: 200% 0;
     }
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildAbilityLinks, type AbilityLinkEntity } from '../../../../../supabase/functions/_shared/ability-links'
+import { buildAbilityLinks, mergeAbilityLinkEntries, type AbilityLinkEntity } from '../../../../../supabase/functions/_shared/ability-links'
 
 function entity(overrides: Partial<AbilityLinkEntity>): AbilityLinkEntity {
   return {
@@ -45,6 +45,46 @@ describe('ability relationship extraction', () => {
         userName: 'אלינה',
         relationshipType: 'has_ability',
       },
+    ])
+  })
+
+  it('links physical and magical abilities to the named character across batches', () => {
+    const characterBatch = [
+      entity({ id: 'nora', canonical_name: 'נורה' }),
+    ]
+    const abilityBatch = [
+      entity({
+        id: 'survival',
+        canonical_name: 'הישרדות במדבר',
+        entity_type: 'ability',
+        attributes: { users: ['נורה'] },
+      }),
+      entity({
+        id: 'spellcraft',
+        canonical_name: 'עיצוב קסם',
+        entity_type: 'magic_ability',
+        attributes: { users: ['נורה'] },
+      }),
+    ]
+
+    expect(buildAbilityLinks([...characterBatch, ...abilityBatch])).toEqual([
+      expect.objectContaining({ characterId: 'nora', abilityId: 'survival', relationshipType: 'has_ability' }),
+      expect.objectContaining({ characterId: 'nora', abilityId: 'spellcraft', relationshipType: 'has_ability' }),
+    ])
+  })
+
+  it('merges persisted and current entries by entity ID for cross-batch resolution', () => {
+    const persistedCharacter = entity({ id: 'nora', canonical_name: 'נורה' })
+    const currentAbility = entity({
+      id: 'spellcraft',
+      canonical_name: 'עיצוב קסם',
+      entity_type: 'magic_ability',
+      attributes: { users: ['נורה'] },
+    })
+
+    const merged = mergeAbilityLinkEntries([persistedCharacter], [currentAbility])
+    expect(buildAbilityLinks(merged)).toEqual([
+      expect.objectContaining({ characterId: 'nora', abilityId: 'spellcraft', relationshipType: 'has_ability' }),
     ])
   })
 

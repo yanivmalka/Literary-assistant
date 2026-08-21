@@ -43,7 +43,8 @@ import {
 import { normalizeEntities as normalizeEntitiesForExtraction } from "./normalization.ts";
 import { parseExtractionJson, normalizeExtractionPayload, validateExtractionMode, validateExtractionPayload } from "./testable-pipeline.ts";
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
-import { buildAbilityLinks, getEmbeddedAbilityReferences } from "../_shared/ability-links.ts";
+import { buildAbilityLinks, mergeAbilityLinkEntries } from "../_shared/ability-links.ts";
+import type { AbilityLinkEntity } from "../_shared/ability-links.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -837,6 +838,90 @@ async function findPersistedEntityId(
   return ids.length === 1 ? ids[0] : null;
 }
 
+/**
+ * Load the entity context required by ability links across all extraction
+ * batches. The current batch is merged later so its freshly normalized
+ * attributes take precedence over the persisted snapshot.
+ */
+async function loadPersistedAbilityLinkEntries(
+  supabase: any,
+  projectId: string,
+  userId: string,
+  branchId: string | null,
+): Promise<AbilityLinkEntity[]> {
+  const entitySelect = "id, canonical_name, entity_type, entity_types, attributes, layer, branch_id";
+  const mainQuery = supabase
+    .from("knowledge_entities")
+    .select(entitySelect)
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .eq("layer", "main");
+  const branchQuery = branchId
+    ? supabase
+      .from("knowledge_entities")
+      .select(entitySelect)
+      .eq("project_id", projectId)
+      .eq("user_id", userId)
+      .eq("layer", "branch")
+      .eq("branch_id", branchId)
+    : Promise.resolve({ data: [], error: null });
+  const overlayQuery = branchId
+    ? supabase
+      .from("knowledge_branch_entities")
+      .select("entity_id, overrides")
+      .eq("branch_id", branchId)
+      .not("source_entity_id", "is", null)
+    : Promise.resolve({ data: [], error: null });
+
+  const [mainResult, branchResult, overlayResult] = await Promise.all([
+    mainQuery,
+    branchQuery,
+    overlayQuery,
+  ]);
+  if (mainResult.error) throw new Error(`Failed to load Main ability-link entities: ${mainResult.error.message}`);
+  if (branchResult.error) throw new Error(`Failed to load Branch ability-link entities: ${branchResult.error.message}`);
+  if (overlayResult.error) throw new Error(`Failed to load Branch ability-link overlays: ${overlayResult.error.message}`);
+
+  const rows = [
+    ...(mainResult.data || []),
+    ...(branchResult.data || []),
+  ] as Array<{
+    id: string;
+    canonical_name: string;
+    entity_type: string;
+    entity_types?: string[];
+    attributes?: Record<string, unknown> | null;
+    layer: "main" | "branch";
+    branch_id: string | null;
+  }>;
+  const aliases = await loadEntityAliases(
+    supabase,
+    rows.map((row) => row.id),
+    branchId,
+  );
+  const overlays = new Map<string, Record<string, unknown>>(
+    ((overlayResult.data || []) as Array<{
+      entity_id: string;
+      overrides: Record<string, unknown> | null;
+    }>)
+      .filter((row) => row.entity_id && row.overrides)
+      .map((row) => [row.entity_id, row.overrides as Record<string, unknown>]),
+  );
+
+  return rows.map((row) => {
+    const effective = row.layer === "main" && overlays.has(row.id)
+      ? applyEntityOverrides(row, overlays.get(row.id) || {})
+      : row;
+    return {
+      id: row.id,
+      canonical_name: effective.canonical_name,
+      entity_type: effective.entity_type,
+      aliases: aliases.get(row.id) || [],
+      attributes: effective.attributes || {},
+    };
+  });
+}
+
 // ============================================
 // Main Handler
 // ============================================
@@ -1551,22 +1636,36 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create character → ability relationships from top-level ability entities.
-    // The tested helper resolves both canonical names and aliases, and supports
-    // Gemini's array or comma-separated users representation.
-    const abilityLinks = buildAbilityLinks(
-      entityIdEntries.map(({ entity, id }) => ({
-        id,
-        canonical_name: entity.canonical_name,
-        entity_type: entity.entity_type,
-        aliases: entity.aliases,
-        attributes: entity.attributes,
-      })),
+    // Create character → ability relationships using both the current batch and
+    // persisted Main/Branch entities. This is essential when a character and
+    // its ability arrive in different requests.
+    const currentAbilityLinkEntries = entityIdEntries.map(({ entity, id }) => ({
+      id,
+      canonical_name: entity.canonical_name,
+      entity_type: entity.entity_type,
+      aliases: entity.aliases,
+      attributes: entity.attributes,
+    } satisfies AbilityLinkEntity));
+    const persistedAbilityLinkEntries = await loadPersistedAbilityLinkEntries(
+      supabase,
+      body.project_id,
+      body.user_id,
+      targetBranchId,
     );
+    const allAbilityLinkEntries = mergeAbilityLinkEntries(
+      persistedAbilityLinkEntries,
+      currentAbilityLinkEntries,
+    );
+    const currentEntityIds = new Set(currentAbilityLinkEntries.map((entry) => entry.id));
+    const abilityLinks = buildAbilityLinks(allAbilityLinkEntries)
+      // Do not rewrite every historical link on every batch. Keep only links
+      // whose character or ability was part of this batch.
+      .filter((link) => currentEntityIds.has(link.characterId) || currentEntityIds.has(link.abilityId));
+    let abilityRelationshipsSaved = 0;
+    const abilityRelationshipErrors: string[] = [];
 
     for (const link of abilityLinks) {
       const abilityEntity = entityIdEntries.find(({ id }) => id === link.abilityId)?.entity;
-      if (!abilityEntity) continue;
 
       const { error: relError } = await supabase
         .from("knowledge_entity_relationships")
@@ -1579,7 +1678,7 @@ Deno.serve(async (req) => {
             target_entity_id: link.abilityId,
             relationship_type: link.relationshipType,
             evidence: null,
-            chunk_position: abilityEntity.chunk_positions?.[0] || null,
+            chunk_position: abilityEntity?.chunk_positions?.[0] || null,
             raw_extraction_id: rawExtractionId,
             branch_id: targetBranchId || null,
             operation: "add",
@@ -1590,7 +1689,11 @@ Deno.serve(async (req) => {
         );
 
       if (relError) {
-        console.warn(`Failed to create ability relationship '${link.userName}' → '${link.abilityName}':`, relError.message);
+        const message = `Failed to create ability relationship '${link.userName}' → '${link.abilityName}': ${relError.message}`;
+        console.warn(message);
+        abilityRelationshipErrors.push(message);
+      } else {
+        abilityRelationshipsSaved++;
       }
     }
 
@@ -1784,6 +1887,8 @@ Deno.serve(async (req) => {
           mentions_saved: mentionsSaved,
           aliases_saved: aliasesSaved,
           relationships_saved: relationshipsSaved,
+          ability_relationships_saved: abilityRelationshipsSaved,
+          ability_relationship_errors: abilityRelationshipErrors.length > 0 ? abilityRelationshipErrors : undefined,
           events_saved: eventsSaved,
           event_mentions_saved: eventMentionsSaved,
           event_participants_saved: eventParticipantsSaved,
