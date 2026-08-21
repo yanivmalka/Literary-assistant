@@ -18,11 +18,19 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 ## 3. Run Migrations
 
-Go to Supabase Dashboard > SQL Editor and run these files in order:
+Run every file in `supabase/migrations/` in numeric order in the Supabase SQL Editor (or with the Supabase CLI). Do not deploy the Edge Functions until the migrations have completed. In particular, the current extraction flow requires migrations 115-120, including `120_reconcile_extraction_metadata.sql`, which repairs environments where the function was deployed before the extraction metadata schema.
 
-1. `migrations/001_initial_schema.sql` - Creates all tables
-2. `migrations/002_rls_policies.sql` - Sets up Row Level Security
-3. `migrations/003_storage_and_cleanup.sql` - Creates storage bucket and cleanup function
+Afterward, verify the columns required by the extraction function:
+
+```sql
+SELECT column_name
+FROM information_schema.columns
+WHERE table_schema = 'public'
+  AND table_name = 'raw_extractions'
+  AND column_name IN ('extraction_run_id', 'model_profile');
+```
+
+The query must return both columns.
 
 ## 4. Enable Auth Providers
 

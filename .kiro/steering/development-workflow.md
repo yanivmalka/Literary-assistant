@@ -19,10 +19,10 @@ npm run install:all
 # Copy client/.env.example to client/.env and fill in Supabase credentials
 # Copy server/.env.example to server/.env (optional: add HuggingFace API key)
 
-# Run Supabase migrations (in Supabase SQL Editor, in order):
-# 1. supabase/migrations/001_initial_schema.sql
-# 2. supabase/migrations/002_rls_policies.sql
-# 3. supabase/migrations/003_storage_and_cleanup.sql
+# Run Supabase migrations (in Supabase SQL Editor, in numeric order)
+# Apply every file under supabase/migrations/ before deploying Edge Functions.
+# The current extraction flow specifically requires migrations 115-120,
+# including 120_reconcile_extraction_metadata.sql.
 ```
 
 ### Development

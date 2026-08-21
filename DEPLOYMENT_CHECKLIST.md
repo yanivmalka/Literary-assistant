@@ -8,6 +8,8 @@
 ## Pre-Deployment Verification
 
 ### Database Migrations
+Apply all migrations in `supabase/migrations/` in numeric order. The current extraction function requires migrations 115-120 in addition to the earlier knowledge-extraction migrations.
+
 - [ ] Migration 112 deployed (`add_mentions_provenance.sql`)
   - [ ] `mentions.chunk_id` added with FK to `document_chunks.id`
   - [ ] `mentions.page_number` added
@@ -25,6 +27,34 @@
   - [ ] `entity_resolution_signals` table created
   - [ ] Indexes created on `entity_a_id`, `entity_b_id`, `status`
   - Verify: `SELECT table_name FROM information_schema.tables WHERE table_name LIKE '%suggestions%'`
+
+- [ ] Migration 115 deployed (`extraction_model_profiles.sql`)
+  - [ ] `raw_extractions.model_profile` exists
+
+- [ ] Migration 116 deployed (`extraction_run_lineage.sql`)
+  - [ ] `raw_extractions.extraction_run_id` exists
+  - [ ] `idx_raw_extractions_extraction_run` exists
+
+- [ ] Migration 117 deployed (`rename_extraction_model_profiles.sql`)
+  - [ ] `raw_extractions.model_profile` accepts `current` and `development`
+
+- [ ] Migration 118 deployed (`profile_scoped_branches.sql`)
+  - [ ] `knowledge_branches.profile` exists
+
+- [ ] Migration 119 deployed (`extraction_promotions.sql`)
+  - [ ] Promotion tables and validation triggers exist
+
+- [ ] Migration 120 deployed (`reconcile_extraction_metadata.sql`)
+  - [ ] Recovery migration applied to environments that may have run the function before migrations 115-117
+  - Verify:
+    ```sql
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'raw_extractions'
+      AND column_name IN ('extraction_run_id', 'model_profile');
+    ```
+    Expected: both columns are returned.
 
 ### Code Deployment
 - [ ] `supabase/functions/_shared/extraction-state.ts` deployed
@@ -299,7 +329,7 @@ If critical issues occur:
 **Recommended:** Deploy during low-traffic period (e.g., early morning UTC)
 
 - [ ] Pre-deployment: Backup database
-- [ ] Deploy migrations (112, 113, 114)
+- [ ] Deploy migrations (112-120, in numeric order)
 - [ ] Deploy function updates
 - [ ] Deploy client updates
 - [ ] Run post-deployment tests
