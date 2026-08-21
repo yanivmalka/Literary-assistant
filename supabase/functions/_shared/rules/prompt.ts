@@ -214,10 +214,10 @@ Magical examples:
 - "רונת אש"
 
 When an ability is mentioned as belonging to a character, emit BOTH:
-1. A top-level entity in 'entities' with the ability name and the correct type.
-2. The character's name in that ability entity's 'attributes.users' array.
+1. A top-level entity in the entities array with the ability name and the correct type.
+2. The character's name in that ability entity's attributes.users array.
 
-Do not place an ability only inside a character. If the model also returns 'character.attributes.abilities', 'character.attributes.life_skills', or 'character.attributes.magic_abilities', treat those fields as compatibility hints; the top-level ability entity is still mandatory. Always use an array for 'attributes.users', even for one user. When no user is known, use an empty array.
+Do not place an ability only inside a character. If the model also returns character.attributes.abilities, character.attributes.life_skills, or character.attributes.magic_abilities, treat those fields as compatibility hints; the top-level ability entity is still mandatory. Always use an array for attributes.users, even for one user. When no user is known, use an empty array.
 
 If the text mentions "בעל יכולת X", "לחימה ב-X", or "טכניקת X", extract X only when the context identifies it as a meaningful ability.
 
