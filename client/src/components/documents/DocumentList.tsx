@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileText, Trash2, Brain, Loader2 } from 'lucide-react'
+import { FileText, Trash2, Brain } from 'lucide-react'
 import { useDocumentStore, type Document } from '@/stores/documentStore'
 import ProcessingStatus from './ProcessingStatus'
 import ExtractionProgress from './ExtractionProgress'
@@ -139,11 +139,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                     }`}
                     title={t('ui.documents.extractKnowledgeTitle')}
                   >
-                    {extractionInProgress && extractionDocumentId === doc.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Brain className="h-3.5 w-3.5" />
-                    )}
+                    <Brain className="h-3.5 w-3.5" />
                     {t('ui.documents.extractKnowledge')}
                   </button>
                 </>
