@@ -60,6 +60,38 @@ export interface AbilityLink {
 }
 
 /**
+ * Combine entries from persisted batches with the current batch while keeping
+ * one candidate per entity ID. Later entries win for scalar fields, while
+ * aliases and attributes are merged so a cross-batch reference is retained.
+ */
+export function mergeAbilityLinkEntries(...groups: AbilityLinkEntity[][]): AbilityLinkEntity[] {
+  const entriesById = new Map<string, AbilityLinkEntity>()
+
+  for (const group of groups) {
+    for (const entry of group) {
+      const previous = entriesById.get(entry.id)
+      if (!previous) {
+        entriesById.set(entry.id, {
+          ...entry,
+          aliases: [...entry.aliases],
+          attributes: { ...entry.attributes },
+        })
+        continue
+      }
+
+      entriesById.set(entry.id, {
+        ...previous,
+        ...entry,
+        aliases: [...new Set([...previous.aliases, ...entry.aliases])],
+        attributes: { ...previous.attributes, ...entry.attributes },
+      })
+    }
+  }
+
+  return [...entriesById.values()]
+}
+
+/**
  * Build character -> ability links from normalized extraction entities.
  * Gemini returns character names in the top-level ability.users field,
  * persisted as attributes.users during normalization.
