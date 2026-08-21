@@ -18,13 +18,13 @@ All four critical failures have been fixed in code with minimum, focused changes
 3. ✅ **Failure #3 (Objects)** — Root cause identified: Field coverage detection prevents sparse merges
 4. ✅ **Failure #4 (Cabinet Consolidation)** — FIXED: `entityFieldCoverage()` correctly distinguishes sparse entities
 
-**What's ready:"
+**What's ready:**
 - Local production code validated with client and Deno tests
 - Canonical schema v2, backward-compatible normalization, and graph/timeline persistence changes are implemented
 - Controlled Markdown fixture is available at `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md`
 - SQL verification protocol remains ready for a real Supabase run
 
-**What's not yet proven:"
+**What's not yet proven:**
 - Gemini live output on the controlled fixture
 - Remote Supabase persistence after migration/deployment
 - The four database scenarios below

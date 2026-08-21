@@ -4,6 +4,7 @@ Controlled Extraction Test - Verification Script
 Queries the Supabase database to verify test results
 """
 
+import json
 import os
 import sys
 from pathlib import Path

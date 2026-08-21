@@ -101,7 +101,9 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
   if (selectedCategory) {
     const isLifeSkills = selectedCategory === 'life_skills'
     const abilityList = isLifeSkills ? abilities : magicAbilities
-    const title = isLifeSkills ? 'Life Skills' : 'Magic Skills'
+    const emptyStateKey = isLifeSkills
+      ? 'entities.emptyStates.lifeSkills'
+      : 'entities.emptyStates.magicSkills'
 
     return (
       <div className="max-w-2xl">
@@ -114,7 +116,7 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </button>
           <div>
-            <h2 className="text-xl font-bold">{title}</h2>
+            <h2 className="text-xl font-bold">{t(`${emptyStateKey}.label`)}</h2>
             <p className="text-sm text-muted-foreground mt-1">{character.name}</p>
           </div>
         </div>
@@ -123,12 +125,10 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
         {abilityList.length === 0 ? (
           <div className="border-2 border-dashed rounded-lg p-12 text-center">
             <p className="text-muted-foreground mb-2">
-              {t('entities.empty')}
+              {t(`${emptyStateKey}.title`)}
             </p>
             <p className="text-xs text-muted-foreground">
-              {isLifeSkills
-                ? 'Life skills for this character will appear here.'
-                : 'Magic skills for this character will appear here.'}
+              {t(`${emptyStateKey}.description`)}
             </p>
           </div>
         ) : (

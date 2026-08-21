@@ -10,7 +10,7 @@ const SUPABASE_URL = 'https://lqfqfzqcrqluxanhnjwu.supabase.co';
 // Use anon key for read-only queries
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxZnFmenFjcnFsdXhhbmhuand1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY5NTgwODEsImV4cCI6MjEwMjUzNDA4MX0.D27T3yEG8rbp7eQMKxG-L7Z62PPaKzDYD3q4SCLjoww';
 // Use the actual project ID where extraction was completed
-const PROJECT_ID = process.env.TEST_PROJECT_ID || '39c5af73-9baa-460c-b823-eeeee0a27978';
+const PROJECT_ID = process.env.TEST_PROJECT_ID || '6c4b7b92-214a-4785-ad66-e62527ee68d6';
 
 const supabase = createClient(SUPABASE_URL, ANON_KEY, {
   auth: {
@@ -189,7 +189,7 @@ async function verifyCabinetIdentity() {
   console.log('╚════════════════════════════════════════════════════════════════════╝');
 
   // Query 3.1: Cabinet count
-  const { data: countData, error: countError } = await supabase
+  const { count: cabinetCount, error: countError } = await supabase
     .from('knowledge_entities')
     .select('id', { count: 'exact', head: true })
     .eq('project_id', PROJECT_ID)
@@ -201,7 +201,7 @@ async function verifyCabinetIdentity() {
   if (countError) {
     console.log(`❌ FAILED: ${countError.message}`);
   } else {
-    const count = countData?.length || 0;
+    const count = cabinetCount ?? 0;
     let status = '❌ FAIL';
     if (count === 2) status = '✅ PASS';
     else if (count === 1) status = '❌ FAIL (merged, not split)';
@@ -234,19 +234,19 @@ async function verifyCabinetIdentity() {
 
     // Check mentions
     if (cabinetDetails && cabinetDetails.length >= 2) {
-      const cab1Mentions = await supabase
+      const { count: cab1MentionCount } = await supabase
         .from('knowledge_entity_mentions')
         .select('id', { count: 'exact', head: true })
         .eq('entity_id', cabinetDetails[0].id);
 
-      const cab2Mentions = await supabase
+      const { count: cab2MentionCount } = await supabase
         .from('knowledge_entity_mentions')
         .select('id', { count: 'exact', head: true })
         .eq('entity_id', cabinetDetails[1].id);
 
       console.log(`\n  Mention counts:`);
-      console.log(`    Cabinet A: ${cab1Mentions.data?.length || 0} mentions`);
-      console.log(`    Cabinet B: ${cab2Mentions.data?.length || 0} mentions`);
+      console.log(`    Cabinet A: ${cab1MentionCount ?? 0} mentions`);
+      console.log(`    Cabinet B: ${cab2MentionCount ?? 0} mentions`);
       console.log(`\n${cabinetDetails[0].id !== cabinetDetails[1].id ? '✅ PASS' : '❌ FAIL'}: UUIDs are different`);
     }
   }

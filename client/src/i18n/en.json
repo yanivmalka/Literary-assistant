@@ -241,6 +241,22 @@
     "subtitle": "Characters, locations, and other elements found in your documents",
     "subtitleByType": "{{type}} found in your documents",
     "empty": "No entities found yet. Upload a document to get started.",
+    "emptyStates": {
+      "object": {
+        "title": "No objects are associated with this character yet.",
+        "description": "Objects identified in your documents and linked to this character will appear here."
+      },
+      "lifeSkills": {
+        "label": "Life Skills",
+        "title": "No life skills were found for this character yet.",
+        "description": "Life skills identified in your documents and linked to this character will appear here."
+      },
+      "magicSkills": {
+        "label": "Magic Skills",
+        "title": "No magic skills were found for this character yet.",
+        "description": "Magic skills identified in your documents and linked to this character will appear here."
+      }
+    },
     "confirm": "Confirm",
     "dismiss": "Dismiss",
     "merge": "Merge",

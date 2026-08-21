@@ -2,6 +2,7 @@ import { createRequire } from "module";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { randomUUID } from "crypto";
 
 const require = createRequire(import.meta.url);
 const { createClient } = require("@supabase/supabase-js");
@@ -109,6 +110,7 @@ async function main() {
 
     // Step 7: Invoke extraction
     console.log("7️⃣  Invoking extract-knowledge...");
+    const extractionRunId = randomUUID();
     const { data: extraction, error: extractError } = await supabase.functions.invoke(
       "extract-knowledge",
       {
@@ -117,7 +119,8 @@ async function main() {
           document_id: documentId,
           project_id: projectId,
           user_id: userId,
-          use_main: true,
+          extraction_mode: "bootstrap",
+          extraction_run_id: extractionRunId,
           target_branch_id: null,
           offset: 0,
           limit: 100,

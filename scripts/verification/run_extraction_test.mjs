@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
+import { randomUUID } from 'crypto';
 
 const require = createRequire(import.meta.url);
 const { createClient } = require('@supabase/supabase-js');
@@ -151,13 +152,15 @@ async function queryEntitiesBefore(project, user) {
 async function invokeExtraction(project, document, version, user) {
   console.log('\n📤 Invoking extract-knowledge Edge Function...');
   
+  const extractionRunId = randomUUID();
   const { data, error } = await supabase.functions.invoke('extract-knowledge', {
     body: {
       version_id: version.id,
       document_id: document.id,
       project_id: project.id,
       user_id: user.id,
-      use_main: true,  // First extraction goes to Main
+      extraction_mode: 'bootstrap',
+      extraction_run_id: extractionRunId,
       target_branch_id: null,
       offset: 0,
       limit: 100,

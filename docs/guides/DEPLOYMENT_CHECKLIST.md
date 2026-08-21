@@ -1,14 +1,16 @@
 # Deployment Checklist - Knowledge Extraction Architecture
 
-**Date:** August 20, 2026  
-**Status:** Ready for Production (all prerequisites must be completed)
+**Date:** August 21, 2026
+**Status:** Conditional — offline checks pass; real Gemini/Supabase verification is still pending
+
+Offline validation does not establish production readiness. Complete the controlled extraction verification and confirm the required migrations are deployed before production approval.
 
 ---
 
 ## Pre-Deployment Verification
 
 ### Database Migrations
-Apply all migrations in `supabase/migrations/` in numeric order. The current extraction function requires migrations 115-121 in addition to the earlier knowledge-extraction migrations.
+Apply the migrations required by the active extraction handler in numeric order. The active handler uses the provenance, model-profile, run-lineage, branch-profile, branch-persistence, and graph/timeline schema changes from migrations 112 and 115-123. Migrations 113-114 define optional bootstrap-staging and resolution-suggestion infrastructure; those modules are not invoked by the current handler and must not be described as active extraction behavior.
 
 - [ ] Migration 112 deployed (`add_mentions_provenance.sql`)
   - [ ] `mentions.chunk_id` added with FK to `document_chunks.id`
@@ -16,16 +18,12 @@ Apply all migrations in `supabase/migrations/` in numeric order. The current ext
   - [ ] `mentions.evidence_text` added
   - Verify: `SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'mentions' AND column_name = 'chunk_id'`
 
-- [ ] Migration 113 deployed (`bootstrap_staging.sql`)
-  - [ ] `bootstrap_stages` table created
-  - [ ] `bootstrap_entity_staging` table created
-  - [ ] Indexes created on `extraction_run_id`, `batch_id`
+- [ ] Migration 113 deployed (`bootstrap_staging.sql`) — optional schema support only; the active handler writes directly to Main/Branch and does not call the staging module
+  - [ ] If deployed, treat `bootstrap_stages` and `bootstrap_entity_staging` as inactive until an integration change explicitly wires them into the handler
   - Verify: `SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'bootstrap%'`
 
-- [ ] Migration 114 deployed (`resolution_suggestions.sql`)
-  - [ ] `entity_resolution_suggestions` table created
-  - [ ] `entity_resolution_signals` table created
-  - [ ] Indexes created on `entity_a_id`, `entity_b_id`, `status`
+- [ ] Migration 114 deployed (`resolution_suggestions.sql`) — supporting schema; suggestion creation is not an acceptance criterion for the active extraction handler
+  - [ ] If deployed, verify the tables and policies independently
   - Verify: `SELECT table_name FROM information_schema.tables WHERE table_name LIKE '%suggestions%'`
 
 - [ ] Migration 115 deployed (`extraction_model_profiles.sql`)
@@ -59,20 +57,20 @@ Apply all migrations in `supabase/migrations/` in numeric order. The current ext
 - [ ] Migration 121 deployed (`set_current_model_profile_default.sql`)
   - [ ] New raw extraction rows default to `model_profile = 'current'`
 
-- [ ] `supabase/functions/_shared/extraction-state.ts` deployed
-  - [ ] ExtractionRunState interface accessible
-  - [ ] findPriorBatchEntity() function available
-  - [ ] recordCreatedEntity() function available
+- [ ] Migration 122 deployed (`reconcile_branch_entity_persistence.sql`)
+  - [ ] Branch entity rows and `knowledge_branch_entities.entity_id` satisfy the current Branch persistence contract
 
-- [ ] `supabase/functions/_shared/bootstrap-staging.ts` deployed
-  - [ ] initializeBootstrapStage() callable
-  - [ ] stageEntity() callable
-  - [ ] promoteBootstrapToMain() callable
-  - [ ] failBootstrap() and rollbackBootstrap() callable
+- [ ] Migration 123 deployed (`extraction_graph_provenance.sql`)
+  - [ ] Relationship/event metadata and event mention provenance columns exist
 
-- [ ] `supabase/functions/_shared/resolution-suggestions.ts` deployed
-  - [ ] createResolutionSuggestion() callable
-  - [ ] approveSuggestion() and rejectSuggestion() callable
+- [ ] `supabase/functions/_shared/extraction-state.ts` reviewed as supporting code only
+  - [ ] Do not claim active handler integration unless an E2E test proves it
+
+- [ ] `supabase/functions/_shared/bootstrap-staging.ts` reviewed as inactive in the current handler
+  - [ ] `initializeBootstrapStage()`, `stageEntity()`, and `promoteBootstrapToMain()` are not called by `extract-knowledge/index.ts`
+
+- [ ] `supabase/functions/_shared/resolution-suggestions.ts` reviewed as supporting code only
+  - [ ] Suggestion persistence requires a separate integration test before being listed as production behavior
 
 - [ ] `supabase/functions/_shared/value-sync.ts` updated
   - [ ] calculateFieldConfidence() uses 6-signal model
@@ -86,9 +84,10 @@ Apply all migrations in `supabase/migrations/` in numeric order. The current ext
   - [ ] Example extraction format includes field_evidence mapping
 
 - [ ] `supabase/functions/extract-knowledge/index.ts` updated
-  - [ ] ExtractRequest interface includes extraction_mode and extraction_run_id
-  - [ ] extraction_mode and extraction_run_id passed to bootstrap functions
-  - [ ] Consolidation logic checks confidence >= 100% only
+  - [ ] `ExtractRequest` includes `extraction_mode` and `extraction_run_id`
+  - [ ] The handler writes bootstrap entities directly to Main and Branch entities to the active Branch
+  - [ ] Relationships and events are persisted in the selected layer with the appropriate review status
+  - [ ] Consolidation logic checks confidence against the configured thresholds
 
 - [ ] `client/src/stores/documentStore.ts` updated
   - [ ] extraction_mode set once at RUN start
@@ -99,7 +98,7 @@ Apply all migrations in `supabase/migrations/` in numeric order. The current ext
 - [ ] Environment variables set in Supabase functions:
   - [ ] `SUPABASE_URL` configured
   - [ ] `SUPABASE_ANON_KEY` configured
-  - [ ] `OPENAI_API_KEY` configured (or equivalent AI service)
+  - [ ] `GEMINI_API_KEY` configured
 
 - [ ] Supabase RLS (Row Level Security) policies reviewed:
   - [ ] `extraction_run_state` accessible to authenticated users
@@ -121,30 +120,29 @@ Apply all migrations in `supabase/migrations/` in numeric order. The current ext
   }
   ```
 
-- [ ] Extraction response includes:
+- [ ] Extraction response includes the handler's actual envelope:
   ```json
   {
-    "entities": [
-      {
-        "id": "uuid",
-        "type": "character|object|location|ability|event",
-        "name": "string",
-        "field_evidence": { "first_name": [...], "age": [...] },
-        "field_confidence": { "first_name": 0.95, "age": 0.65 },
-        "aliases": [],
-        "relationships": []
-      }
-    ],
-    "suggestions": [
-      {
-        "entity_a_id": "uuid",
-        "entity_b_id": "uuid",
-        "confidence": 0.75,
-        "signals": ["name_similarity", "field_overlap"]
-      }
-    ]
+    "success": true,
+    "done": true,
+    "next_offset": 100,
+    "telemetry": {
+      "model": "string",
+      "model_profile": "current|development",
+      "latency_ms": 0,
+      "chunks_sent": 1
+    },
+    "summary": {
+      "entities_saved": 0,
+      "relationships_saved": 0,
+      "events_saved": 0,
+      "raw_extraction_id": "uuid",
+      "layer": "main|branch",
+      "branch_id": null
+    }
   }
   ```
+  - [ ] Raw extraction data and normalized entities are verified through the database queries; they are not returned as an `entities`/`suggestions` array by this handler.
 
 ---
 
@@ -157,28 +155,26 @@ Apply all migrations in `supabase/migrations/` in numeric order. The current ext
   - [ ] Golden dataset contract and production normalization tests pass
   - [ ] Main/Branch mode contract tests pass
 
-- [ ] Run a real database verification separately (requires Supabase access)
+- [ ] Run a real database verification separately (requires Gemini, Supabase access, the applied migrations, and authenticated credentials)
 - [ ] Test single-batch extraction (bootstrap mode)
-  - [ ] Extract document chunk
-  - [ ] Verify entities created in main_entities
-  - [ ] Verify bootstrap_stage_id set correctly
+  - [ ] Send `extraction_mode: "bootstrap"` and one stable `extraction_run_id`
+  - [ ] Verify entities are created in `knowledge_entities` with `layer='main'` and `branch_id IS NULL`
+  - [ ] Verify relationships/events, when extracted, use Main with approved status
 
 - [ ] Test multi-batch extraction (bootstrap mode)
+  - [ ] Send the same `extraction_run_id` for every batch
   - [ ] Extract batch 1: Create entity A
   - [ ] Extract batch 2: Reference entity A from batch 1
   - [ ] Verify only one UUID for entity A
 
 - [ ] Test second extraction (branch mode)
-  - [ ] Extract existing document with branch_mode
-  - [ ] Verify new entities created with branch_version_id
-  - [ ] Verify Main entities unchanged
+  - [ ] Send `extraction_mode: "branch"` with an active `target_branch_id`
+  - [ ] Verify new entities use `layer='branch'` and the target Branch ID
+  - [ ] Verify Main entities remain unchanged
 
-- [ ] Test failed extraction and rollback
-  - [ ] Extract batch 1: Create entities
-  - [ ] Extract batch 2: Corrupt data → extraction fails
-  - [ ] Verify rollbackBootstrap() executed
-  - [ ] Verify bootstrap_entity_staging cleaned up
-  - [ ] Verify Main entities untouched
+- [ ] Test failed extraction behavior
+  - [ ] Verify the returned error and inspect whether partial writes remain
+  - [ ] Do not claim `rollbackBootstrap()` or staging cleanup: the active handler does not invoke bootstrap-staging rollback
 
 ### Load Testing
 - [ ] Test multi-batch extraction with 10+ batches

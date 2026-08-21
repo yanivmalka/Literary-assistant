@@ -1,4 +1,4 @@
-# Controlled Extraction Test - Verification Queries
+-- Controlled Extraction Test - Verification Queries
 -- Fixture: `tests/fixtures/CONTROLLED_TEST_DOCUMENT.md` (text fixture used by the runner)
 -- Date: August 20, 2026
 -- Commit: 8597629

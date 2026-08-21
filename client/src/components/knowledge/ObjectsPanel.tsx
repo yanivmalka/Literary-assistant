@@ -29,10 +29,10 @@ export default function ObjectsPanel({ character, onBack }: ObjectsPanelProps) {
       {/* Empty State */}
       <div className="border-2 border-dashed rounded-lg p-12 text-center">
         <p className="text-muted-foreground mb-2">
-          {t('entities.empty')}
+          {t('entities.emptyStates.object.title')}
         </p>
         <p className="text-xs text-muted-foreground">
-          Objects associated with this character will appear here once they are identified in your documents.
+          {t('entities.emptyStates.object.description')}
         </p>
       </div>
     </div>

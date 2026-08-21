@@ -1,6 +1,6 @@
 # Controlled Extraction Test - Verification Execution Guide
 
-**Created:** 2024  
+**Created:** August 21, 2026
 **Project ID:** `6c4b7b92-214a-4785-ad66-e62527ee68d6`  
 **Test Document:** `../../../tests/fixtures/CONTROLLED_TEST_DOCUMENT.md` (text fixture; the original PDF is also retained in the same directory)
 
@@ -38,7 +38,7 @@ This test verifies the **controlled extraction** functionality - specifically th
 2. **Create entity relationships** for abilities (not attributes)
 3. **Identify distinct entities** when contexts conflict (two Cabinets with different materials)
 4. **Consolidate repeated mentions** (same Cabinet mentioned 5 times = 1 entity)
-5. **Maintain Main/Branch isolation** (first extraction creates Main layer only)
+5. **Maintain Main/Branch isolation** for the first extraction (entities in Main with `branch_id=NULL`; relationships and events are also persisted in Main with approved status)
 
 ---
 
