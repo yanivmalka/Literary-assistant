@@ -68,11 +68,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signUp: async (email, password) => {
     set({ loading: true })
     try {
-      const { error } = await supabase.auth.signUp({ 
-        email, 
+      const normalizedEmail = email.trim()
+      if (!normalizedEmail || !password) {
+        set({ loading: false })
+        return { error: 'Email and password are required.' }
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email: normalizedEmail,
         password,
         options: {
-          // Disable email confirmation requirement for now - can be enabled in Supabase settings later
           emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
         }
       })
@@ -88,14 +93,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signIn: async (email, password) => {
     set({ loading: true })
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      
+      const normalizedEmail = email.trim()
+      if (!normalizedEmail || !password) {
+        set({ loading: false })
+        return { error: 'Email and password are required.' }
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      })
+
       if (error) {
         set({ loading: false })
-        // If sign in fails and user exists but not confirmed, provide helpful message
-        if (error?.message?.includes('Email not confirmed')) {
+        const errorCode = error.code?.toLowerCase()
+        const errorMessage = error.message.toLowerCase()
+
+        if (errorCode === 'email_not_confirmed' || errorMessage.includes('email not confirmed')) {
           return { error: 'Please check your email to confirm your account before logging in.' }
         }
+
+        if (errorCode === 'invalid_credentials' || errorCode === 'invalid_grant') {
+          return { error: 'Invalid email or password.' }
+        }
+
         return { error: error.message }
       }
 

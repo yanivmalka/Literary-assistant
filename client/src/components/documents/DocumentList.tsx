@@ -144,13 +144,15 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                   </button>
                 </>
               )}
-              <button
-                onClick={() => handleDelete(doc.id)}
-                className="relative z-20 p-1.5 text-red-600 hover:text-red-700 rounded transition-colors"
-                title={t('common.delete')}
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {isReady && !extractionInProgress && (
+                <button
+                  onClick={() => handleDelete(doc.id)}
+                  className="relative z-20 p-1.5 text-red-600 hover:text-red-700 rounded transition-colors"
+                  title={t('common.delete')}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
 
