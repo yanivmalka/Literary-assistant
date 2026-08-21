@@ -176,6 +176,7 @@ export default function CharactersHub({ projectId }: CharactersHubProps) {
         <CharacterDetailModal
           isOpen={detailModalOpen}
           character={selectedCharacter}
+          projectId={projectId}
           onClose={handleCloseDetailModal}
         />
       )}

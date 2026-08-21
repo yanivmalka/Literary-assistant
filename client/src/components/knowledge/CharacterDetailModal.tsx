@@ -9,6 +9,7 @@ import AbilitiesPanel from './AbilitiesPanel'
 interface CharacterDetailModalProps {
   isOpen: boolean
   character: Entity
+  projectId: string
   onClose: () => void
 }
 
@@ -25,6 +26,7 @@ function getField(entity: Entity, field: string): string | null {
 export default function CharacterDetailModal({
   isOpen,
   character,
+  projectId,
   onClose,
 }: CharacterDetailModalProps) {
   const { t } = useTranslation()
@@ -227,7 +229,11 @@ export default function CharacterDetailModal({
           )}
 
           {view === 'abilities' && (
-            <AbilitiesPanel character={character} onBack={() => setView('detail')} />
+            <AbilitiesPanel
+              character={character}
+              projectId={projectId}
+              onBack={() => setView('detail')}
+            />
           )}
         </div>
       </div>

@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 
 interface AbilitiesPanelProps {
   character: Entity
+  projectId: string
   onBack: () => void
 }
 
@@ -70,7 +71,22 @@ function getEmbeddedAbilities(character: Entity): Ability[] {
   return result
 }
 
-export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProps) {
+function abilityUsersMatchCharacter(entity: {
+  attributes?: Record<string, unknown> | null
+}, character: Entity): boolean {
+  const users = entity.attributes?.users
+  const userNames = Array.isArray(users)
+    ? users.filter((value): value is string => typeof value === 'string')
+    : typeof users === 'string'
+      ? users.split(',').map(value => value.trim()).filter(Boolean)
+      : []
+  const characterNames = [character.name, ...(character.aliases || [])]
+    .map(value => value.trim().toLocaleLowerCase())
+    .filter(Boolean)
+  return userNames.some(user => characterNames.includes(user.trim().toLocaleLowerCase()))
+}
+
+export default function AbilitiesPanel({ character, projectId, onBack }: AbilitiesPanelProps) {
   const { t } = useTranslation()
   const [selectedCategory, setSelectedCategory] = useState<AbilityCategory | null>(null)
   const [abilities, setAbilities] = useState<Ability[]>([])
@@ -80,7 +96,7 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
   // Load abilities from database
   useEffect(() => {
     loadAbilities()
-  }, [character.id])
+  }, [character.id, projectId])
 
   const loadAbilities = async () => {
     try {
@@ -90,10 +106,56 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
         setAbilities(embeddedAbilities.filter(ability => ability.type === 'ability'))
         setMagicAbilities(embeddedAbilities.filter(ability => ability.type === 'magic_ability'))
       }
+      const applyAbilityEntities = (entities: Array<{
+        id: string
+        canonical_name: string
+        description?: string | null
+        entity_type: string
+        attributes?: Record<string, unknown> | null
+      }>) => {
+        const lifeSkills = entities
+          .filter(e => e.entity_type === 'ability')
+          .map(e => ({
+            id: e.id,
+            name: e.canonical_name,
+            description: e.description || undefined,
+            type: 'ability' as const,
+          }))
+        const magicSkills = entities
+          .filter(e => e.entity_type === 'magic_ability')
+          .map(e => ({
+            id: e.id,
+            name: e.canonical_name,
+            description: e.description || undefined,
+            type: 'magic_ability' as const,
+          }))
+
+        if (lifeSkills.length === 0 && magicSkills.length === 0) return false
+        setAbilities(lifeSkills)
+        setMagicAbilities(magicSkills)
+        return true
+      }
+      const loadAbilityEntitiesByUser = async () => {
+        const { data, error } = await supabase
+          .from('knowledge_entities')
+          .select('id, canonical_name, description, entity_type, attributes')
+          .eq('project_id', projectId)
+          .in('entity_type', ['ability', 'magic_ability'])
+
+        if (error) {
+          console.error('Failed to fetch ability entities by user:', error)
+          return false
+        }
+
+        const matchingEntities = (data || []).filter(entity =>
+          abilityUsersMatchCharacter(entity, character),
+        )
+        return applyAbilityEntities(matchingEntities)
+      }
       
       // Query relationships for this character. Relationships are canonical;
-      // embedded attributes are used only as a backward-compatible fallback
-      // for extractions created before abilities became first-class entities.
+      // embedded attributes and ability.users are compatibility fallbacks for
+      // extractions created before all links were persisted.
       const { data: relationships, error: relError } = await supabase
         .from('knowledge_entity_relationships')
         .select('target_entity_id, relationship_type')
@@ -102,54 +164,22 @@ export default function AbilitiesPanel({ character, onBack }: AbilitiesPanelProp
 
       if (relError) {
         console.error('Failed to fetch relationships:', relError)
-        setEmbeddedState()
+        if (!(await loadAbilityEntitiesByUser())) setEmbeddedState()
         return
       }
 
-      if (!relationships || relationships.length === 0) {
-        setEmbeddedState()
-        return
+      if (relationships && relationships.length > 0) {
+        const abilityIds = relationships.map(r => r.target_entity_id)
+        const { data: abilityEntities, error: entError } = await supabase
+          .from('knowledge_entities')
+          .select('id, canonical_name, description, entity_type, attributes')
+          .in('id', abilityIds)
+
+        if (!entError && abilityEntities && applyAbilityEntities(abilityEntities)) return
+        if (entError) console.error('Failed to fetch ability entities:', entError)
       }
 
-      // Get the target ability entities
-      const abilityIds = relationships.map(r => r.target_entity_id)
-      const { data: abilityEntities, error: entError } = await supabase
-        .from('knowledge_entities')
-        .select('id, canonical_name, description, entity_type')
-        .in('id', abilityIds)
-
-      if (entError) {
-        console.error('Failed to fetch ability entities:', entError)
-        setEmbeddedState()
-        return
-      }
-
-      if (!abilityEntities || abilityEntities.length === 0) {
-        setEmbeddedState()
-        return
-      }
-
-      // Split by type
-      const lifeSkills = abilityEntities
-        .filter(e => e.entity_type === 'ability')
-        .map(e => ({
-          id: e.id,
-          name: e.canonical_name,
-          description: e.description || undefined,
-          type: 'ability' as const,
-        }))
-
-      const magicSkills = abilityEntities
-        .filter(e => e.entity_type === 'magic_ability')
-        .map(e => ({
-          id: e.id,
-          name: e.canonical_name,
-          description: e.description || undefined,
-          type: 'magic_ability' as const,
-        }))
-
-      setAbilities(lifeSkills)
-      setMagicAbilities(magicSkills)
+      if (!(await loadAbilityEntitiesByUser())) setEmbeddedState()
     } catch (error) {
       console.error('Error loading abilities:', error)
       setAbilities(getEmbeddedAbilities(character).filter(ability => ability.type === 'ability'))
