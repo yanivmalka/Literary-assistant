@@ -30,6 +30,10 @@ interface RelationshipPanelProps {
 
 const RELATIONSHIP_TYPES = ['owns', 'uses', 'located_in', 'knows', 'parent_of', 'involves', 'occurs_at', 'contained_in'] as const
 
+function relationshipLabel(type: string, translate: (key: string) => string) {
+  return translate(`ui.relationships.types.${type}`)
+}
+
 export default function RelationshipPanel({
   entity,
   relationships,
