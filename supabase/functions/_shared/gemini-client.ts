@@ -357,12 +357,26 @@ export async function callGeminiWithFallback(
     }
   }
 
-  // All models exhausted
-  console.error("[Gemini Fallback] All models exhausted. No available model.");
+  // All models exhausted. Return a sanitized summary so callers can
+  // distinguish invalid model IDs, quota/rate limiting, transient provider
+  // failures, timeouts, and in-memory cooldown skips without exposing the API
+  // key, prompt, or full provider response.
+  const fallbackDetails = JSON.stringify({
+    attempts: fallbackChain.map(({ model, status, error, skipped, reason }) => ({
+      model,
+      status,
+      skipped: skipped ?? false,
+      reason: reason ?? null,
+      error: error ? error.slice(0, 200) : null,
+    })),
+  });
+
+  console.error("[Gemini Fallback] All models exhausted. No available model.", fallbackDetails);
   return {
     success: false,
     error: "All Gemini models unavailable. Please try again later.",
     status: 503,
+    details: fallbackDetails,
     modelUsed: null,
     isRetriable: true,
     fallbackChain,
