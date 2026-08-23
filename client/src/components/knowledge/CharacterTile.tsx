@@ -3,6 +3,7 @@ import { Edit3 } from 'lucide-react'
 import type { Entity } from '@/stores/entityStore'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import {
+  getCharacterAppearanceSummaries,
   getPopulatedCharacterFields,
   isDynamicCharacterProfile,
   isPopulatedCharacterField,
@@ -35,11 +36,19 @@ export default function CharacterTile({ character, modelProfile, definitions = [
   const { t } = useTranslation()
   const isDynamicProfile = isDynamicCharacterProfile(modelProfile)
   const populatedFields = getPopulatedCharacterFields(character, modelProfile, definitions)
-  const preferredKeys = ['age', 'height', 'gender', 'eye_color', 'hair_color', 'hair_type']
-  const dynamicFields = preferredKeys
-    .map(key => populatedFields.find(field => field.key === key))
-    .filter((field): field is typeof populatedFields[number] => Boolean(field))
-    .slice(0, 6)
+  const appearanceSummaries = getCharacterAppearanceSummaries(character, modelProfile, definitions)
+  const preferredKeys = ['age', 'height', 'gender']
+  const dynamicFields = [
+    ...preferredKeys
+      .map(key => populatedFields.find(field => field.key === key))
+      .filter((field): field is typeof populatedFields[number] => Boolean(field))
+      .map(field => ({ key: field.key, value: field.value, label: field.definition.label })),
+    ...appearanceSummaries.map(summary => ({
+      key: summary.key,
+      value: summary.value,
+      label: t(`entityFields.dynamic.${summary.key}`, { defaultValue: summary.key === 'hair_summary' ? 'שיער' : 'עיניים' }),
+    })),
+  ].slice(0, 6)
 
   const age = getField(character, 'age')
   const height = getField(character, 'height')
@@ -64,10 +73,10 @@ export default function CharacterTile({ character, modelProfile, definitions = [
       {isDynamicProfile ? (
         dynamicFields.length > 0 && (
           <div className="grid grid-cols-2 gap-3 mb-4">
-            {dynamicFields.map(({ key, value, definition }) => (
+            {dynamicFields.map(({ key, value, label }) => (
               <div key={key}>
                 <p className="text-xs text-muted-foreground font-medium">
-                  {t(`entityFields.dynamic.${key}`, { defaultValue: definition.label || key })}
+                  {t(`entityFields.dynamic.${key}`, { defaultValue: label || key })}
                 </p>
                 <p className="text-sm">{displayValue(value)}</p>
               </div>

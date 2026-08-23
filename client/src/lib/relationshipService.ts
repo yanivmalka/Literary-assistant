@@ -11,44 +11,43 @@ export interface Relationship {
 }
 
 /**
- * Fetch all relationships for an entity (outgoing)
- * Includes Main relationships (base_exists=true) and Branch proposals
+ * Fetch all relationships touching an entity (outgoing and incoming).
+ * The database keeps one directed edge; the profile view exposes that edge
+ * from either endpoint so mutual character relationships are visible to both.
  */
 export async function getEntityRelationships(
   entityId: string,
   projectId: string,
-  branchId?: string
+  branchId?: string,
 ): Promise<Relationship[]> {
-  const query = supabase
-    .from('knowledge_entity_relationships')
-    .select('*')
-    .eq('project_id', projectId)
-    .eq('source_entity_id', entityId)
-
-  if (branchId) {
-    // Include both Main (branch_id IS NULL) and Branch (branch_id = branchId)
-    const { data: branchRels } = await query.eq('branch_id', branchId)
-    const { data: mainRels } = await supabase
+  const loadScope = async (scopeBranchId: string | null) => {
+    let query = supabase
       .from('knowledge_entity_relationships')
       .select('*')
       .eq('project_id', projectId)
-      .eq('source_entity_id', entityId)
-      .is('branch_id', null)
+      .or(`source_entity_id.eq.${entityId},target_entity_id.eq.${entityId}`)
 
-    const combined = [...(branchRels || []), ...(mainRels || [])]
-    // Deduplicate by (type, target) — prefer Branch if exists
-    const seen = new Set<string>()
-    return combined.filter(rel => {
-      const key = `${rel.relationship_type}:${rel.target_entity_id}`
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-  } else {
-    // Main only
-    const { data } = await query.is('branch_id', null)
+    query = scopeBranchId === null
+      ? query.is('branch_id', null)
+      : query.eq('branch_id', scopeBranchId)
+
+    const { data, error } = await query
+    if (error) throw error
     return data || []
   }
+
+  const rows = branchId
+    ? [...await loadScope(branchId), ...await loadScope(null)]
+    : await loadScope(null)
+
+  // Prefer the Branch proposal/override over Main for the same directed edge.
+  const seen = new Set<string>()
+  return rows.filter(rel => {
+    const key = `${rel.source_entity_id}:${rel.target_entity_id}:${rel.relationship_type}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 /**

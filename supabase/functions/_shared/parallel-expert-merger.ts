@@ -119,6 +119,28 @@ function uniqueNumbers(values: number[]): number[] {
   return [...new Set(values.filter((value) => Number.isInteger(value)))].sort((a, b) => a - b);
 }
 
+function mergeFieldObservations(
+  existing: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...existing };
+  for (const [field, value] of Object.entries(incoming)) {
+    const values = [
+      ...(Array.isArray(merged[field]) ? merged[field] : merged[field] == null ? [] : [merged[field]]),
+      ...(Array.isArray(value) ? value : [value]),
+    ].filter((item) => item !== null && item !== undefined);
+    const unique = values.filter((item, index, all) => {
+      try {
+        return all.findIndex((candidate) => JSON.stringify(candidate) === JSON.stringify(item)) === index;
+      } catch {
+        return all.indexOf(item) === index;
+      }
+    });
+    if (unique.length > 0) merged[field] = unique.length === 1 ? unique[0] : unique;
+  }
+  return merged;
+}
+
 function uniqueReferences<T extends ExpertSourceReference | Record<string, unknown>>(values: T[]): T[] {
   const seen = new Set<string>();
   return values.filter((reference) => {
@@ -249,10 +271,10 @@ function mergeEntity(
     const existingObservations = isRecord(attributes.character_field_observations)
       ? attributes.character_field_observations
       : {};
-    attributes.character_field_observations = {
-      ...existingObservations,
-      ...candidate.field_observations,
-    };
+    attributes.character_field_observations = mergeFieldObservations(
+      existingObservations,
+      candidate.field_observations,
+    );
   }
 
   const metadata = isRecord(attributes.extraction_meta) ? attributes.extraction_meta : {};
@@ -289,6 +311,9 @@ function addEntity(
   }
 
   const attributes: Record<string, unknown> = { ...candidate.fields };
+  if (candidate.field_observations && Object.keys(candidate.field_observations).length > 0) {
+    attributes.character_field_observations = mergeFieldObservations({}, candidate.field_observations);
+  }
   attributes.extraction_meta = {
     parallel_expert_artifacts: [artifactMarker(artifact)],
   };

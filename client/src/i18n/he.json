@@ -636,6 +636,8 @@
       "secrets": "סודות",
       "emotional_state": "מצב רגשי",
       "eye_size": "גודל עיניים",
+      "hair_summary": "שיער",
+      "eyes_summary": "עיניים",
       "facial_features": "תווי פנים",
       "distinguishing_features": "סממנים ייחודיים",
       "typical_clothing": "לבוש אופייני",
@@ -904,7 +906,20 @@
         "parent_of": "הורה של",
         "involves": "מערב את",
         "occurs_at": "מתרחש ב־",
-        "contained_in": "מוכל בתוך"
+        "contained_in": "מוכל בתוך",
+        "acquaintance": "מכיר את",
+        "friendship": "חברות",
+        "friendship_deep": "חברות עמוקה",
+        "family": "משפחה",
+        "romantic_relationship": "קשר רומנטי",
+        "hostility": "עוינות",
+        "rivalry": "יריבות",
+        "alliance": "ברית",
+        "mentorship": "חניכה",
+        "work_subordinate": "כפוף ל־",
+        "work_supervisor": "ממונה על",
+        "protection_or_dependency": "הגנה או תלות",
+        "no_significant_bond": "ללא קשר משמעותי"
       }
     },
     "debugAuth": {

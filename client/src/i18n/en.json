@@ -636,6 +636,8 @@
       "secrets": "Secrets",
       "emotional_state": "Emotional State",
       "eye_size": "Eye Size",
+      "hair_summary": "Hair",
+      "eyes_summary": "Eyes",
       "facial_features": "Facial Features",
       "distinguishing_features": "Distinguishing Features",
       "typical_clothing": "Typical Clothing",
@@ -904,7 +906,20 @@
         "parent_of": "Parent of",
         "involves": "Involves",
         "occurs_at": "Occurs at",
-        "contained_in": "Contained in"
+        "contained_in": "Contained in",
+        "acquaintance": "Acquaintance",
+        "friendship": "Friendship",
+        "friendship_deep": "Deep Friendship",
+        "family": "Family",
+        "romantic_relationship": "Romantic Relationship",
+        "hostility": "Hostility",
+        "rivalry": "Rivalry",
+        "alliance": "Alliance",
+        "mentorship": "Mentorship",
+        "work_subordinate": "Reports To",
+        "work_supervisor": "Supervises",
+        "protection_or_dependency": "Protection or Dependency",
+        "no_significant_bond": "No Significant Bond"
       }
     },
     "debugAuth": {

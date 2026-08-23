@@ -257,6 +257,44 @@ export function getPopulatedCharacterFields(
     .filter(item => isPopulatedCharacterField(item.value))
 }
 
+export interface CharacterAppearanceSummary {
+  key: 'hair_summary' | 'eyes_summary'
+  value: string
+  sourceKeys: string[]
+}
+
+function displayValueParts(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(displayValueParts)
+  if (value === null || value === undefined) return []
+  if (typeof value === 'object') return [JSON.stringify(value)]
+  const text = String(value).trim()
+  return text ? [text] : []
+}
+
+/**
+ * Builds display-only summaries while preserving the individual extracted
+ * fields as the canonical values used by editing, persistence, and prompts.
+ */
+export function getCharacterAppearanceSummaries(
+  entity: Entity,
+  profile: ExtractionModelProfile | string,
+  definitions: CharacterFieldDefinition[] = [],
+): CharacterAppearanceSummary[] {
+  const values = new Map(
+    getPopulatedCharacterFields(entity, profile, definitions)
+      .map(field => [field.key, field.value] as const),
+  )
+  const summary = (key: CharacterAppearanceSummary['key'], sourceKeys: string[]) => {
+    const parts = sourceKeys.flatMap(sourceKey => displayValueParts(values.get(sourceKey)))
+    return parts.length > 0 ? { key, value: [...new Set(parts)].join(' '), sourceKeys } : null
+  }
+
+  return [
+    summary('hair_summary', ['hair_color', 'hair_type']),
+    summary('eyes_summary', ['eye_shape', 'eye_color', 'eye_size']),
+  ].filter((item): item is CharacterAppearanceSummary => item !== null)
+}
+
 export interface CharacterFieldProvenance {
   sourceType: 'ai' | 'user'
   confidence: number | null

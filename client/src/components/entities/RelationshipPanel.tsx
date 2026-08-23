@@ -28,7 +28,29 @@ interface RelationshipPanelProps {
   onRemoveRelationship: (relId: string) => Promise<void>
 }
 
-const RELATIONSHIP_TYPES = ['owns', 'uses', 'located_in', 'knows', 'parent_of', 'involves', 'occurs_at', 'contained_in'] as const
+const RELATIONSHIP_TYPES = [
+  'owns',
+  'uses',
+  'located_in',
+  'knows',
+  'parent_of',
+  'involves',
+  'occurs_at',
+  'contained_in',
+  'acquaintance',
+  'friendship',
+  'friendship_deep',
+  'family',
+  'romantic_relationship',
+  'hostility',
+  'rivalry',
+  'alliance',
+  'mentorship',
+  'work_subordinate',
+  'work_supervisor',
+  'protection_or_dependency',
+  'no_significant_bond',
+] as const
 
 function relationshipLabel(type: string, translate: (key: string) => string) {
   return translate(`ui.relationships.types.${type}`)
@@ -89,7 +111,9 @@ export default function RelationshipPanel({
             <div key={type} className="border rounded-lg p-3 space-y-2">
               <h4 className="font-medium text-sm capitalize">{relationshipLabel(type, t)}</h4>
               {rels.map(rel => {
-                const targetName = getEntityName(rel.target_entity_id)
+                const isIncoming = rel.target_entity_id === entity.id
+                const relatedEntityId = isIncoming ? rel.source_entity_id : rel.target_entity_id
+                const relatedEntityName = getEntityName(relatedEntityId)
                 const isPending = rel.review_status === 'pending'
 
                 return (
@@ -103,7 +127,9 @@ export default function RelationshipPanel({
                           : 'bg-red-50 border border-red-200'
                     }`}
                   >
-                    <span className="flex-1">{targetName}</span>
+                    <span className="flex-1" title={isIncoming ? 'Incoming relationship' : 'Outgoing relationship'}>
+                      {isIncoming ? '← ' : ''}{relatedEntityName}
+                    </span>
                     {branchId && isPending && (
                       <div className="flex gap-1">
                         <button

@@ -86,8 +86,8 @@ For each field you extract, if the field is one of these key fields, include the
 CHARACTERS - key fields requiring evidence:
 - name: The exact textual mention of the character's name
 - age: If mentioned (e.g., "בן 18", "בת 25"), include the quote
-- gender: If explicitly stated, include the quote
-- physical attributes (hair_color, eye_color, height, scars, tattoos): Include the exact description
+- gender: If explicitly stated OR unambiguously indicated by consistent grammatical pronouns/adjectives/verb forms referring to the named character, include the supporting quote; never infer it from a name, role, appearance, or stereotype
+- physical attributes (hair_color, hair_type, eye_color, eye_shape, eye_size, height, scars, tattoos): Include the exact description and keep each supported field separate
 - narrative_role: The quote showing the character's role or importance
 - relationships: Who they're connected to and how
 
@@ -161,7 +161,10 @@ NAME CONSOLIDATION:
 - **ONLY consolidate if same first name + additional surname, OR within same document/context showing both names for the same entity**
 - Never consolidate on family relationship alone (e.g., "ליאו" + "אביו של ליאו" → DO NOT consolidate "אביו" as a character unless it has its own name)
 
-PHYSICAL ATTRIBUTES — pay special attention to: age, height, eye_color, hair_color.
+PHYSICAL ATTRIBUTES — pay special attention to: age, height, gender, eye_color, eye_shape, eye_size, hair_color, hair_type.
+- Extract gender from an explicit statement or an unambiguous grammatical signal; do not guess from a name, role, clothing, or stereotype.
+- Extract hair_color and hair_type as separate fields whenever both are present. For example, “שיער שחור ארוך וחלק” means hair_color="שחור" and hair_type="ארוך וחלק"; “שיער חום מתולתל” means hair_color="חום" and hair_type="מתולתל".
+- Extract eye_color, eye_shape, and eye_size independently whenever each is supported. For example, “עיני שקד חומות” means eye_shape="שקד" and eye_color="חומות"; “עיניים כחולות גדולות” means eye_color="כחולות" and eye_size="גדולות".
 - Extract even when mentioned indirectly:
   "חגג את יום הולדתו השמונה עשרה" → age: "18"
   "שערו השחור נפל על עיניו הכחולות" → hair_color: "שחור", eye_color: "כחול"
@@ -270,8 +273,18 @@ IDENTITY AND FIELD RULES:
 SUPPORTED FIXED FIELDS:
 first_name, last_name, aliases, age, gender, sexual_orientation, pronouns, occupation, hobbies, favorite_foods, disliked_foods, religion, beliefs, race, height, narrative_role, status, personality_traits, strengths, weaknesses, fears, goals_and_desires, values_and_principles, habits_and_mannerisms, speech_style, secrets, emotional_state, eye_color, eye_shape, eye_size, skin_color, hair_color, hair_type, tattoos, scars, jewelry, body_type, facial_features, distinguishing_features, typical_clothing, posture_and_body_language, appearance_traits.
 
+GENDER AND APPEARANCE EXTRACTION:
+- For this C profile, the generic rule that asks for explicit gender is superseded by this rule: extract gender when the text gives an explicit statement OR consistent, unambiguous grammatical evidence such as gendered pronouns, adjectives, or verb forms referring to the named character.
+- Do not infer gender from a first name, occupation, appearance, clothing, personality, stereotype, or social role. If the grammatical evidence is ambiguous or inconsistent, omit gender.
+- When gender is inferred from grammatical evidence, set inferred=true, include the exact supporting quote in the observation evidence, provide confidence, and add a short inference_note explaining the grammatical signal.
+- Extract hair_color and hair_type independently whenever the text supports them. For example, from “שיער שחור ארוך וחלק”, extract hair_color=שחור and hair_type=ארוך וחלק; do not choose only one field and do not merge them in the extraction payload.
+- Extract eye_color, eye_shape, and eye_size independently whenever supported. For example, “עיני שקד חומות” may produce eye_shape=שקד and eye_color=חומות; “עיניים כחולות גדולות” may produce eye_color=כחולות and eye_size=גדולות.
+- Never guess physical attributes. Direct descriptions and unambiguous grammatical references are valid evidence; names, stereotypes, ethnicity, or visual “impressions” are not.
+
 RELATIONSHIPS:
 Use only these relationship_type values: acquaintance, friendship, friendship_deep, family, romantic_relationship, hostility, rivalry, alliance, mentorship, work_subordinate, work_supervisor, protection_or_dependency, no_significant_bond.
+- Treat acquaintance, friendship, friendship_deep, family, romantic_relationship, hostility, rivalry, alliance, and no_significant_bond as mutual/symmetric for display: emit one canonical relationship edge, not two duplicate reverse edges.
+- Preserve direction for mentorship, work_subordinate, work_supervisor, and protection_or_dependency. The product will display an edge from either character's profile without changing its stored direction.
 `;
 
 const DYNAMIC_CHARACTER_FIELD_INSTRUCTIONS = `=== DYNAMIC CHARACTER FIELDS — SUB-BASE-LOCATIONS ONLY ===

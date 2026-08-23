@@ -14,6 +14,7 @@ import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import { EXTRACTION_MODEL_PROFILES, getStoredExtractionModelProfile } from '@/lib/extractionModels'
 import {
   getCatalogCharacterField,
+  getCharacterAppearanceSummaries,
   getPopulatedCharacterFields,
   isDynamicCharacterProfile,
   loadCharacterFieldSchema,
@@ -76,13 +77,17 @@ export default function CharacterProfilePage() {
       const groups = new Map<string, string[]>()
       groups.set('זהות', ['name', 'first_name'])
       for (const field of visibleDynamicDefinitions) {
-        // first_name is already rendered in the explicit identity group above.
+        // Identity fields are rendered in one explicit group, including the
+        // catalog's longer identity group key.
         if (field.field_key === 'first_name') continue
-        const group = groups.get(field.group_key) || []
+        const groupKey = field.group_key === 'זהות ופרטים אישיים' ? 'זהות' : field.group_key
+        const group = groups.get(groupKey) || []
         if (!group.includes(field.field_key)) group.push(field.field_key)
-        groups.set(field.group_key, group)
+        groups.set(groupKey, group)
       }
-      return [...groups.entries()].map(([key, fields]) => ({ key, labelKey: '', fields }))
+      return [...groups.entries()]
+        .filter(([, fields]) => fields.length > 0)
+        .map(([key, fields]) => ({ key, labelKey: '', fields }))
     },
     [entity, entityType, isDynamicProfile, visibleDynamicDefinitions]
   )
@@ -121,11 +126,11 @@ export default function CharacterProfilePage() {
     if (!projectId || !entityId) return
     
     setLoadingRelationships(true)
-    getEntityRelationships(entityId, projectId, currentBranch?.id)
+    getEntityRelationships(entityId, projectId, selectedVersion === 'branch' ? currentBranch?.id : undefined)
       .then(rels => setRelationships(rels))
       .catch(err => console.error('Failed to load relationships:', err))
       .finally(() => setLoadingRelationships(false))
-  }, [projectId, entityId, currentBranch?.id])
+  }, [projectId, entityId, selectedVersion, currentBranch?.id])
 
   // Initialize form data from entity
   // Depends only on entity itself, not on allFields.
@@ -283,74 +288,89 @@ export default function CharacterProfilePage() {
 
       {/* Content */}
       <div className="border rounded-lg p-6 bg-card">
-        {fieldGroups.map(group => (
-          <div key={group.key} className="mb-8 last:mb-0">
-            <h3 className="text-lg font-semibold mb-4 text-muted-foreground">
-              {isDynamicProfile
-                ? t(`entityFields.dynamic.groups.${group.key === 'זהות' ? 'identity' : group.key === 'זהות ופרטים אישיים' ? 'identity' : group.key === 'תכונות' ? 'traits' : group.key === 'מראה חיצוני' ? 'appearance' : group.key === 'עולם הדמות' ? 'world' : group.key === 'שדות מותאמים אישית' ? 'custom' : 'analysis'}`, { defaultValue: group.key })
-                : t(group.labelKey)}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {group.fields.map(field => {
-                const fieldKey = field as string
-                const value = formData[fieldKey] ?? ''
-                const dynamicDefinition = dynamicFields.find(item => item.field_key === fieldKey) || getCatalogCharacterField(fieldKey)
-                const populatedValue = isDynamicProfile
-                  ? getPopulatedCharacterFields(entity, modelProfile, dynamicFields).find(item => item.key === fieldKey)?.value
-                  : value
-                const displayValue = Array.isArray(populatedValue) ? populatedValue.join(', ') : populatedValue == null ? '' : String(populatedValue)
-                const isTextarea = dynamicDefinition?.field_type === 'long_text' || TEXTAREA_FIELDS.has(fieldKey)
-                const fieldLabel = isDynamicProfile && dynamicDefinition
-                  ? t(`entityFields.dynamic.${fieldKey}`, { defaultValue: dynamicDefinition.label || fieldKey })
-                  : t(`entityFields.${fieldKey}`, { defaultValue: fieldKey })
+        {fieldGroups.map(group => {
+          const appearanceSummaries = isDynamicProfile && viewMode === 'profile' && group.key === 'מראה חיצוני'
+            ? getCharacterAppearanceSummaries(entity, modelProfile, dynamicFields)
+            : []
+          const hiddenAppearanceFields = appearanceSummaries.length > 0
+            ? new Set(['hair_color', 'hair_type', 'eye_color', 'eye_shape', 'eye_size'])
+            : new Set<string>()
+          const renderFields = [
+            ...group.fields
+              .filter(field => !hiddenAppearanceFields.has(field as string))
+              .map(field => ({ fieldKey: field as string, summaryValue: null as string | null })),
+            ...appearanceSummaries.map(summary => ({ fieldKey: summary.key, summaryValue: summary.value })),
+          ]
 
-                if (viewMode === 'profile') {
-                  if (isDynamicProfile && !displayValue.trim()) return null
+          return (
+            <div key={group.key} className="mb-8 last:mb-0">
+              <h3 className="text-lg font-semibold mb-4 text-muted-foreground">
+                {isDynamicProfile
+                  ? t(`entityFields.dynamic.groups.${group.key === 'זהות' ? 'identity' : group.key === 'תכונות' ? 'traits' : group.key === 'מראה חיצוני' ? 'appearance' : group.key === 'עולם הדמות' ? 'world' : group.key === 'שדות מותאמים אישית' ? 'custom' : 'analysis'}`, { defaultValue: group.key })
+                  : t(group.labelKey)}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {renderFields.map(({ fieldKey, summaryValue }) => {
+                  const value = formData[fieldKey] ?? ''
+                  const dynamicDefinition = dynamicFields.find(item => item.field_key === fieldKey) || getCatalogCharacterField(fieldKey)
+                  const populatedValue = summaryValue ?? (isDynamicProfile
+                    ? getPopulatedCharacterFields(entity, modelProfile, dynamicFields).find(item => item.key === fieldKey)?.value
+                    : value)
+                  const displayValue = Array.isArray(populatedValue) ? populatedValue.join(', ') : populatedValue == null ? '' : String(populatedValue)
+                  const isTextarea = dynamicDefinition?.field_type === 'long_text' || TEXTAREA_FIELDS.has(fieldKey)
+                  const fieldLabel = summaryValue !== null
+                    ? t(`entityFields.dynamic.${fieldKey}`, { defaultValue: fieldKey === 'hair_summary' ? 'שיער' : 'עיניים' })
+                    : isDynamicProfile && dynamicDefinition
+                      ? t(`entityFields.dynamic.${fieldKey}`, { defaultValue: dynamicDefinition.label || fieldKey })
+                      : t(`entityFields.${fieldKey}`, { defaultValue: fieldKey })
+
+                  if (viewMode === 'profile') {
+                    if (isDynamicProfile && !displayValue.trim()) return null
+                    return (
+                      <div key={fieldKey}>
+                        <span className="text-sm font-medium text-muted-foreground">{fieldLabel}</span>
+                        <div className="mt-1 p-2 rounded bg-muted/50 min-h-[2.5rem] flex items-center">
+                          <p className={displayValue ? '' : 'text-muted-foreground italic'}>
+                            {displayValue || t('ui.common.unknown')}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  }
+
                   return (
                     <div key={fieldKey}>
-                      <span className="text-sm font-medium text-muted-foreground">{fieldLabel}</span>
-                      <div className="mt-1 p-2 rounded bg-muted/50 min-h-[2.5rem] flex items-center">
-                        <p className={displayValue ? '' : 'text-muted-foreground italic'}>
-                          {displayValue || t('ui.common.unknown')}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                } else {
-                  // Edit mode
-                  return (
-                    <div key={field}>
-                      <label className="text-sm font-medium" htmlFor={field}>
+                      <label className="text-sm font-medium" htmlFor={fieldKey}>
                         {fieldLabel}
                       </label>
                       {isTextarea ? (
                         <textarea
-                          id={field}
-                          name={field}
+                          id={fieldKey}
+                          name={fieldKey}
                           autoComplete="off"
                           value={value}
-                          onChange={e => handleFieldChange(field as string, e.target.value)}
+                          onChange={e => handleFieldChange(fieldKey, e.target.value)}
                           className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground resize-none"
                           rows={4}
                         />
                       ) : (
                         <input
-                          id={field}
-                          name={field}
+                          id={fieldKey}
+                          name={fieldKey}
                           type="text"
                           autoComplete="off"
                           value={value}
-                          onChange={e => handleFieldChange(field as string, e.target.value)}
+                          onChange={e => handleFieldChange(fieldKey, e.target.value)}
                           className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground"
                         />
                       )}
                     </div>
                   )
-                }
-              })}
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Action buttons in edit mode */}
@@ -382,7 +402,7 @@ export default function CharacterProfilePage() {
             entity={{ id: entity.id, name: entity.name, entity_type: entity.entity_type }}
             relationships={relationships}
             allEntities={versionEntities}
-            branchId={currentBranch?.id}
+            branchId={selectedVersion === 'branch' ? currentBranch?.id : undefined}
             isEditMode={viewMode === 'edit'}
             onAddRelationship={async (targetId, type) => {
               if (!currentBranch) {

@@ -136,11 +136,13 @@ export default function CharacterEditModal({
     for (const field of visibleDynamicFields) {
       // first_name is already rendered in the explicit identity group above.
       if (field.field_key === 'first_name') continue
-      const group = groups.get(field.group_key) || []
+      const groupKey = field.group_key === 'זהות ופרטים אישיים' ? 'זהות' : field.group_key
+      const group = groups.get(groupKey) || []
       group.push(field)
-      groups.set(field.group_key, group)
+      groups.set(groupKey, group)
     }
     return [...groups.entries()]
+      .filter(([, fields]) => fields.length > 0)
   }, [visibleDynamicFields])
   const fieldGroups = useMemo(
     () => isDynamicProfile
