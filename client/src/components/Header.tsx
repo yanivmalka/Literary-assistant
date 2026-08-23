@@ -103,7 +103,7 @@ export default function Header() {
               aria-label={t('ui.account.settings')}
             >
               <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Settings</span>
+              <span className="hidden sm:inline">{t('ui.account.settings')}</span>
             </Link>
             <button
               onClick={handleSignOut}

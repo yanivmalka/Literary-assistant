@@ -369,7 +369,7 @@ export default function CharacterEditModal({
                 </p>
               </div>
               <div className="flex gap-2">
-                <label htmlFor="character-field-to-add" className="sr-only">בחר שדה להוספה</label>
+                <label htmlFor="character-field-to-add" className="sr-only">{t('ui.character.selectField')}</label>
                 <select
                   id="character-field-to-add"
                   name="character-field-to-add"
@@ -378,16 +378,16 @@ export default function CharacterEditModal({
                   disabled={dynamicSchemaLoading || availableDynamicFields.length === 0}
                   className="flex-1 px-3 py-2 border rounded-md bg-background"
                 >
-                  <option value="">בחר שדה להוספה</option>
+                  <option value="">{t('ui.character.selectField')}</option>
                   {availableDynamicFields.map(field => (
                     <option key={field.field_key} value={field.field_key}>{field.label}</option>
                   ))}
                 </select>
                 <button onClick={handleAddField} disabled={!fieldToAdd || dynamicSchemaLoading} className="px-3 py-2 border rounded-md disabled:opacity-50">
-                  הוסף
+                  {t('ui.character.addField')}
                 </button>
               </div>
-              {availableDynamicFields.length === 0 && <p className="text-xs text-muted-foreground">כל שדות הקטלוג כבר נבחרו.</p>}
+              {availableDynamicFields.length === 0 && <p className="text-xs text-muted-foreground">{t('ui.character.allFieldsSelected')}</p>}
             </section>
           )}
         </div>
