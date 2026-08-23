@@ -1054,6 +1054,24 @@ Create a visual folder/gallery for important story material, including character
 
 Gallery items should link back to the relevant canonical entities, Timeline Events, chapters, and evidence. The gallery should support Main/Branch scope, asset provenance, captions, review status, and references to the prompts or source descriptions used to create an image. It should remain useful as a user-managed visualization workspace even when no AI image generation is available.
 
+#### **7. Experience Personalization and Theme Packs — Remote Wishlist**
+
+A distant, unscheduled personalization layer for adapting the product's visual language and motion to each author's preferences. This is a Wishlist item only and must not be treated as part of the current implementation scope.
+
+Potential preferences include:
+- Loading-bar styles
+- Color palettes
+- Themes
+- Animation and transition speed
+- Effect intensity
+- Global animation enable/disable
+- Reduce Motion support
+- Theme Packs organized by visual style or literary genre
+- Preference persistence at the user level
+- Project-specific preference overrides, allowing different settings between projects
+
+User-level defaults and project-level overrides should be stored separately, with clear precedence rules and safe fallback behavior when a Theme Pack or preference is unavailable. Accessibility settings such as Reduce Motion should take precedence over decorative motion preferences.
+
 ### **Future Prioritization and Task Management**
 
 This section is a planning backlog for post-v2.0 work. It is **not an authorization to implement these features now**. All tasks below remain deferred until the current Knowledge Layer, Main/Branch workflow, Timeline, and v2.0 integration work are stable.
