@@ -375,10 +375,12 @@ Model A מקבל את כל ה־chunks של ה־batch, אך instruction שלו מ
 
 ### שלב 4 — Normalization ו־Knowledge Layer
 
-- [ ] להרחיב את CharacterFields וה־normalizer.
-- [ ] לסנכרן `knowledge_entity_values` ו־field evidence.
-- [ ] להוסיף dynamic field definitions לפרופיל C.
-- [ ] לבדוק Main/Branch, user precedence ו־conflict preservation.
+- [x] להרחיב את CharacterFields וה־normalizer.
+- [x] לסנכרן `knowledge_entity_values` ו־field evidence.
+- [x] להוסיף dynamic field definitions לפרופיל C.
+- [x] לבדוק Main/Branch, user precedence ו־conflict preservation.
+
+> שלב 4 ממומש ללא טבלת `characters` חדשה: migration 141 פותחת את profile constraints ואת dynamic-field RLS ל־`sub-base-c-characters`, ה־normalizer מאמת `first_name`, מחשב display name מ־`first_name`/`last_name`, ומקבל רק fixed fields ו־dynamic fields פעילים של project/profile. `field_observations` מומר ל־chunk/page/offset evidence ול־metadata של `confidence`, `inferred` ו־`inference_note`. Metadata פנימי אינו נכתב כ־Knowledge value. כאשר קיימות תצפיות AI סותרות, הראשונה נשארת active והתצפיות הנוספות נשמרות כהיסטוריית `superseded` עם conflict metadata. user value פעיל גובר על AI באותו Main/Branch scope; Branch נשאר scope עצמאי כדי לשמר את מודל ה־overlay הקיים.
 
 ### שלב 5 — UI דמויות
 

@@ -5,6 +5,13 @@
 // ============================================
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import type {
+  FieldEvidenceMap,
+  FieldObservationMap,
+  NormalizedFieldObservation,
+} from "./field-provenance.ts";
+
+import { buildValueWritePlan } from "./value-write-plan.ts";
 
 export interface SyncValueRequest {
   supabase: SupabaseClient<any, "public", any>;
@@ -21,10 +28,11 @@ export interface SyncValueRequest {
     attributes: Record<string, unknown>;
     evidence: string[];
     chunk_positions: number[];
-    // NEW: Field-specific evidence mapping
-    field_evidence?: Record<string, string[]>;
-    // NEW: Confidence scores per field (0-1)
+    field_evidence?: FieldEvidenceMap;
     field_confidence?: Record<string, number>;
+    field_observations?: FieldObservationMap;
+    field_inferred?: Record<string, boolean>;
+    field_inference_notes?: Record<string, string | null>;
   };
 }
 
@@ -43,157 +51,194 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
   let valuesSynced = 0;
   let evidenceSynced = 0;
 
-  // Combine all value fields from structured_fields and attributes
+  // Combine canonical fields while excluding internal provenance metadata from
+  // becoming user-visible Knowledge values. Provenance is persisted through the
+  // dedicated observation/evidence metadata below.
+  const excludedAttributeKeys = new Set([
+    "extraction_meta",
+    "character_field_observations",
+    "character_fields",
+    "location_fields",
+  ]);
   const allFieldValues: Record<string, unknown> = {
     ...normalizedEntity.structured_fields,
-    ...normalizedEntity.attributes,
+  };
+  for (const [field, value] of Object.entries(normalizedEntity.attributes)) {
+    if (!excludedAttributeKeys.has(field)) allFieldValues[field] = value;
+  }
+
+  // Special handling for description/name.
+  if (normalizedEntity.description) allFieldValues.description = normalizedEntity.description;
+  if (normalizedEntity.canonical_name) allFieldValues.name = normalizedEntity.canonical_name;
+
+  // Character observations can contain a field that is not represented in the
+  // legacy structured_fields shape. Include its primary value without allowing
+  // internal metadata to become a field.
+  for (const [field, observations] of Object.entries(normalizedEntity.field_observations || {})) {
+    if (!excludedAttributeKeys.has(field) && allFieldValues[field] === undefined && observations[0]) {
+      allFieldValues[field] = observations[0].value;
+    }
+  }
+
+  const normalizeValue = (value: unknown): string => {
+    if (typeof value === "string") return value.toLowerCase().trim();
+    try {
+      return JSON.stringify(value).toLowerCase();
+    } catch {
+      return String(value).toLowerCase();
+    }
   };
 
-  // Special handling for description/name
-  if (normalizedEntity.description) {
-    allFieldValues.description = normalizedEntity.description;
-  }
-  if (normalizedEntity.canonical_name) {
-    allFieldValues.name = normalizedEntity.canonical_name;
-  }
+  const observationsForField = (
+    fieldPath: string,
+    value: unknown,
+  ): NormalizedFieldObservation[] => {
+    const observations = normalizedEntity.field_observations?.[fieldPath];
+    if (observations && observations.length > 0) return observations;
+    return [{
+      value,
+      evidence: normalizedEntity.field_evidence?.[fieldPath] || [],
+      confidence: normalizedEntity.field_confidence?.[fieldPath] ?? null,
+      inferred: normalizedEntity.field_inferred?.[fieldPath] ?? false,
+      inference_note: normalizedEntity.field_inference_notes?.[fieldPath] ?? null,
+    }];
+  };
 
-  // Process each field that has a value
-  for (const [fieldPath, value] of Object.entries(allFieldValues)) {
-    if (value === null || value === undefined) {
-      continue; // Skip nulls
+  const persistEvidence = async (
+    valueId: string,
+    fieldPath: string,
+    fieldEvidence: FieldEvidenceMap[string] | undefined,
+  ): Promise<void> => {
+    const references = fieldEvidence && fieldEvidence.length > 0
+      ? fieldEvidence
+      : normalizedEntity.evidence.length > 0
+        ? normalizedEntity.evidence.slice(0, 1).map((quote) => ({
+          quote,
+          chunk_position: null,
+          chunk_id: null,
+          page: null,
+          position_start: null,
+          position_end: null,
+        }))
+        : normalizedEntity.chunk_positions.slice(0, 1).map((chunk_position) => ({
+          quote: `Extracted from chunk ${chunk_position}`,
+          chunk_position,
+          chunk_id: null,
+          page: null,
+          position_start: null,
+          position_end: null,
+        }));
+
+    for (const reference of references) {
+      const quote = reference.quote?.slice(0, 1000)
+        || (reference.chunk_position === null ? `Extracted field: ${fieldPath}` : `Extracted from chunk ${reference.chunk_position}`);
+      const { error: evidenceError } = await supabase
+        .from("knowledge_entity_value_evidence")
+        .insert({
+          value_id: valueId,
+          chunk_id: reference.chunk_id,
+          quote,
+          position_start: reference.position_start,
+          position_end: reference.position_end,
+          page_number: reference.page,
+          raw_extraction_id: rawExtractionId,
+        });
+      if (evidenceError) {
+        errors.push(`Failed to link evidence for ${fieldPath}: ${evidenceError.message}`);
+      } else {
+        evidenceSynced++;
+      }
     }
+  };
 
-    // Normalize the value to JSON
-    const valueJson = typeof value === "string" || typeof value === "number" || typeof value === "boolean"
-      ? { value }
-      : value;
+  // Process each field that has a value.
+  for (const [fieldPath, value] of Object.entries(allFieldValues)) {
+    if (value === null || value === undefined) continue;
 
-    // Normalize for deduplication (simplified: convert to lowercase string)
-    const normalized = typeof value === "string"
-      ? value.toLowerCase().trim()
-      : JSON.stringify(value).toLowerCase();
+    const observations = observationsForField(fieldPath, value)
+      .filter((observation) => observation.value !== null && observation.value !== undefined)
+      .filter((observation, index, all) => normalizeValue(observation.value) !== ""
+        && all.findIndex((candidate) => normalizeValue(candidate.value) === normalizeValue(observation.value)) === index);
+    if (observations.length === 0) continue;
 
-    // Check if a value for this entity/field already exists in the same
-    // Main/Branch scope. A Branch value must never supersede Main history.
     let existingValuesQuery = supabase
       .from("knowledge_entity_values")
       .select("id, source_type, value_status")
       .eq("entity_id", entityId)
       .eq("field_path", fieldPath)
       .eq("value_status", "active");
-
     existingValuesQuery = branchId
       ? existingValuesQuery.eq("branch_id", branchId)
       : existingValuesQuery.is("branch_id", null);
 
     const { data: existingValues, error: checkError } = await existingValuesQuery;
-
     if (checkError) {
       errors.push(`Failed to check existing value for ${fieldPath}: ${checkError.message}`);
       continue;
     }
+    const plan = buildValueWritePlan(existingValues || [], observations);
+    if (plan.skip) continue;
 
-    // User-authored values take precedence: skip if user value exists
-    const hasUserValue = existingValues?.some(v => v.source_type === "user");
-    if (hasUserValue) {
-      continue; // Don't overwrite user values
-    }
-
-    // If AI value exists, mark it as superseded (preserve history)
-    const existingAiValue = existingValues?.find(v => v.source_type === "ai");
-    if (existingAiValue) {
+    for (const valueId of plan.supersede_ids) {
       await supabase
         .from("knowledge_entity_values")
         .update({ value_status: "superseded" })
-        .eq("id", existingAiValue.id);
+        .eq("id", valueId);
     }
 
-    // CRITICAL FIX: Use field-specific confidence if available, otherwise calculate
-    const confidence = normalizedEntity.field_confidence?.[fieldPath] 
-      ?? calculateFieldConfidence(fieldPath, value, normalizedEntity);
+    const conflictGroup = plan.writes.length > 1
+      ? `${rawExtractionId}:${entityId}:${fieldPath}`
+      : null;
+    let primaryValueId: string | null = null;
+    for (const [observationIndex, write] of plan.writes.entries()) {
+      const observation = write.observation;
+      const value = observation.value;
+      const valueJson = typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+        ? { value }
+        : value;
+      const normalized = normalizeValue(value);
+      const confidence = observation.confidence
+        ?? normalizedEntity.field_confidence?.[fieldPath]
+        ?? calculateFieldConfidence(fieldPath, value, normalizedEntity);
+      const isPrimary = write.value_status === "active";
+      const metadata = {
+        inferred: observation.inferred,
+        inference_note: observation.inference_note,
+        conflict_group: conflictGroup,
+        observation_index: observationIndex,
+        observation_count: plan.writes.length,
+      };
 
-    // Insert new AI value
-    const { data: newValue, error: insertError } = await supabase
-      .from("knowledge_entity_values")
-      .insert({
-        project_id: projectId,
-        entity_id: entityId,
-        branch_id: branchId,
-        field_path: fieldPath,
-        value_json: valueJson,
-        normalized_value: normalized,
-        source_type: "ai",
-        value_status: "active",
-        confidence,
-        raw_extraction_id: rawExtractionId,
-        created_by: userId,
-      })
-      .select("id")
-      .single();
-
-    if (insertError || !newValue) {
-      errors.push(`Failed to insert value for ${fieldPath}: ${insertError?.message}`);
-      continue;
-    }
-
-    valuesSynced++;
-    const valueId = newValue.id;
-
-    // CRITICAL FIX: Link field-specific evidence only
-    const fieldEvidence = normalizedEntity.field_evidence?.[fieldPath] || [];
-    
-    if (fieldEvidence.length > 0) {
-      // Use field-specific evidence
-      for (const quote of fieldEvidence) {
-        const { error: evidenceError } = await supabase
-          .from("knowledge_entity_value_evidence")
-          .insert({
-            value_id: valueId,
-            chunk_id: null, // TODO: Populate from extraction context
-            quote: quote.slice(0, 1000),
-            raw_extraction_id: rawExtractionId,
-          });
-
-        if (evidenceError) {
-          errors.push(`Failed to link evidence for ${fieldPath}: ${evidenceError.message}`);
-        } else {
-          evidenceSynced++;
-        }
-      }
-    } else if (normalizedEntity.evidence.length > 0) {
-      // Fallback: Use first evidence as general support (less precise)
-      // This maintains backward compatibility when field_evidence is not provided
-      const quote = normalizedEntity.evidence[0];
-      if (quote) {
-        const { error: evidenceError } = await supabase
-          .from("knowledge_entity_value_evidence")
-          .insert({
-            value_id: valueId,
-            chunk_id: null,
-            quote: quote.slice(0, 1000),
-            raw_extraction_id: rawExtractionId,
-          });
-
-        if (!evidenceError) {
-          evidenceSynced++;
-        }
-      }
-    }
-
-    // If no evidence text but we have chunk positions, create minimal evidence
-    if (fieldEvidence.length === 0 && normalizedEntity.evidence.length === 0 && normalizedEntity.chunk_positions.length > 0) {
-      const { error: evidenceError } = await supabase
-        .from("knowledge_entity_value_evidence")
+      const insertResult = await supabase
+        .from("knowledge_entity_values")
         .insert({
-          value_id: valueId,
-          chunk_id: null,
-          quote: `Extracted from chunks: ${normalizedEntity.chunk_positions.join(", ")}`,
+          project_id: projectId,
+          entity_id: entityId,
+          branch_id: branchId,
+          field_path: fieldPath,
+          value_json: valueJson,
+          metadata,
+          normalized_value: normalized,
+          source_type: "ai",
+          value_status: write.value_status,
+          confidence,
           raw_extraction_id: rawExtractionId,
-        });
+          supersedes_value_id: write.supersedes_value_id ?? primaryValueId,
+          created_by: userId,
+        })
+        .select("id")
+        .single();
+      const newValue = insertResult.data as { id: string } | null;
+      const insertError = insertResult.error;
 
-      if (!evidenceError) {
-        evidenceSynced++;
+      if (insertError || !newValue) {
+        errors.push(`Failed to insert value for ${fieldPath}: ${insertError?.message || "no row returned"}`);
+        continue;
       }
+
+      valuesSynced++;
+      if (isPrimary) primaryValueId = newValue.id;
+      await persistEvidence(newValue.id, fieldPath, observation.evidence);
     }
   }
 

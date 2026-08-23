@@ -35,6 +35,14 @@ import { normalizeKey, stripNikud } from "../_shared/rules/normalization.ts";
 import { shouldFilterEntity } from "../_shared/rules/filtering.ts";
 import { isPrefixMatch, scoreConsolidation, CONSOLIDATION_THRESHOLDS } from "../_shared/rules/consolidation.ts";
 import { syncEntityValues } from "../_shared/value-sync.ts";
+import type {
+  FieldConfidenceMap,
+  FieldEvidenceMap,
+  FieldInferenceMap,
+  FieldInferenceNoteMap,
+  FieldObservationMap,
+} from "../_shared/field-provenance.ts";
+import { normalizeLegacyFieldEvidence } from "../_shared/field-provenance.ts";
 import {
   applyEntityOverrides,
   hasConflictingEntityContext,
@@ -269,9 +277,11 @@ interface NormalizedEntity {
   // NEW: Provenance tracking for mentions
   chunk_ids?: string[];        // UUIDs of document_chunks
   page_numbers?: number[];     // Page numbers from chunks
-  // NEW: Field-specific evidence and confidence
-  field_evidence?: Record<string, string[]>;
-  field_confidence?: Record<string, number>;
+  field_evidence?: FieldEvidenceMap;
+  field_confidence?: FieldConfidenceMap;
+  field_inferred?: FieldInferenceMap;
+  field_inference_notes?: FieldInferenceNoteMap;
+  field_observations?: FieldObservationMap;
 }
 
 /** Build structured_fields from the entity's flat fields based on its type */
@@ -484,7 +494,7 @@ function normalizeEntities(
         chunk_ids: chunkIds.length > 0 ? chunkIds : undefined,
         page_numbers: pageNumbers.length > 0 ? pageNumbers : undefined,
         // NEW: Propagate field-specific evidence from extraction
-        field_evidence: entity.field_evidence,
+        field_evidence: entity.field_evidence ? normalizeLegacyFieldEvidence(entity.field_evidence) : undefined,
         field_confidence: entity.field_evidence ? computeFieldConfidence(entity.field_evidence, incomingStructuredFields) : undefined,
       });
     }

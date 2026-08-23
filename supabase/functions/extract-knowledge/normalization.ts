@@ -7,6 +7,18 @@ import {
 } from "../_shared/entity-resolution.ts";
 import type { ExtractionNameUncertainty, ExtractionSourceReference } from "../_shared/extraction-contract.ts";
 import { getEmbeddedAbilityReferences } from "../_shared/ability-links.ts";
+import { CHARACTER_FIELD_KEYS } from "../_shared/character-specialist.ts";
+import {
+  deriveFieldProvenance,
+  mergeFieldObservationMaps,
+  normalizeFieldObservationMap,
+  normalizeLegacyFieldEvidence,
+  type FieldConfidenceMap,
+  type FieldEvidenceMap,
+  type FieldInferenceMap,
+  type FieldInferenceNoteMap,
+  type FieldObservationMap,
+} from "../_shared/field-provenance.ts";
 
 export interface ExtractedEntity {
   name: string;
@@ -107,8 +119,11 @@ export interface NormalizedEntity {
   chunk_positions: number[];
   chunk_ids?: string[];
   page_numbers?: number[];
-  field_evidence?: Record<string, string[]>;
-  field_confidence?: Record<string, number>;
+  field_evidence?: FieldEvidenceMap;
+  field_confidence?: FieldConfidenceMap;
+  field_inferred?: FieldInferenceMap;
+  field_inference_notes?: FieldInferenceNoteMap;
+  field_observations?: FieldObservationMap;
 }
 
 function normalizeStringList(value: unknown): string[] {
@@ -179,8 +194,12 @@ export function buildStructuredFields(
       const characterFields = entity.character_fields
         || (entityAttributes.character_fields as Record<string, unknown> | undefined)
         || entityAttributes;
+      const allowedKeys = new Set<string>([
+        ...CHARACTER_FIELD_KEYS,
+        ...(options.activeCharacterFieldKeys || []),
+      ]);
       for (const [key, value] of Object.entries(characterFields)) {
-        if (key === "extraction_meta" || key === "character_field_observations") continue;
+        if (!allowedKeys.has(key)) continue;
         if (hasExtractedValue(value)) fields[key] = value;
       }
     } else if (profile === "sub-base-locations") {
@@ -313,11 +332,29 @@ export function normalizeEntities(
 
   function addEntity(name: string, type: string, entity: ExtractedEntity) {
     if (!name || !name.trim()) return;
-    const cleanName = stripNikud(name.trim());
+    const incomingStructuredFields = buildStructuredFields(type, entity, profile, options);
+    const incomingObservations = profile === "sub-base-c-characters" && type === "character"
+      ? normalizeFieldObservationMap(
+        (entity.attributes || {}).character_field_observations,
+        chunkLookup,
+      )
+      : {};
+    const incomingProvenance = deriveFieldProvenance(incomingObservations);
+    const firstName = typeof incomingStructuredFields.first_name === "string"
+      ? incomingStructuredFields.first_name.trim()
+      : "";
+    const lastName = typeof incomingStructuredFields.last_name === "string"
+      ? incomingStructuredFields.last_name.trim()
+      : "";
+    if (profile === "sub-base-c-characters" && type === "character" && !firstName) return;
+    const displayName = profile === "sub-base-c-characters" && type === "character"
+      ? [firstName, lastName].filter(Boolean).join(" ")
+      : name.trim();
+    const cleanName = stripNikud((displayName || name).trim());
+    const originalCleanName = stripNikud(name.trim());
     const key = normalizeKey(cleanName);
     if (!key) return;
 
-    const incomingStructuredFields = buildStructuredFields(type, entity, profile, options);
     const incomingContext: EntityResolutionRecord = {
       canonical_name: cleanName,
       entity_type: type,
@@ -383,6 +420,14 @@ export function normalizeEntities(
         existing.attributes.members = [...((existing.attributes.members as string[]) || []), ...entity.members];
       }
       if (entity.purpose) existing.attributes.purpose = entity.purpose;
+      if (Object.keys(incomingObservations).length > 0) {
+        existing.field_observations = mergeFieldObservationMaps(existing.field_observations || {}, incomingObservations);
+        const mergedProvenance = deriveFieldProvenance(existing.field_observations);
+        existing.field_evidence = mergedProvenance.field_evidence;
+        existing.field_confidence = mergedProvenance.field_confidence;
+        existing.field_inferred = mergedProvenance.field_inferred;
+        existing.field_inference_notes = mergedProvenance.field_inference_notes;
+      }
       for (const [field, value] of Object.entries(incomingStructuredFields)) {
         if (value != null && existing.structured_fields[field] == null) existing.structured_fields[field] = value;
       }
@@ -413,15 +458,27 @@ export function normalizeEntities(
         description: entity.description || entity.significance || null,
         attributes,
         structured_fields: incomingStructuredFields,
-        aliases: (entity.aliases || []).map((alias) => stripNikud(alias)).filter(Boolean),
+        aliases: [
+          ...(originalCleanName !== cleanName ? [originalCleanName] : []),
+          ...(entity.aliases || []).map((alias) => stripNikud(alias)).filter(Boolean),
+        ].filter((alias, index, all) => all.indexOf(alias) === index && alias !== cleanName),
         evidence: entity.evidence || [],
         chunk_positions: entity.chunk_positions || [],
         chunk_ids: chunkIds.length > 0 ? chunkIds : undefined,
         page_numbers: pageNumbers.length > 0 ? pageNumbers : undefined,
-        field_evidence: entity.field_evidence,
-        field_confidence: entity.field_evidence
-          ? computeFieldConfidence(entity.field_evidence, incomingStructuredFields)
-          : undefined,
+        field_evidence: profile === "sub-base-c-characters"
+          ? incomingProvenance.field_evidence
+          : entity.field_evidence
+            ? normalizeLegacyFieldEvidence(entity.field_evidence)
+            : undefined,
+        field_confidence: profile === "sub-base-c-characters"
+          ? incomingProvenance.field_confidence
+          : entity.field_evidence
+            ? computeFieldConfidence(entity.field_evidence, incomingStructuredFields)
+            : undefined,
+        field_inferred: profile === "sub-base-c-characters" ? incomingProvenance.field_inferred : undefined,
+        field_inference_notes: profile === "sub-base-c-characters" ? incomingProvenance.field_inference_notes : undefined,
+        field_observations: Object.keys(incomingObservations).length > 0 ? incomingObservations : undefined,
       });
     }
   }
@@ -515,6 +572,14 @@ export function normalizeEntities(
     if (!keep.description && remove.description) keep.description = remove.description;
     for (const [field, value] of Object.entries(remove.structured_fields)) {
       if (value != null && keep.structured_fields[field] == null) keep.structured_fields[field] = value;
+    }
+    if (remove.field_observations) {
+      keep.field_observations = mergeFieldObservationMaps(keep.field_observations || {}, remove.field_observations);
+      const mergedProvenance = deriveFieldProvenance(keep.field_observations);
+      keep.field_evidence = mergedProvenance.field_evidence;
+      keep.field_confidence = mergedProvenance.field_confidence;
+      keep.field_inferred = mergedProvenance.field_inferred;
+      keep.field_inference_notes = mergedProvenance.field_inference_notes;
     }
     for (const [field, value] of Object.entries(remove.attributes)) {
       if (value != null && keep.attributes[field] == null) keep.attributes[field] = value;
