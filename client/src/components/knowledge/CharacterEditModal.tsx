@@ -134,6 +134,8 @@ export default function CharacterEditModal({
       },
     ])
     for (const field of visibleDynamicFields) {
+      // first_name is already rendered in the explicit identity group above.
+      if (field.field_key === 'first_name') continue
       const group = groups.get(field.group_key) || []
       group.push(field)
       groups.set(field.group_key, group)

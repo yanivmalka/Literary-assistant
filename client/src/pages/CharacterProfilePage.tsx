@@ -76,6 +76,8 @@ export default function CharacterProfilePage() {
       const groups = new Map<string, string[]>()
       groups.set('זהות', ['name', 'first_name'])
       for (const field of visibleDynamicDefinitions) {
+        // first_name is already rendered in the explicit identity group above.
+        if (field.field_key === 'first_name') continue
         const group = groups.get(field.group_key) || []
         if (!group.includes(field.field_key)) group.push(field.field_key)
         groups.set(field.group_key, group)
