@@ -2,7 +2,12 @@ import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import { useEntityStore } from '@/stores/entityStore'
 import { buildExtractionRequest, getExtractionMode, hasMainEntities, getOrCreateActiveBranch } from '@/lib/extractionBranching'
-import { DEFAULT_EXTRACTION_MODEL_PROFILE, type ExtractionModelProfile } from '@/lib/extractionModels'
+import {
+  DEFAULT_EXTRACTION_MODEL_PROFILE,
+  getLegacyExtractionModelProfile,
+  type ExtractionModelProfile,
+  type LegacyExtractionModelProfile,
+} from '@/lib/extractionModels'
 import { useQuillStore } from '@/stores/quillStore'
 
 export interface DocumentVersion {
@@ -339,6 +344,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     const BATCH_SIZE = 2
     let offset = 0
     let done = false
+    // The canonical profile is used first. If an older deployed Edge Function
+    // rejects it, this is switched once to the legacy server profile and kept
+    // stable for every batch in the same extraction run.
+    let requestModelProfile: ExtractionModelProfile | LegacyExtractionModelProfile = modelProfile
 
     console.log('[Knowledge] Starting extraction for version', versionId)
 
@@ -389,28 +398,47 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       }
 
       try {
-        // Send extraction request with:
-        // - extraction_mode: 'bootstrap' or 'branch' (constant for all batches in run)
-        // - extraction_run_id: shared identifier for cross-batch resolution
-        // - target_branch_id: only set if mode is 'branch'
-        const { data, error } = await supabase.functions.invoke('extract-knowledge', {
-          body: {
-            ...buildExtractionRequest(
-              versionId,
-              projectId,
-              documentId,
-              user.id,
-              extractionMode === 'branch' ? activeBranch?.id || null : null,
-              offset,
-              BATCH_SIZE,
-            ),
-            // CRITICAL: Add extraction-level context
-            extraction_mode: extractionMode,
-            extraction_run_id: extractionRunId,
-            // Keep the selected profile constant across every batch in this run.
-            model_profile: modelProfile,
-          },
+        const requestBody = {
+          ...buildExtractionRequest(
+            versionId,
+            projectId,
+            documentId,
+            user.id,
+            extractionMode === 'branch' ? activeBranch?.id || null : null,
+            offset,
+            BATCH_SIZE,
+          ),
+          // CRITICAL: Add extraction-level context
+          extraction_mode: extractionMode,
+          extraction_run_id: extractionRunId,
+          // Keep the selected profile constant across every batch in this run.
+          model_profile: requestModelProfile,
+        }
+
+        let { data, error } = await supabase.functions.invoke('extract-knowledge', {
+          body: requestBody,
         })
+
+        // Older deployed Edge Functions accept current/development instead of
+        // the canonical sub-base profile IDs. Retry only for this explicit
+        // validation error; never retry arbitrary extraction failures.
+        const invalidProfileResponse = typeof data?.error === 'string'
+          && /invalid model_profile/i.test(data.error)
+        if (!error && !data?.success && invalidProfileResponse) {
+          const legacyProfile = getLegacyExtractionModelProfile(modelProfile)
+          if (requestModelProfile !== legacyProfile) {
+            requestModelProfile = legacyProfile
+            console.warn(
+              '[Knowledge] Edge Function rejected canonical model_profile; retrying with legacy profile:',
+              requestModelProfile,
+            )
+            const retry = await supabase.functions.invoke('extract-knowledge', {
+              body: { ...requestBody, model_profile: requestModelProfile },
+            })
+            data = retry.data
+            error = retry.error
+          }
+        }
 
         if (error) {
           console.error('[DIAGNOSTIC] triggerEntityExtraction() - Edge Function error - operation: POST /functions/v1/extract-knowledge - error_code:', error.code, 'error_message:', error.message)

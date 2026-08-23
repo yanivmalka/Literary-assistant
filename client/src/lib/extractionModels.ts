@@ -25,6 +25,19 @@ export function setStoredExtractionModelProfile(profile: ExtractionModelProfile)
   window.dispatchEvent(new Event(EXTRACTION_MODEL_PROFILE_CHANGED_EVENT))
 }
 
+export type LegacyExtractionModelProfile = 'current' | 'development'
+
+/**
+ * Maps canonical profile IDs to the names used by older deployed Edge Functions.
+ * The locations profile has no legacy equivalent, so it uses the development
+ * profile's compatible server behavior until the Edge Function is upgraded.
+ */
+export function getLegacyExtractionModelProfile(
+  profile: ExtractionModelProfile,
+): LegacyExtractionModelProfile {
+  return profile === 'sub-base' ? 'current' : 'development'
+}
+
 export function shouldUseProfileBranch(profile: ExtractionModelProfile): boolean {
   return profile !== 'sub-base'
 }
