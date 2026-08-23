@@ -66,6 +66,7 @@ interface EdgeFunctionResponse {
 
 export const useQAStore = create<QAState>((set, get) => ({
   messages: [],
+  conversationId: null,
   loading: false,
   error: null,
 
@@ -118,6 +119,8 @@ export const useQAStore = create<QAState>((set, get) => ({
           project_id: projectId,
           question: question.trim(),
           top_k: 5,
+          conversation_id: get().conversationId,
+          client_request_id: questionMsg.id,
         }),
       })
 
@@ -136,6 +139,9 @@ export const useQAStore = create<QAState>((set, get) => ({
       }
 
       const result = data.result
+      if (result.conversationId) {
+        set({ conversationId: result.conversationId })
+      }
       if (result.quills) {
         useQuillStore.getState().applyServerWallet(result.quills)
       } else {
@@ -145,7 +151,7 @@ export const useQAStore = create<QAState>((set, get) => ({
       // No context available
       if (result.noSufficientContext && !result.answer) {
         const noContextMsg: QAMessage = {
-          id: crypto.randomUUID(),
+          id: result.messageId || crypto.randomUUID(),
           type: 'answer',
           text: i18n.t('ui.qa.noResults'),
           sources: result.sources,
@@ -159,7 +165,7 @@ export const useQAStore = create<QAState>((set, get) => ({
 
       // Generate answer from LLM
       const answerMsg: QAMessage = {
-        id: crypto.randomUUID(),
+        id: result.messageId || crypto.randomUUID(),
         type: 'answer',
         text: result.answer || i18n.t('ui.qa.staticModeAnswer'),
         sources: result.sources,
@@ -185,5 +191,83 @@ export const useQAStore = create<QAState>((set, get) => ({
     }
   },
 
-  clearHistory: () => set({ messages: [], error: null }),
+  loadConversation: async (projectId) => {
+    set({ loading: true, error: null })
+    try {
+      const { data: conversation, error: conversationError } = await supabase
+        .from('notebook_conversations')
+        .select('id')
+        .eq('project_id', projectId)
+        .is('archived_at', null)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (conversationError) throw conversationError
+      if (!conversation?.id) {
+        set({ conversationId: null, messages: [], loading: false })
+        return
+      }
+
+      const { data: storedMessages, error: messagesError } = await supabase
+        .from('notebook_messages')
+        .select(`
+          id, role, content, created_at, metadata,
+          notebook_citations (
+            id, chunk_id, quote, page, chapter_number, chapter_title,
+            chunk_position, retrieval_score,
+            notebook_sources (title, version_id)
+          )
+        `)
+        .eq('conversation_id', conversation.id)
+        .order('created_at', { ascending: true })
+
+      if (messagesError) throw messagesError
+
+      const messages: QAMessage[] = (storedMessages ?? [])
+        .filter((message: { role: string }) => message.role === 'user' || message.role === 'assistant')
+        .map((message: any) => {
+          const citations = Array.isArray(message.notebook_citations)
+            ? message.notebook_citations
+            : []
+          const sources: QASource[] = citations.map((citation: any) => {
+            const source = Array.isArray(citation.notebook_sources)
+              ? citation.notebook_sources[0]
+              : citation.notebook_sources
+            return {
+              chunkId: citation.chunk_id || citation.id,
+              content: citation.quote || '',
+              chapterNumber: citation.chapter_number ?? null,
+              chapterTitle: citation.chapter_title ?? null,
+              page: citation.page ?? null,
+              position: citation.chunk_position ?? 0,
+              versionId: source?.version_id,
+              score: citation.retrieval_score ?? 0,
+              documentName: source?.title,
+              citationId: citation.id,
+            }
+          })
+          const metadata = message.metadata && typeof message.metadata === 'object'
+            ? message.metadata
+            : {}
+          return {
+            id: message.id,
+            type: message.role === 'user' ? 'question' : 'answer',
+            text: message.role === 'assistant' && !message.content
+              ? i18n.t('ui.qa.staticModeAnswer')
+              : message.content,
+            sources,
+            noSufficientContext: metadata.no_sufficient_context === true,
+            timestamp: new Date(message.created_at),
+          }
+        })
+
+      set({ conversationId: conversation.id, messages, loading: false })
+    } catch (error) {
+      console.warn('Notebook conversation unavailable; starting with local history', error)
+      set({ conversationId: null, messages: [], loading: false })
+    }
+  },
+
+  clearHistory: () => set({ messages: [], conversationId: null, error: null }),
 }))

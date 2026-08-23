@@ -10,9 +10,13 @@ interface QAPanelProps {
 
 export default function QAPanel({ projectId }: QAPanelProps) {
   const { t } = useTranslation()
-  const { messages, loading, ask, clearHistory } = useQAStore()
+  const { messages, loading, ask, loadConversation, clearHistory } = useQAStore()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    void loadConversation(projectId)
+  }, [loadConversation, projectId])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
