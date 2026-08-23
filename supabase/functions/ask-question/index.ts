@@ -12,6 +12,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callGeminiWithFallback } from "../_shared/gemini-client.ts";
 import { assertQuillsAvailable, consumeGeminiUsage } from "../_shared/quills.ts";
 import { DEFAULT_MODEL } from "../_shared/gemini-config.ts";
+import {
+  adjacentPositions,
+  buildRetrievalTerms,
+  mergeAdjacentRetrievalChunks,
+  type RetrievalChunk,
+} from "../_shared/qa-retrieval.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,6 +34,11 @@ interface AskQuestionRequest {
   question: string;
   top_k?: number;
   branch_id?: string | null;
+  /** Optional source scope used only by the enhanced retrieval rollout. */
+  source_version_ids?: string[];
+  chapter_numbers?: number[];
+  chunk_ids?: string[];
+  include_adjacent?: boolean;
 }
 
 interface DocumentChunk {
@@ -95,10 +106,10 @@ function errorResponse(
 }
 
 // ============================================
-// Hybrid Search: Full-Text + Semantic (if available)
+// Retrieval rollout: legacy full-text by default; enhanced scoped retrieval is opt-in.
 // ============================================
 
-async function hybridSearch(
+async function legacyHybridSearch(
   supabase: any,
   projectId: string,
   question: string,
@@ -191,6 +202,215 @@ async function hybridSearch(
   }));
 
   return sources;
+}
+
+interface RetrievalScope {
+  sourceVersionIds?: unknown;
+  chapterNumbers?: unknown;
+  chunkIds?: unknown;
+  includeAdjacent?: unknown;
+}
+
+function scopeStrings(value: unknown, max = 100): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim())
+      .filter(Boolean),
+  )].slice(0, max);
+}
+
+function scopeIntegers(value: unknown, max = 100): number[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(
+    value
+      .filter((item): item is number => typeof item === "number" && Number.isInteger(item))
+      .filter((item) => item >= 0),
+  )].slice(0, max);
+}
+
+function applyChunkScope(query: any, versionIds: string[], scope: ReturnType<typeof normalizeRetrievalScope>): any {
+  let scopedQuery = query.in("version_id", versionIds);
+  if (scope.chapterNumbers.length > 0) {
+    scopedQuery = scopedQuery.in("chapter_number", scope.chapterNumbers);
+  }
+  if (scope.chunkIds.length > 0) {
+    scopedQuery = scopedQuery.in("id", scope.chunkIds);
+  }
+  return scopedQuery;
+}
+
+function normalizeRetrievalScope(scope?: RetrievalScope): {
+  sourceVersionIds: string[];
+  chapterNumbers: number[];
+  chunkIds: string[];
+  includeAdjacent: boolean;
+} {
+  return {
+    sourceVersionIds: scopeStrings(scope?.sourceVersionIds),
+    chapterNumbers: scopeIntegers(scope?.chapterNumbers),
+    chunkIds: scopeStrings(scope?.chunkIds),
+    includeAdjacent: scope?.includeAdjacent !== false,
+  };
+}
+
+async function enhancedHybridSearch(
+  supabase: any,
+  projectId: string,
+  question: string,
+  topK: number,
+  scopeInput?: RetrievalScope,
+): Promise<QASource[]> {
+  const scope = normalizeRetrievalScope(scopeInput);
+  const safeTopK = Math.min(20, Math.max(1, Math.floor(topK || 5)));
+  const { data: docs, error: docsError } = await supabase
+    .from("documents")
+    .select("id")
+    .eq("project_id", projectId);
+
+  if (docsError) throw new Error(`Failed to fetch documents: ${docsError.message}`);
+  if (!docs || docs.length === 0) return [];
+
+  const docIds = docs.map((doc: { id: string }) => doc.id);
+  let versionQuery = supabase
+    .from("document_versions")
+    .select("id")
+    .in("document_id", docIds)
+    .in("status", ["ready", "indexed", "skipped_no_provider"]);
+  if (scope.sourceVersionIds.length > 0) {
+    versionQuery = versionQuery.in("id", scope.sourceVersionIds);
+  }
+
+  const { data: versions, error: versionsError } = await versionQuery;
+  if (versionsError) throw new Error(`Failed to fetch versions: ${versionsError.message}`);
+  if (!versions || versions.length === 0) return [];
+
+  const versionIds = versions.map((version: { id: string }) => version.id);
+  const terms = buildRetrievalTerms(question);
+  const queryTerms = terms.join(" & ");
+  if (!queryTerms) return [];
+
+  const selectFields = "id, content, chapter_number, chapter_title, page, position, version_id";
+  let query = applyChunkScope(
+    supabase.from("document_chunks").select(selectFields),
+    versionIds,
+    scope,
+  )
+    .textSearch("content", queryTerms, { type: "plain", config: "simple" })
+    .limit(safeTopK);
+
+  let chunks: DocumentChunk[] | null = null;
+  let chunksError: { message?: string } | null = null;
+  try {
+    const result = await query;
+    chunks = result.data as DocumentChunk[] | null;
+    chunksError = result.error;
+  } catch (error) {
+    chunksError = error as { message?: string };
+  }
+
+  if (chunksError) {
+    console.warn(`[ask-question] Enhanced full-text search failed: ${chunksError.message || "unknown error"}`);
+    let fallbackQuery = applyChunkScope(
+      supabase.from("document_chunks").select(selectFields),
+      versionIds,
+      scope,
+    );
+    fallbackQuery = fallbackQuery.ilike("content", `%${terms[0]}%`).limit(safeTopK);
+    const fallbackResult = await fallbackQuery;
+    chunks = fallbackResult.data as DocumentChunk[] | null;
+    if (fallbackResult.error) {
+      throw new Error(`Fallback search failed: ${fallbackResult.error.message}`);
+    }
+  }
+
+  const primary: RetrievalChunk[] = (chunks || []).map((chunk, index) => ({
+    id: chunk.id,
+    content: chunk.content,
+    chapter_number: chunk.chapter_number,
+    chapter_title: chunk.chapter_title,
+    page: chunk.page,
+    position: chunk.position,
+    version_id: chunk.version_id,
+    score: safeTopK - index,
+  }));
+
+  if (!scope.includeAdjacent || scope.chunkIds.length > 0 || primary.length === 0) {
+    return primary.map((chunk) => ({
+      chunkId: chunk.id,
+      content: chunk.content,
+      chapterNumber: chunk.chapter_number,
+      chapterTitle: chunk.chapter_title,
+      page: chunk.page,
+      score: chunk.score,
+      documentName: chunk.document_name,
+    }));
+  }
+
+  const primaryPositions = new Map<string, number[]>();
+  for (const chunk of primary) {
+    const positions = primaryPositions.get(chunk.version_id) || [];
+    positions.push(chunk.position);
+    primaryPositions.set(chunk.version_id, positions);
+  }
+
+  const minPosition = Math.max(0, Math.min(...primary.map((chunk) => chunk.position)) - 1);
+  const maxPosition = Math.max(...primary.map((chunk) => chunk.position)) + 1;
+  let adjacentQuery = supabase
+    .from("document_chunks")
+    .select(selectFields)
+    .in("version_id", versionIds)
+    .gte("position", minPosition)
+    .lte("position", maxPosition);
+  if (scope.chapterNumbers.length > 0) {
+    adjacentQuery = adjacentQuery.in("chapter_number", scope.chapterNumbers);
+  }
+
+  const adjacentResult = await adjacentQuery;
+  if (adjacentResult.error) {
+    console.warn(`[ask-question] Adjacent context lookup failed: ${adjacentResult.error.message}`);
+  }
+
+  const adjacent: RetrievalChunk[] = ((adjacentResult.data || []) as DocumentChunk[])
+    .filter((chunk) => {
+      const positions = primaryPositions.get(chunk.version_id) || [];
+      return positions.some((position) => adjacentPositions(position).includes(chunk.position));
+    })
+    .map((chunk) => ({
+      id: chunk.id,
+      content: chunk.content,
+      chapter_number: chunk.chapter_number,
+      chapter_title: chunk.chapter_title,
+      page: chunk.page,
+      position: chunk.position,
+      version_id: chunk.version_id,
+      score: 0.5,
+    }));
+
+  return mergeAdjacentRetrievalChunks(primary, adjacent, safeTopK).map((chunk) => ({
+    chunkId: chunk.id,
+    content: chunk.content,
+    chapterNumber: chunk.chapter_number,
+    chapterTitle: chunk.chapter_title,
+    page: chunk.page,
+    score: chunk.score,
+    documentName: chunk.document_name,
+  }));
+}
+
+async function hybridSearch(
+  supabase: any,
+  projectId: string,
+  question: string,
+  topK: number,
+  branchId?: string | null,
+  scope?: RetrievalScope,
+): Promise<QASource[]> {
+  if (Deno.env.get("QA_RETRIEVAL_MODE") === "enhanced") {
+    return enhancedHybridSearch(supabase, projectId, question, topK, scope);
+  }
+  return legacyHybridSearch(supabase, projectId, question, topK, branchId);
 }
 
 // ============================================
@@ -322,7 +542,19 @@ Deno.serve(async (req) => {
     }
 
     // --- Step 1: Hybrid search for relevant chunks ---
-    const sources = await hybridSearch(supabase, projectId, question, topK, branchId);
+    const sources = await hybridSearch(
+      supabase,
+      projectId,
+      question,
+      topK,
+      branchId,
+      {
+        sourceVersionIds: body.source_version_ids,
+        chapterNumbers: body.chapter_numbers,
+        chunkIds: body.chunk_ids,
+        includeAdjacent: body.include_adjacent,
+      },
+    );
 
     // --- Step 2: Find relevant entities ---
     const { entityInfo, entityNames } = await findRelevantEntities(

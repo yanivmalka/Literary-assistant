@@ -27,11 +27,9 @@ interface ErrorResponse {
 
 type GeminiResponse = SuccessResponse | ErrorResponse
 
-const DEFAULT_PROMPT = 'Describe a fantasy character in 2 sentences.'
-
 export default function DevTestPage() {
   const { t } = useTranslation()
-  const [prompt, setPrompt] = useState(DEFAULT_PROMPT)
+  const [prompt, setPrompt] = useState(() => t('ui.dev.defaultPrompt'))
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<GeminiResponse | null>(null)
   const [networkError, setNetworkError] = useState<string | null>(null)
@@ -126,7 +124,7 @@ export default function DevTestPage() {
           {result.details && (
             <details className="mt-2">
               <summary className="text-xs text-muted-foreground cursor-pointer">
-                Raw error details
+                {t('ui.dev.rawErrorDetails')}
               </summary>
               <pre className="mt-1 text-xs bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap">
                 {result.details}
@@ -142,37 +140,37 @@ export default function DevTestPage() {
           {/* Status */}
           <div className="flex items-center gap-2 text-green-600">
             <CheckCircle2 className="h-5 w-5" />
-            <span className="font-medium">Connection successful!</span>
+            <span className="font-medium">{t('ui.dev.success')}</span>
           </div>
 
           {/* Telemetry */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <TelemetryCard label="Model" value={result.telemetry.model} />
+            <TelemetryCard label={t('ui.dev.model')} value={result.telemetry.model} />
             <TelemetryCard
-              label="Input Tokens"
+              label={t('ui.dev.inputTokens')}
               value={result.telemetry.input_tokens?.toLocaleString() ?? '—'}
             />
             <TelemetryCard
-              label="Output Tokens"
+              label={t('ui.dev.outputTokens')}
               value={result.telemetry.output_tokens?.toLocaleString() ?? '—'}
             />
             <TelemetryCard
-              label="Total Tokens"
+              label={t('ui.dev.totalTokens')}
               value={result.telemetry.total_tokens?.toLocaleString() ?? '—'}
             />
             <TelemetryCard
-              label="Cached Tokens"
+              label={t('ui.dev.cachedTokens')}
               value={result.telemetry.cached_tokens?.toLocaleString() ?? '—'}
             />
             <TelemetryCard
-              label="Latency"
+              label={t('ui.dev.latency')}
               value={`${result.telemetry.latency_ms.toLocaleString()} ms`}
             />
           </div>
 
           {/* Response text */}
           <div>
-            <span className="block text-sm font-medium mb-2">Gemini Response</span>
+            <span className="block text-sm font-medium mb-2">{t('ui.dev.response')}</span>
             <div className="p-4 bg-muted rounded-lg text-sm whitespace-pre-wrap leading-relaxed">
               {result.response}
             </div>

@@ -728,8 +728,10 @@
     },
     "qa": {
       "noDocuments": "No documents uploaded yet. Upload a document to start asking questions.",
+      "authRequired": "Please log in to ask questions.",
       "processing": "Documents are still being processed. Please wait until processing is complete.",
       "noResults": "No relevant passages found for this question. Try different keywords.",
+      "partialResults": "Some results may be incomplete.",
       "staticModeAnswer": "Here are the relevant passages found in your documents. Full AI-generated answers require the Express server.",
       "searchError": "An error occurred while searching. Please try again."
     },
@@ -827,10 +829,42 @@
         "contained_in": "Contained in"
       }
     },
+    "debugAuth": {
+      "title": "Auth Debug Page",
+      "credentials": "Test Credentials",
+      "emailPlaceholder": "test@example.com (NEW EMAIL)",
+      "passwordPlaceholder": "Test password",
+      "signUpTitle": "Test Sign Up",
+      "signUpButton": "Test signUp()",
+      "signUpTests": "Tests: supabase.auth.signUp(email, password)",
+      "signInTitle": "Test Sign In",
+      "signInButton": "Test signInWithPassword()",
+      "signInTests": "Tests: supabase.auth.signInWithPassword(email, password)",
+      "instructionsTitle": "Instructions:",
+      "instructionNewEmail": "Enter a NEW email (not yet in Supabase)",
+      "instructionPassword": "Enter any password (min 6 chars)",
+      "instructionSignUp": "Click \"Test signUp()\"",
+      "instructionConsole": "Check browser console logs (F12 → Console)",
+      "instructionInbox": "Check email inbox for confirmation",
+      "instructionSignIn": "After confirming, test signIn()",
+      "logsTitle": "Detailed Logs",
+      "noLogs": "No logs yet. Run a test to see responses.",
+      "latestSignUp": "Latest SignUp Response",
+      "latestSignIn": "Latest SignIn Response",
+      "logs": {
+        "startingSignUp": "Starting signup with email: {{email}}",
+        "signUpReceived": "signUp response received",
+        "signUpHeader": "=== SIGNUP RESPONSE ===",
+        "startingSignIn": "Starting signin with email: {{email}}",
+        "signInReceived": "signIn response received",
+        "signInHeader": "=== SIGNIN RESPONSE ==="
+      }
+    },
     "dev": {
       "title": "Gemini Smoke Test",
       "description": "Test connectivity: Frontend → Supabase Edge Function → Gemini 2.5 Flash → Frontend",
       "prompt": "Prompt",
+      "defaultPrompt": "Describe a fantasy character in 2 sentences.",
       "promptPlaceholder": "Enter a prompt to send to Gemini...",
       "waiting": "Waiting for Gemini...",
       "test": "Test Gemini",

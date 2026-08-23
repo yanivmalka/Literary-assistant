@@ -229,7 +229,7 @@ export default function AccountSettingsPage() {
                           disabled={passwordLoading}
                           className="flex-1 py-2 px-3 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
                         >
-                          {passwordLoading ? t('ui.account.adding') : t('ui.account.addPassword')}
+                          {passwordLoading ? t('ui.common.saving') : t('ui.account.addPassword')}
                         </button>
                         <button
                           type="button"

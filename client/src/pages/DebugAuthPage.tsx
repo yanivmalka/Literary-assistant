@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase'
 
 /**
@@ -6,6 +7,7 @@ import { supabase } from '@/lib/supabase'
  * Navigate to /debug-auth to use this page
  */
 export default function DebugAuthPage() {
+  const { t } = useTranslation()
   const [testEmail, setTestEmail] = useState('')
   const [testPassword, setTestPassword] = useState('')
   const [signupResponse, setSignupResponse] = useState<any>(null)
@@ -20,15 +22,15 @@ export default function DebugAuthPage() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLogs([])
-    addLog(`Starting signup with email: ${testEmail}`)
+    addLog(t('ui.debugAuth.logs.startingSignUp', { email: testEmail }))
 
     const { data, error } = await supabase.auth.signUp({
       email: testEmail,
       password: testPassword,
     })
 
-    addLog(`signUp response received`)
-    addLog(`=== SIGNUP RESPONSE ===`)
+    addLog(t('ui.debugAuth.logs.signUpReceived'))
+    addLog(t('ui.debugAuth.logs.signUpHeader'))
     addLog(`data: ${JSON.stringify(data, null, 2)}`)
     addLog(`error: ${JSON.stringify(error, null, 2)}`)
     addLog(`data.user: ${JSON.stringify(data?.user, null, 2)}`)
@@ -51,15 +53,15 @@ export default function DebugAuthPage() {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setLogs([])
-    addLog(`Starting signin with email: ${testEmail}`)
+    addLog(t('ui.debugAuth.logs.startingSignIn', { email: testEmail }))
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: testEmail,
       password: testPassword,
     })
 
-    addLog(`signIn response received`)
-    addLog(`=== SIGNIN RESPONSE ===`)
+    addLog(t('ui.debugAuth.logs.signInReceived'))
+    addLog(t('ui.debugAuth.logs.signInHeader'))
     addLog(`data: ${JSON.stringify(data, null, 2)}`)
     addLog(`error: ${JSON.stringify(error, null, 2)}`)
     if (data?.user) {
@@ -79,7 +81,7 @@ export default function DebugAuthPage() {
   return (
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Auth Debug Page</h1>
+        <h1 className="text-3xl font-bold mb-8">{t('ui.debugAuth.title')}</h1>
 
         <div className="grid grid-cols-2 gap-8">
           {/* Left side - Forms */}
@@ -87,12 +89,12 @@ export default function DebugAuthPage() {
             <div className="space-y-6">
               {/* Email/Password Input */}
               <div className="border rounded-lg p-4 bg-card">
-                <h2 className="text-xl font-semibold mb-4">Test Credentials</h2>
+                <h2 className="text-xl font-semibold mb-4">{t('ui.debugAuth.credentials')}</h2>
                 <input
                   id="test-email"
                   name="test-email"
                   type="email"
-                  placeholder="test@example.com (NEW EMAIL)"
+                  placeholder={t('ui.debugAuth.emailPlaceholder')}
                   value={testEmail}
                   onChange={(e) => setTestEmail(e.target.value)}
                   className="w-full px-3 py-2 border rounded mb-3 bg-background"
@@ -102,7 +104,7 @@ export default function DebugAuthPage() {
                   id="test-password"
                   name="test-password"
                   type="password"
-                  placeholder="Test password"
+                  placeholder={t('ui.debugAuth.passwordPlaceholder')}
                   value={testPassword}
                   onChange={(e) => setTestPassword(e.target.value)}
                   className="w-full px-3 py-2 border rounded mb-4 bg-background"
@@ -112,46 +114,46 @@ export default function DebugAuthPage() {
 
               {/* SignUp Form */}
               <form onSubmit={handleSignUp} className="border rounded-lg p-4 bg-card">
-                <h2 className="text-xl font-semibold mb-4">Test Sign Up</h2>
+                <h2 className="text-xl font-semibold mb-4">{t('ui.debugAuth.signUpTitle')}</h2>
                 <button
                   type="submit"
                   className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
                   disabled={!testEmail || !testPassword}
                 >
-                  Test signUp()
+                  {t('ui.debugAuth.signUpButton')}
                 </button>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Tests: supabase.auth.signUp(email, password)
+                  {t('ui.debugAuth.signUpTests')}
                 </p>
               </form>
 
               {/* SignIn Form */}
               <form onSubmit={handleSignIn} className="border rounded-lg p-4 bg-card">
-                <h2 className="text-xl font-semibold mb-4">Test Sign In</h2>
+                <h2 className="text-xl font-semibold mb-4">{t('ui.debugAuth.signInTitle')}</h2>
                 <button
                   type="submit"
                   className="w-full py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700"
                   disabled={!testEmail || !testPassword}
                 >
-                  Test signInWithPassword()
+                  {t('ui.debugAuth.signInButton')}
                 </button>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Tests: supabase.auth.signInWithPassword(email, password)
+                  {t('ui.debugAuth.signInTests')}
                 </p>
               </form>
 
               {/* Quick Info */}
               <div className="border rounded-lg p-4 bg-card text-sm">
                 <p className="text-muted-foreground">
-                  <strong>Instructions:</strong>
+                  <strong>{t('ui.debugAuth.instructionsTitle')}</strong>
                 </p>
                 <ol className="list-decimal list-inside text-muted-foreground mt-2 space-y-1">
-                  <li>Enter a NEW email (not yet in Supabase)</li>
-                  <li>Enter any password (min 6 chars)</li>
-                  <li>Click "Test signUp()"</li>
-                  <li>Check browser console logs (F12 → Console)</li>
-                  <li>Check email inbox for confirmation</li>
-                  <li>After confirming, test signIn()</li>
+                  <li>{t('ui.debugAuth.instructionNewEmail')}</li>
+                  <li>{t('ui.debugAuth.instructionPassword')}</li>
+                  <li>{t('ui.debugAuth.instructionSignUp')}</li>
+                  <li>{t('ui.debugAuth.instructionConsole')}</li>
+                  <li>{t('ui.debugAuth.instructionInbox')}</li>
+                  <li>{t('ui.debugAuth.instructionSignIn')}</li>
                 </ol>
               </div>
             </div>
@@ -159,10 +161,10 @@ export default function DebugAuthPage() {
 
           {/* Right side - Logs */}
           <div className="border rounded-lg p-4 bg-card overflow-auto max-h-screen">
-            <h2 className="text-xl font-semibold mb-4 sticky top-0">Detailed Logs</h2>
+            <h2 className="text-xl font-semibold mb-4 sticky top-0">{t('ui.debugAuth.logsTitle')}</h2>
             <div className="space-y-1 font-mono text-sm">
               {logs.length === 0 ? (
-                <p className="text-muted-foreground">No logs yet. Run a test to see responses.</p>
+                <p className="text-muted-foreground">{t('ui.debugAuth.noLogs')}</p>
               ) : (
                 logs.map((log, idx) => (
                   <div key={idx} className="text-xs py-0.5">
@@ -178,7 +180,7 @@ export default function DebugAuthPage() {
         <div className="mt-8 grid grid-cols-2 gap-8">
           {signupResponse && (
             <div className="border rounded-lg p-4 bg-card">
-              <h3 className="font-semibold mb-2">Latest SignUp Response</h3>
+              <h3 className="font-semibold mb-2">{t('ui.debugAuth.latestSignUp')}</h3>
               <pre className="text-xs bg-background p-3 rounded overflow-auto max-h-64">
                 {JSON.stringify(signupResponse, null, 2)}
               </pre>
@@ -186,7 +188,7 @@ export default function DebugAuthPage() {
           )}
           {signinResponse && (
             <div className="border rounded-lg p-4 bg-card">
-              <h3 className="font-semibold mb-2">Latest SignIn Response</h3>
+              <h3 className="font-semibold mb-2">{t('ui.debugAuth.latestSignIn')}</h3>
               <pre className="text-xs bg-background p-3 rounded overflow-auto max-h-64">
                 {JSON.stringify(signinResponse, null, 2)}
               </pre>

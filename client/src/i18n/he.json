@@ -728,8 +728,10 @@
     },
     "qa": {
       "noDocuments": "עדיין לא הועלו מסמכים. העלה מסמך כדי להתחיל לשאול שאלות.",
+      "authRequired": "יש להתחבר כדי לשאול שאלות.",
       "processing": "המסמכים עדיין בעיבוד. המתן עד לסיום העיבוד.",
       "noResults": "לא נמצאו קטעים רלוונטיים לשאלה. נסה מילות מפתח אחרות.",
+      "partialResults": "ייתכן שחלק מהתוצאות אינן מלאות.",
       "staticModeAnswer": "אלה הקטעים הרלוונטיים שנמצאו במסמכים שלך. תשובות מלאות שנוצרו באמצעות AI דורשות את שרת Express.",
       "searchError": "אירעה שגיאה במהלך החיפוש. נסה שוב."
     },
@@ -827,10 +829,42 @@
         "contained_in": "מוכל בתוך"
       }
     },
+    "debugAuth": {
+      "title": "דף אבחון התחברות",
+      "credentials": "פרטי בדיקה",
+      "emailPlaceholder": "test@example.com (אימייל חדש)",
+      "passwordPlaceholder": "סיסמת בדיקה",
+      "signUpTitle": "בדיקת הרשמה",
+      "signUpButton": "בדוק signUp()",
+      "signUpTests": "בדיקה: supabase.auth.signUp(email, password)",
+      "signInTitle": "בדיקת התחברות",
+      "signInButton": "בדוק signInWithPassword()",
+      "signInTests": "בדיקה: supabase.auth.signInWithPassword(email, password)",
+      "instructionsTitle": "הוראות:",
+      "instructionNewEmail": "הזן אימייל חדש (שעדיין לא קיים ב-Supabase)",
+      "instructionPassword": "הזן סיסמה כלשהי (לפחות 6 תווים)",
+      "instructionSignUp": "לחץ על \"בדוק signUp()\"",
+      "instructionConsole": "בדוק את לוגי הקונסול בדפדפן (F12 ← Console)",
+      "instructionInbox": "בדוק את תיבת הדואר לאישור",
+      "instructionSignIn": "לאחר האישור, בדוק signIn()",
+      "logsTitle": "לוגים מפורטים",
+      "noLogs": "עדיין אין לוגים. הפעל בדיקה כדי לראות תגובות.",
+      "latestSignUp": "תגובת ההרשמה האחרונה",
+      "latestSignIn": "תגובת ההתחברות האחרונה",
+      "logs": {
+        "startingSignUp": "מתחיל הרשמה עם האימייל: {{email}}",
+        "signUpReceived": "תגובת signUp התקבלה",
+        "signUpHeader": "=== תגובת הרשמה ===",
+        "startingSignIn": "מתחיל התחברות עם האימייל: {{email}}",
+        "signInReceived": "תגובת signIn התקבלה",
+        "signInHeader": "=== תגובת התחברות ==="
+      }
+    },
     "dev": {
       "title": "בדיקת Gemini",
       "description": "בדיקת תקשורת: Frontend → Supabase Edge Function → Gemini 2.5 Flash → Frontend",
       "prompt": "פרומפט",
+      "defaultPrompt": "תאר דמות פנטזיה בשני משפטים.",
       "promptPlaceholder": "הזן פרומפט לשליחה ל-Gemini...",
       "waiting": "ממתין ל-Gemini...",
       "test": "בדוק את Gemini",
