@@ -131,6 +131,13 @@ function summarizeEmptyGeminiResponse(data: Record<string, unknown>): string {
   });
 }
 
+function getPromptBlockReason(data: Record<string, unknown>): string | null {
+  const feedback = data.promptFeedback;
+  if (!feedback || typeof feedback !== "object") return null;
+  const reason = (feedback as Record<string, unknown>).blockReason;
+  return typeof reason === "string" && reason.trim().length > 0 ? reason : null;
+}
+
 // ============================================
 // In-Memory Cooldown Tracker
 // Simple per-isolate cooldown. Each Deno edge function isolate
@@ -318,14 +325,35 @@ export async function callGeminiWithFallback(
         if (!responseText) {
           const reason = "Model returned no text candidate";
           const diagnostics = summarizeEmptyGeminiResponse(data);
+          const blockReason = getPromptBlockReason(data);
+          const safetyBlocked = Boolean(
+            blockReason && blockReason !== "BLOCK_REASON_UNSPECIFIED",
+          );
           console.warn(`[Gemini Fallback] ${reason}: ${modelId}`, diagnostics);
           fallbackChain.push({
             model: modelId,
             status: response.status,
             error: `${reason}; ${diagnostics}`,
-            reason: "empty model response",
+            reason: safetyBlocked ? "safety block" : "empty model response",
             timestampMs: Date.now(),
           });
+
+          // A prompt/content safety block is deterministic for this request;
+          // trying the same prompt with other models cannot make it safe. Stop
+          // here, do not mark the model unavailable, and preserve the provider
+          // reason for a clear user-facing diagnostic.
+          if (safetyBlocked) {
+            return {
+              success: false,
+              error: "Gemini blocked this request under its safety policy.",
+              status: 422,
+              details: diagnostics,
+              modelUsed: modelId,
+              isRetriable: false,
+              fallbackChain,
+            };
+          }
+
           recordModelFailure(modelId);
           continue;
         }
