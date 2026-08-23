@@ -1,14 +1,96 @@
 # Literary Assistant - Product Roadmap
 
 **Version**: 1.3 → 2.0+  
-**Last Updated**: August 20, 2026  
+**Last Updated**: August 23, 2026
 **Current State**: v1.3 (Extraction & Entity Index Complete)
 
 ---
 
-## **Overview**
+## **Product North Star: One Story System**
 
-This document is the master product roadmap for Literary Assistant, tracking progress from v1.3 through v2.0 and beyond. It aligns technical implementation with user value, prioritizing architecture cleanup before new features.
+Literary Assistant is intended to become a complete workspace for authors: a system that understands the book, remembers its established knowledge, helps the author plan and write it, checks it, teaches the author, supports safe experimentation, and makes the story visible.
+
+The product must not become a collection of disconnected writing, planning, Worldbuilding, and analysis features. Every capability should operate on the same central **Story Model** and **Entity System**. The Story Model is the source of truth for canonical story knowledge; features consume it, enrich it through traceable evidence, or propose reviewable changes to it.
+
+### **Unified Story Intelligence Flow**
+
+The end-to-end product flow is:
+
+```text
+Manuscript
+  → Extraction
+  → Entities
+  → Relationships
+  → Events
+  → Timeline
+  → Canonical Knowledge
+  → Main / Branch
+  → Analysis
+  → Writing
+  → Visualization
+  → Publishing
+```
+
+This is a connected lifecycle, not a required linear workflow. Authors may begin with planning or writing, import an existing manuscript later, or work non-linearly. Regardless of entry point, new information must resolve into the shared Story Model with provenance, scope, and review status.
+
+### **What the Story Model Owns**
+
+The shared model should represent, at minimum:
+
+- Manuscripts, documents, chapters, scenes, passages, and source mentions
+- Characters, locations, objects, abilities, cultures, languages, and other canonical entities
+- Relationships, ownership, knowledge, status, and other time-aware connections
+- Events, scenes, causes, consequences, participants, locations, and temporal positions
+- Plot lines, goals, conflicts, setups, payoffs, and narrative structure
+- Evidence, provenance, confidence, certainty, review state, and author decisions
+- Main canon, isolated Branch proposals, effective views, diffs, and promotion history
+- Writing context, research, visual assets, and publishing metadata linked to the relevant story objects
+
+No future feature should create a parallel entity, relationship, timeline, or canon store when the information belongs in this model.
+
+### **Product Inspiration Without Feature Parity**
+
+The following products are sources of design inspiration, not separate implementation targets. Literary Assistant should adopt their strongest user value while connecting it to the Story Model:
+
+| Product | Strength to learn from | Integrated Literary Assistant interpretation |
+|---------|------------------------|----------------------------------------------|
+| Sudowrite | AI writing, brainstorming, rewriting, scene generation, Story Bible | Writing assistance grounded in the active canon, character knowledge, timeline, and author-approved constraints |
+| Novelcrafter | Codex, structured lore, series support, BYOK | A central Codex/Story Bible backed by canonical entities and provider-independent AI configuration |
+| Fictionary | Story Elements, Story Map, structural coaching | Evidence-based narrative analysis that explains both the finding and the underlying craft concept |
+| NovelContinuity | Extraction, timelines, cross-references, continuity analysis | A provenance-aware extraction and continuity layer shared by every feature |
+| Plottr | Visual planning, scene cards, plotlines, character sheets, series bible | Visual projections of the same scenes, events, plotlines, entities, and relationships—not duplicate planning data |
+| Campfire | Deep Worldbuilding, maps, cultures, magic, languages, encyclopedia | A world encyclopedia and visual world model linked to canonical locations, entities, events, and relationships |
+| Scrivener | Long-form writing, research, organization, non-linear workflow | A professional manuscript workspace where chapters, research, scenes, and Story Model references remain connected |
+| Dabble / NovelPad | Simple writing flow, goals, scenes, organization, cloud workflow | A focused writing experience with goals and scenes that remains synchronized with the shared story knowledge |
+| Atticus | Writing, organization, formatting, and publishing workflow | A continuous path from manuscript and structured knowledge to book formatting and publication outputs |
+
+The goal is not to copy competitors feature-by-feature. The goal is to combine their strongest workflows around one model of the book.
+
+### **Core Capability Pillars**
+
+Future capabilities should be delivered as connected layers over the Story Model:
+
+1. **AI Writing Assistant** — brainstorming, rewrite, scene generation, summarization, and contextual suggestions using the effective canon.
+2. **Story Bible / Codex** — a living, explainable view of characters, places, lore, events, relationships, and author decisions.
+3. **Entity and Relationship Management** — canonical identity, aliases, attributes, mentions, relationships, provenance, and safe merging.
+4. **Worldbuilding Encyclopedia** — locations, maps, cultures, magic, languages, objects, abilities, and other world knowledge.
+5. **Timeline and Visual Story Planning** — chapters, scenes, events, plotlines, goals, conflicts, dependencies, and visual cards backed by shared records.
+6. **Character Management** — character sheets, states, goals, knowledge, abilities, relationships, arcs, and visual identity.
+7. **Continuity and Narrative Intelligence** — plot holes, character consistency, causality, setup/payoff, Deus Ex Machina, narrative errors, and timeline risks.
+8. **Narrative Education** — contextual explanations, examples, repair strategies, and a knowledge base connected to each diagnostic.
+9. **Branches and Impact Analysis** — isolated what-if changes, downstream impact analysis, comparison, review, and explicit promotion to Main.
+10. **Visualization** — world maps, character portraits, event/scene illustrations, relationship graphs, and a visual Story Bible.
+11. **Publishing Workflow** — formatting, export, editions, and publication preparation without breaking links to the manuscript and Story Model.
+
+### **Non-Negotiable Product Rules**
+
+- The Story Model and Entity System are the shared source of truth; feature-specific views are projections, not separate databases of meaning.
+- Every extracted, inferred, generated, or user-authored fact must have scope, provenance, and an appropriate review state.
+- Main represents canonical knowledge. AI suggestions and experimental changes remain Branch-scoped or reviewable until explicitly promoted.
+- Writing, planning, analysis, visualization, and publishing must be able to link back to the same entities, events, scenes, evidence, and decisions.
+- The Effective Branch View is the basis for branch-aware writing and analysis; raw tables must not be interpreted independently when overlays apply.
+- Features should be prioritized by the quality of the shared model they strengthen and the number of workflows they unlock, not by isolated feature count.
+- The author remains the final authority. The system may extract, suggest, explain, visualize, and identify risk, but must not silently rewrite canon.
 
 ### **Architectural Principle**
 **Legacy Architecture Cleanup is a prerequisite for Contradiction Detection and future features.** The current codebase has two parallel entity/attribute systems:
