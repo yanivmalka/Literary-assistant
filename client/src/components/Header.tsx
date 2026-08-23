@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useQuillStore } from '@/stores/quillStore'
 import { toast } from './Toast'
 import LanguageSwitcher from './LanguageSwitcher'
+import ThemeToggle from './ThemeToggle'
 
 export default function Header() {
   const { t } = useTranslation()
@@ -89,6 +90,7 @@ export default function Header() {
       </div>
 
       <div className="flex items-center gap-4">
+        <ThemeToggle />
         <LanguageSwitcher />
         {user && (
           <div className="flex items-center gap-3">

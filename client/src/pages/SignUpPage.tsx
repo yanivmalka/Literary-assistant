@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { Map } from 'lucide-react'
+import ThemeToggle from '@/components/ThemeToggle'
 
 export default function SignUpPage() {
   const { t } = useTranslation()
@@ -45,7 +46,10 @@ export default function SignUpPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="relative min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="absolute right-4 top-4">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-md text-center">
           <Map className="h-12 w-12 text-primary mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-4">Check your email</h2>

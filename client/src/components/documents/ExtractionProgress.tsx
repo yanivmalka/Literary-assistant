@@ -1,19 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Brain, CheckCircle, XCircle, AlertTriangle, X, Loader2 } from 'lucide-react'
+import { Brain, CheckCircle, XCircle, AlertTriangle, X, Loader2, Pause, Play } from 'lucide-react'
 import { useDocumentStore } from '@/stores/documentStore'
 
-export default function ExtractionProgress() {
+interface ExtractionProgressProps {
+  documentId: string
+}
+
+export default function ExtractionProgress({ documentId }: ExtractionProgressProps) {
   const { t } = useTranslation()
   const [showCancelWarning, setShowCancelWarning] = useState(false)
 
   const {
-    extractionInProgress,
     extractionDone,
     extractionCancelled,
     extractionError,
+    extractionPausing,
+    extractionDocumentId,
     extractionWarnings,
     extractionProgress,
+    pausedExtractions,
+    pauseExtraction,
+    resumeExtraction,
     cancelExtraction,
     dismissExtractionStatus,
   } = useDocumentStore()
@@ -28,12 +36,16 @@ export default function ExtractionProgress() {
     return () => window.clearTimeout(timeoutId)
   }, [extractionDone, dismissExtractionStatus])
 
-  // Nothing to show
-  if (!extractionInProgress && !extractionDone && !extractionCancelled && !extractionError) {
+  const pausedExtraction = pausedExtractions[documentId]
+  const isActiveDocument = extractionDocumentId === documentId
+
+  // Nothing to show for unrelated documents. A paused run remains visible
+  // even while another, higher-priority document is being extracted.
+  if (!isActiveDocument && !pausedExtraction) {
     return null
   }
 
-  const progress = extractionProgress
+  const progress = isActiveDocument ? extractionProgress : pausedExtraction?.progress ?? null
   const percentage = progress && progress.totalChunks > 0
     ? Math.round((progress.processedChunks / progress.totalChunks) * 100)
     : 0
@@ -52,9 +64,44 @@ export default function ExtractionProgress() {
     cancelExtraction()
   }
 
+  const handleResume = () => {
+    void resumeExtraction(documentId)
+  }
+
   const handleDismiss = () => {
     setShowCancelWarning(false)
     dismissExtractionStatus()
+  }
+
+  if (pausedExtraction && !isActiveDocument) {
+    return (
+      <div className="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-amber-700">
+            <Pause className="h-5 w-5" />
+            <span className="text-sm font-medium">{t('documents.extraction.paused')}</span>
+          </div>
+        </div>
+        <p className="text-xs text-amber-700 ps-7">
+          {t('documents.extraction.pausedDescription')}
+        </p>
+        {progress && progress.totalChunks > 0 && (
+          <p className="text-xs text-amber-700 ps-7">
+            {t('documents.extraction.progress', {
+              processed: progress.processedChunks,
+              total: progress.totalChunks,
+            })}
+          </p>
+        )}
+        <button
+          onClick={handleResume}
+          className="flex items-center gap-1 text-xs px-3 py-1.5 text-green-700 border border-green-200 bg-green-50 hover:bg-green-100 rounded transition-colors"
+        >
+          <Play className="h-3.5 w-3.5" />
+          {t('documents.extraction.resumeButton')}
+        </button>
+      </div>
+    )
   }
 
   // Completed with warnings state
@@ -209,35 +256,48 @@ export default function ExtractionProgress() {
         </p>
       )}
 
-      {/* Cancel button / warning */}
-      {!showCancelWarning ? (
+      {/* Pause and cancel controls */}
+      <div className="flex flex-wrap gap-2">
         <button
-          onClick={handleCancelClick}
-          className="text-xs px-3 py-1.5 text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded transition-colors"
+          onClick={pauseExtraction}
+          disabled={extractionPausing}
+          className="flex items-center gap-1 text-xs px-3 py-1.5 text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 rounded transition-colors"
         >
-          {t('documents.extraction.cancelButton')}
+          <Pause className="h-3.5 w-3.5" />
+          {extractionPausing
+            ? t('documents.extraction.pausing')
+            : t('documents.extraction.pauseButton')}
         </button>
-      ) : (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-md space-y-2">
-          <p className="text-xs text-amber-700">
-            {t('documents.extraction.cancelWarning')}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={handleConfirmCancel}
-              className="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-            >
-              {t('common.confirm')}
-            </button>
-            <button
-              onClick={() => setShowCancelWarning(false)}
-              className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
-            >
-              {t('common.cancel')}
-            </button>
+
+        {!showCancelWarning ? (
+          <button
+            onClick={handleCancelClick}
+            className="text-xs px-3 py-1.5 text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded transition-colors"
+          >
+            {t('documents.extraction.cancelButton')}
+          </button>
+        ) : (
+          <div className="basis-full p-3 bg-amber-50 border border-amber-200 rounded-md space-y-2">
+            <p className="text-xs text-amber-700">
+              {t('documents.extraction.cancelWarning')}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirmCancel}
+                className="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+              >
+                {t('common.confirm')}
+              </button>
+              <button
+                onClick={() => setShowCancelWarning(false)}
+                className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

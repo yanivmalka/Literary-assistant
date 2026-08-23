@@ -253,6 +253,12 @@
       "completedSummary": "Found {{entities}} entities and {{events}} events",
       "cancelled": "Entity extraction cancelled",
       "cancelledDescription": "Entities already extracted have been saved. You can restart at any time.",
+      "paused": "Entity extraction paused",
+      "pausedDescription": "The current batch has finished. You can resume this extraction from the same point.",
+      "pauseButton": "Pause extraction",
+      "pausing": "Finishing the current batch...",
+      "resumeButton": "Resume extraction",
+      "resumeUnavailable": "This extraction cannot resume because the document content changed. Start a new extraction.",
       "cancelButton": "Cancel extraction",
       "cancelWarning": "Cancel entity extraction? Entities already extracted will be saved, but the extraction will not be completed.",
       "dismiss": "Dismiss",
@@ -506,6 +512,10 @@
       "viewDetails": "View Details",
       "edit": "Edit",
       "saving": "Saving..."
+    },
+    "theme": {
+      "switchToDark": "Switch to dark mode",
+      "switchToLight": "Switch to light mode"
     },
     "documents": {
       "extractKnowledge": "Extract",

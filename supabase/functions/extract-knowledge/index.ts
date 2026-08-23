@@ -56,6 +56,7 @@ import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_s
 import { buildAbilityLinks, mergeAbilityLinkEntries } from "../_shared/ability-links.ts";
 import type { AbilityLinkEntity } from "../_shared/ability-links.ts";
 import { buildSkippedBatchResponse, getExtractionSkipReason } from "./skip-policy.ts";
+import { executeParallelExpertExtraction } from "../_shared/parallel-expert-merger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1319,8 +1320,56 @@ Deno.serve(async (req) => {
     const prompt = buildPrompt(chunkData, modelProfile, projectPlaceFields, projectCharacterFields);
     const promptBuildLatencyMs = Date.now() - promptBuildStartedAt;
     const totalChars = chunkData.reduce((sum, c) => sum + c.content.length, 0);
+    let extraction: GeminiExtraction;
+    let responseText = "";
+    let storageSafeExtraction: GeminiExtraction | null = null;
+    let modelUsed: string;
+    let latencyMs: number;
+    let usage: Record<string, unknown>;
 
-    const geminiResult = await callGeminiWithFallback(
+    if (extractionStrategy === "parallel-experts") {
+      if (!extractionRunId) {
+        return errorResponse("parallel-experts requires extraction_run_id so specialist artifacts can be resumed safely.", 400);
+      }
+      try {
+        const merged = await executeParallelExpertExtraction({
+          supabase,
+          api_key: geminiApiKey,
+          project_id: body.project_id,
+          document_id: body.document_id,
+          version_id: body.version_id,
+          user_id: body.user_id,
+          extraction_run_id: extractionRunId,
+          branch_id: targetBranchId,
+          model_profile: modelProfile,
+          chunks: chunkData,
+          offset,
+          limit,
+        });
+        extraction = merged.extraction as GeminiExtraction;
+        modelUsed = merged.model;
+        latencyMs = merged.latency_ms;
+        usage = {
+          promptTokenCount: merged.usage.input_tokens,
+          candidatesTokenCount: merged.usage.output_tokens,
+          thoughtsTokenCount: merged.usage.thinking_tokens,
+          cachedContentTokenCount: merged.usage.cached_tokens,
+          totalTokenCount: merged.usage.total_tokens,
+        };
+        const parallelValidation = validateExtractionPayload(extraction);
+        if (!parallelValidation.valid) {
+          throw new Error(`Merged parallel extraction is invalid: ${parallelValidation.errors.join("; ")}`);
+        }
+        storageSafeExtraction = cloneJsonValue(extraction) as GeminiExtraction | null;
+        if (!storageSafeExtraction) {
+          throw new Error("Merged parallel extraction could not be serialized as JSON.");
+        }
+      } catch (parallelError) {
+        const message = parallelError instanceof Error ? parallelError.message : "Parallel expert execution failed";
+        return errorResponse(message, 502);
+      }
+    } else {
+      const geminiResult = await callGeminiWithFallback(
       {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -1356,8 +1405,10 @@ Deno.serve(async (req) => {
       return errorResponse(geminiResult.error, geminiResult.status, geminiResult.details);
     }
 
-    const { data: geminiData, modelUsed, latencyMs } = geminiResult;
-    const responseText = getGeminiResponseText(geminiData) || "";
+    const { data: geminiData, modelUsed: responseModel, latencyMs: responseLatency } = geminiResult;
+    modelUsed = responseModel;
+    latencyMs = responseLatency;
+    responseText = getGeminiResponseText(geminiData) || "";
     const candidates = Array.isArray((geminiData as Record<string, unknown>).candidates)
       ? (geminiData as Record<string, unknown>).candidates as unknown[]
       : [];
@@ -1372,15 +1423,18 @@ Deno.serve(async (req) => {
         `model=${modelUsed}, candidates=${candidates.length}`,
       );
     }
-    const usage = (geminiData as Record<string, unknown>)?.usageMetadata || {};
+    const rawUsage = (geminiData as Record<string, unknown>)?.usageMetadata;
+    usage = rawUsage && typeof rawUsage === "object" && !Array.isArray(rawUsage)
+      ? rawUsage as Record<string, unknown>
+      : {};
 
     if (modelUsed !== DEFAULT_MODEL) {
       console.log(`[extract-knowledge] Used fallback model: ${modelUsed} (primary: ${DEFAULT_MODEL})`);
     }
 
     const parsedExtraction = parseExtractionJson<unknown>(responseText);
-    const extraction = normalizeExtractionPayload<GeminiExtraction>(parsedExtraction);
-    if (!extraction) {
+    const normalizedExtraction = normalizeExtractionPayload<GeminiExtraction>(parsedExtraction);
+    if (!normalizedExtraction) {
       const message = "Gemini returned JSON that does not match the extraction schema.";
       console.error(`[extract-knowledge] ${message} offset=${offset}`);
       return errorResponse(
@@ -1389,6 +1443,7 @@ Deno.serve(async (req) => {
         `model=${modelUsed}, response_length=${responseText.length}`,
       );
     }
+    extraction = normalizedExtraction;
 
     const extractionValidation = validateExtractionPayload(extraction);
     if (!extractionValidation.valid) {
@@ -1407,11 +1462,12 @@ Deno.serve(async (req) => {
     // JSON.parse normally guarantees JSON-safe data, but normalize the value
     // again before any JSONB write. This prevents a malformed/non-serializable
     // value from reaching PostgreSQL and charging the user before failure.
-    const storageSafeExtraction = cloneJsonValue(extraction) as GeminiExtraction | null;
+    storageSafeExtraction = cloneJsonValue(extraction) as GeminiExtraction | null;
     if (!storageSafeExtraction) {
       const message = "Extraction payload could not be serialized as JSON.";
       console.error(`[extract-knowledge] ${message} offset=${offset}`);
       return errorResponse(message, 422);
+    }
     }
 
     const extractedItemCount = [

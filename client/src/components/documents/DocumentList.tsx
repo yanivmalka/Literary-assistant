@@ -37,6 +37,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
     triggerEntityExtraction,
     extractionInProgress,
     extractionDocumentId,
+    pausedExtractions,
   } = useDocumentStore()
 
   if (documents.length === 0) {
@@ -70,7 +71,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
   }
 
   const handleExtractKnowledge = async (doc: Document) => {
-    if (!doc.latest_version || extractionInProgress) return
+    if (!doc.latest_version || extractionInProgress || pausedExtractions[doc.id]) return
     console.log('[Knowledge] Manual extraction triggered for', doc.name)
     setStoredExtractionModelProfile(selectedModelProfile)
     await triggerEntityExtraction(
@@ -86,6 +87,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
       {documents.map(doc => {
         const isReady = doc.latest_version?.status === 'ready'
         const processing = isProcessing(doc)
+        const hasPausedExtraction = Boolean(pausedExtractions[doc.id])
 
         return (
         <div
@@ -127,7 +129,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                       setSelectedModelProfile(profile)
                       setStoredExtractionModelProfile(profile)
                     }}
-                    disabled={extractionInProgress}
+                    disabled={extractionInProgress || hasPausedExtraction}
                     className="max-w-36 rounded border bg-background px-2 py-1 text-xs text-foreground disabled:opacity-50"
                     title={t('ui.documents.modelProfile')}
                   >
@@ -139,9 +141,9 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                   </select>
                   <button
                     onClick={() => handleExtractKnowledge(doc)}
-                    disabled={extractionInProgress}
+                    disabled={extractionInProgress || hasPausedExtraction}
                     className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-                      extractionInProgress
+                      extractionInProgress || hasPausedExtraction
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : 'bg-green-50 text-green-700 hover:bg-green-100'
                     }`}
@@ -180,11 +182,11 @@ export default function DocumentList({ projectId }: DocumentListProps) {
           )}
 
           {/* Entity extraction progress */}
-          {extractionDocumentId === doc.id && (
+          {extractionDocumentId === doc.id || hasPausedExtraction ? (
             <div className="mt-3 ps-8">
-              <ExtractionProgress />
+              <ExtractionProgress documentId={doc.id} />
             </div>
-          )}
+          ) : null}
         </div>
         )
       })}

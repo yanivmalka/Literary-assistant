@@ -50,6 +50,24 @@ export interface ExtractionProgress {
   skippedChunks: number
 }
 
+export interface PausedExtraction {
+  runId: string
+  versionId: string
+  projectId: string
+  documentId: string
+  modelProfile: ExtractionModelProfile
+  requestModelProfile: ExtractionModelProfile | LegacyExtractionModelProfile
+  extractionMode: 'bootstrap' | 'branch'
+  activeBranchId: string | null
+  nextOffset: number
+  total: number
+  totalEntities: number
+  totalEvents: number
+  totalPersisted: number
+  warnings: ExtractionWarning[]
+  progress: ExtractionProgress
+}
+
 interface DocumentState {
   documents: Document[]
   loading: boolean
@@ -65,12 +83,23 @@ interface DocumentState {
   extractionWarnings: ExtractionWarning[]
   extractionProgress: ExtractionProgress | null
   extractionDocumentId: string | null
+  extractionPausing: boolean
+  pausedExtractions: Record<string, PausedExtraction>
   _extractionCancelFlag: boolean
+  _extractionPauseFlag: boolean
 
   fetchDocuments: (projectId: string) => Promise<void>
   uploadDocument: (projectId: string, file: File, documentId?: string) => Promise<{ success: boolean; error?: string }>
   deleteDocument: (projectId: string, documentId: string) => Promise<void>
-  triggerEntityExtraction: (versionId: string, projectId: string, documentId: string, modelProfile?: ExtractionModelProfile) => Promise<void>
+  triggerEntityExtraction: (
+    versionId: string,
+    projectId: string,
+    documentId: string,
+    modelProfile?: ExtractionModelProfile,
+    resumeState?: PausedExtraction,
+  ) => Promise<void>
+  pauseExtraction: () => void
+  resumeExtraction: (documentId: string) => Promise<void>
   cancelExtraction: () => void
   dismissExtractionStatus: () => void
   startPolling: (projectId: string) => void
@@ -92,7 +121,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   extractionWarnings: [],
   extractionProgress: null,
   extractionDocumentId: null,
+  extractionPausing: false,
+  pausedExtractions: {},
   _extractionCancelFlag: false,
+  _extractionPauseFlag: false,
 
   fetchDocuments: async (projectId: string) => {
     set({ loading: true })
@@ -293,7 +325,13 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     projectId: string,
     documentId: string,
     modelProfile: ExtractionModelProfile = DEFAULT_EXTRACTION_MODEL_PROFILE,
+    resumeState?: PausedExtraction,
   ) => {
+    if (get().extractionInProgress) return
+
+    const remainingPaused = { ...get().pausedExtractions }
+    delete remainingPaused[documentId]
+
     // Update the UI before any authentication or branch lookups. These network
     // calls can take several seconds, so the user should see immediate feedback.
     set({
@@ -301,10 +339,13 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       extractionDone: false,
       extractionCancelled: false,
       extractionError: null,
-      extractionWarnings: [],
+      extractionWarnings: resumeState?.warnings ?? [],
       extractionDocumentId: documentId,
-      extractionProgress: null,
+      extractionPausing: false,
+      pausedExtractions: remainingPaused,
+      extractionProgress: resumeState?.progress ?? null,
       _extractionCancelFlag: false,
+      _extractionPauseFlag: false,
     })
 
     const stopIfCancelled = () => {
@@ -325,53 +366,68 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       return
     }
 
-    let activeBranch: { id: string } | null = null
-    let extractionMode: 'bootstrap' | 'branch' | null = null
-    let extractionRunId: string | null = null
+    let activeBranch: { id: string } | null = resumeState?.activeBranchId
+      ? { id: resumeState.activeBranchId }
+      : null
+    let extractionMode: 'bootstrap' | 'branch' | null = resumeState?.extractionMode ?? null
+    let extractionRunId: string | null = resumeState?.runId ?? null
 
-    try {
-      // CRITICAL FIX: Determine extraction mode ONCE for the entire extraction run
-      // NOT per batch. This ensures all batches participate in the same bootstrap
-      // or all go to the same branch.
-      const mainExists = await hasMainEntities(projectId)
+    if (!resumeState) {
+      try {
+        // CRITICAL FIX: Determine extraction mode ONCE for the entire extraction run
+        // NOT per batch. This ensures all batches participate in the same bootstrap
+        // or all go to the same branch.
+        const mainExists = await hasMainEntities(projectId)
 
-      extractionMode = getExtractionMode(mainExists)
-      if (extractionMode === 'bootstrap') {
-        // The first successful extraction for a project initializes Main,
-        // regardless of which isolated profile the user selected.
-        console.log(`[Knowledge] Extraction mode: BOOTSTRAP (${modelProfile}) - initializing Main layer with complete extraction`)
-      } else {
-        // Every extraction after Main initialization is isolated in the
-        // selected profile-specific Branch.
-        console.log(`[Knowledge] Extraction mode: BRANCH (${modelProfile})`)
-        activeBranch = await getOrCreateActiveBranch(projectId, modelProfile)
+        extractionMode = getExtractionMode(mainExists)
+        if (extractionMode === 'bootstrap') {
+          // The first successful extraction for a project initializes Main,
+          // regardless of which isolated profile the user selected.
+          console.log(`[Knowledge] Extraction mode: BOOTSTRAP (${modelProfile}) - initializing Main layer with complete extraction`)
+        } else {
+          // Every extraction after Main initialization is isolated in the
+          // selected profile-specific Branch.
+          console.log(`[Knowledge] Extraction mode: BRANCH (${modelProfile})`)
+          activeBranch = await getOrCreateActiveBranch(projectId, modelProfile)
+        }
+
+        // Generate extraction run ID for cross-batch resolution
+        extractionRunId = crypto.randomUUID()
+        console.log('[Knowledge] Extraction run:', extractionRunId, 'mode:', extractionMode)
+      } catch (error) {
+        if (stopIfCancelled()) return
+
+        console.error('[DIAGNOSTIC] triggerEntityExtraction() - Extraction setup failed - error:', error)
+        console.error('[Knowledge] Extraction setup failed:', error)
+        set({
+          extractionInProgress: false,
+          extractionError: 'ui.documents.extractionError',
+          extractionDocumentId: documentId,
+        })
+        return
       }
-
-      // Generate extraction run ID for cross-batch resolution
-      extractionRunId = crypto.randomUUID()
-      console.log('[Knowledge] Extraction run:', extractionRunId, 'mode:', extractionMode)
-    } catch (error) {
-      if (stopIfCancelled()) return
-
-      console.error('[DIAGNOSTIC] triggerEntityExtraction() - Extraction setup failed - error:', error)
-      console.error('[Knowledge] Extraction setup failed:', error)
-      set({
-        extractionInProgress: false,
-        extractionError: 'ui.documents.extractionError',
-        extractionDocumentId: documentId,
-      })
-      return
+    } else {
+      console.log('[Knowledge] Resuming extraction run:', extractionRunId, 'from offset:', resumeState.nextOffset)
     }
 
     if (stopIfCancelled()) return
 
+    if (!extractionMode || !extractionRunId) {
+      set({
+        extractionInProgress: false,
+        extractionError: 'ui.documents.extractionError',
+      })
+      return
+    }
+
     const BATCH_SIZE = 2
-    let offset = 0
+    let offset = resumeState?.nextOffset ?? 0
     let done = false
     // The canonical profile is used first. If an older deployed Edge Function
     // rejects it, this is switched once to the legacy server profile and kept
     // stable for every batch in the same extraction run.
-    let requestModelProfile: ExtractionModelProfile | LegacyExtractionModelProfile = modelProfile
+    let requestModelProfile: ExtractionModelProfile | LegacyExtractionModelProfile =
+      resumeState?.requestModelProfile ?? modelProfile
 
     console.log('[Knowledge] Starting extraction for version', versionId)
 
@@ -389,15 +445,32 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
     const total = totalChunks || 0
 
+    if (resumeState && total !== resumeState.total) {
+      console.error('[Knowledge] Cannot resume extraction: document chunks changed', {
+        expected: resumeState.total,
+        actual: total,
+      })
+      set({
+        extractionInProgress: false,
+        extractionError: 'documents.extraction.resumeUnavailable',
+      })
+      return
+    }
+
+    const initialProgress = resumeState?.progress ?? {
+      currentBatch: 0,
+      totalChunks: total,
+      processedChunks: 0,
+      entitiesSaved: 0,
+      eventsSaved: 0,
+      skippedBatches: 0,
+      skippedChunks: 0,
+    }
+
     set({
       extractionProgress: {
-        currentBatch: 0,
+        ...initialProgress,
         totalChunks: total,
-        processedChunks: 0,
-        entitiesSaved: 0,
-        eventsSaved: 0,
-        skippedBatches: 0,
-        skippedChunks: 0,
       },
     })
 
@@ -409,15 +482,60 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       return
     }
 
-    let totalEntities = 0
-    let totalEvents = 0
-    let totalPersisted = 0
-    let totalSkippedBatches = 0
-    let totalSkippedChunks = 0
-    const extractionWarnings: ExtractionWarning[] = []
+    let totalEntities = resumeState?.totalEntities ?? 0
+    let totalEvents = resumeState?.totalEvents ?? 0
+    let totalPersisted = resumeState?.totalPersisted ?? 0
+    let totalSkippedBatches = resumeState?.progress.skippedBatches ?? 0
+    let totalSkippedChunks = resumeState?.progress.skippedChunks ?? 0
+    const extractionWarnings: ExtractionWarning[] = resumeState?.warnings.map(warning => ({
+      reason: warning.reason,
+      chunks: [...warning.chunks],
+    })) ?? []
+
+    const pauseIfRequested = () => {
+      if (!get()._extractionPauseFlag) return false
+
+      const progress = get().extractionProgress ?? initialProgress
+      const pausedRun: PausedExtraction = {
+        runId: extractionRunId,
+        versionId,
+        projectId,
+        documentId,
+        modelProfile,
+        requestModelProfile,
+        extractionMode,
+        activeBranchId: activeBranch?.id ?? null,
+        nextOffset: offset,
+        total,
+        totalEntities,
+        totalEvents,
+        totalPersisted,
+        warnings: extractionWarnings.map(warning => ({
+          reason: warning.reason,
+          chunks: [...warning.chunks],
+        })),
+        progress: { ...progress },
+      }
+
+      set({
+        extractionInProgress: false,
+        extractionPausing: false,
+        extractionCancelled: false,
+        pausedExtractions: {
+          ...get().pausedExtractions,
+          [documentId]: pausedRun,
+        },
+        extractionProgress: { ...progress },
+      })
+      console.log('[Knowledge] Extraction paused at offset:', offset)
+      return true
+    }
+
+    if (pauseIfRequested()) return
 
     while (!done) {
       if (stopIfCancelled()) return
+      if (pauseIfRequested()) return
 
       try {
         const requestBody = {
@@ -518,7 +636,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
           console.warn('[Knowledge] Batch skipped:', skipReason, skippedChunks)
           if (!done) {
+            if (pauseIfRequested()) return
             await new Promise(resolve => setTimeout(resolve, 15000))
+            if (pauseIfRequested()) return
           }
           continue
         }
@@ -580,7 +700,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
         // Delay between batches to respect Gemini rate limits (15s)
         if (!done) {
+          if (pauseIfRequested()) return
           await new Promise(resolve => setTimeout(resolve, 15000))
+          if (pauseIfRequested()) return
         }
       } catch (err) {
         if (stopIfCancelled()) return
@@ -602,6 +724,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     // so the client falls back to the individual entity/event/relationship
     // counters above.
     if (done) {
+      const remainingPaused = { ...get().pausedExtractions }
+      delete remainingPaused[documentId]
+
       if (totalPersisted === 0 && extractionWarnings.length === 0) {
         console.warn('[Knowledge] Extraction completed without persisting any entities, relationships, or events')
         set({
@@ -616,6 +741,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         extractionInProgress: false,
         extractionDone: true,
         extractionWarnings,
+        pausedExtractions: remainingPaused,
       })
       // The extraction and entity stores are independent; refresh the cache
       // before the completion message is dismissed or the user opens Knowledge.
@@ -624,12 +750,45 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     }
   },
 
+  pauseExtraction: () => {
+    if (!get().extractionInProgress || get().extractionPausing) return
+
+    set({
+      extractionPausing: true,
+      _extractionPauseFlag: true,
+    })
+  },
+
+  resumeExtraction: async (documentId: string) => {
+    if (get().extractionInProgress) return
+
+    const paused = get().pausedExtractions[documentId]
+    if (!paused) return
+
+    await get().triggerEntityExtraction(
+      paused.versionId,
+      paused.projectId,
+      paused.documentId,
+      paused.modelProfile,
+      paused,
+    )
+  },
+
   cancelExtraction: () => {
+    const remainingPaused = { ...get().pausedExtractions }
+    const activeDocumentId = get().extractionDocumentId
+    if (activeDocumentId) {
+      delete remainingPaused[activeDocumentId]
+    }
+
     set({
       _extractionCancelFlag: true,
+      _extractionPauseFlag: false,
+      extractionPausing: false,
       extractionCancelled: true,
       extractionDone: false,
       extractionError: null,
+      pausedExtractions: remainingPaused,
     })
   },
 

@@ -13,6 +13,12 @@ import {
 } from "./parallel-experts.ts";
 import type { ExpertArtifactInput } from "./parallel-expert-artifacts.ts";
 import { parseExtractionJson } from "../extract-knowledge/testable-pipeline.ts";
+import { callGeminiWithFallback, getGeminiResponseText } from "./gemini-client.ts";
+import {
+  GEMINI_MODEL_PROFILES,
+  isGeminiModelProfile,
+  type GeminiModelConfig,
+} from "./gemini-config.ts";
 
 export interface ExpertChunk {
   position: number;
@@ -42,6 +48,7 @@ export type PersistExpertArtifact = (input: ExpertArtifactInput) => Promise<unkn
 export interface ExpertRunnerOptions {
   max_concurrent_roles?: number;
   min_interval_ms_per_role?: number;
+  timeout_ms?: number;
   token_budget_per_role?: number;
   persist_artifact?: PersistExpertArtifact;
 }
@@ -58,6 +65,7 @@ export interface ExpertJobResult {
 
 const DEFAULT_MAX_CONCURRENT_ROLES = 3;
 const DEFAULT_MIN_INTERVAL_MS_PER_ROLE = 0;
+const DEFAULT_EXPERT_TIMEOUT_MS = 60_000;
 
 const ROLE_INSTRUCTIONS: Record<ExpertRole, string> = {
   characters: "Extract only characters and character facts. Do not create locations, events, or relationships as primary results.",
@@ -148,6 +156,18 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Expert invocation failed";
 }
 
+async function invokeWithTimeout(
+  invoker: ExpertInvoker,
+  job: ExpertJob,
+  prompt: string,
+  timeoutMs: number,
+): Promise<ExpertInvocationResult> {
+  return await new Promise<ExpertInvocationResult>((resolve, reject) => {
+    const timeoutId = setTimeout(() => reject(new Error(`Expert invocation timed out after ${timeoutMs}ms`)), timeoutMs);
+    invoker(job, prompt).then(resolve, reject).finally(() => clearTimeout(timeoutId));
+  });
+}
+
 function artifactInput(
   job: ExpertJob,
   status: ExpertArtifactInput["status"],
@@ -215,11 +235,24 @@ async function runOneExpertJob(
     await options.persist_artifact(withArtifactContext(input, context));
   };
 
+  const budget = budgets.get(job.role) ?? createTokenBudgetState(options.token_budget_per_role);
+  budgets.set(job.role, budget);
+  if (budget.consumed >= budget.limit) {
+    const error = `Token budget exhausted for ${job.role}: ${budget.consumed}/${budget.limit}`;
+    await persist(artifactInput(job, "failed", null, null, error, attempt));
+    return { role: job.role, window_id: job.window.window_id, status: "failed", model: null, result: null, usage: null, error };
+  }
+
   await persist(artifactInput(job, "running", null, null, null, attempt));
 
   let invocation: ExpertInvocationResult | null = null;
   try {
-    invocation = await invoker(job, buildExpertPrompt(job));
+    invocation = await invokeWithTimeout(
+      invoker,
+      job,
+      buildExpertPrompt(job),
+      options.timeout_ms ?? DEFAULT_EXPERT_TIMEOUT_MS,
+    );
     const parsed = parseExtractionJson<unknown>(invocation.response_text);
     const validation = validateExpertExtractionResult(parsed);
     if (!validation.valid) {
@@ -295,4 +328,80 @@ export async function runParallelExpertJobs(
     Array.from({ length: Math.min(maxConcurrentRoles, groups.length) }, () => worker()),
   );
   return results;
+}
+
+export interface GeminiExpertInvokerOptions {
+  api_key: string;
+  timeout_ms?: number;
+  models?: GeminiModelConfig[];
+  max_output_tokens?: number;
+}
+
+function usageNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+}
+
+export function normalizeGeminiTokenUsage(data: Record<string, unknown>): TokenUsage {
+  const metadata = data.usageMetadata;
+  const usage = metadata && typeof metadata === "object" && !Array.isArray(metadata)
+    ? metadata as Record<string, unknown>
+    : {};
+  const input_tokens = usageNumber(usage.promptTokenCount);
+  const output_tokens = usageNumber(usage.candidatesTokenCount);
+  const thinking_tokens = usageNumber(usage.thoughtsTokenCount);
+  const cached_tokens = usageNumber(usage.cachedContentTokenCount);
+  const reportedTotal = usageNumber(usage.totalTokenCount);
+  const total_tokens = reportedTotal > 0
+    ? reportedTotal
+    : input_tokens + output_tokens + thinking_tokens;
+
+  return { input_tokens, output_tokens, thinking_tokens, cached_tokens, total_tokens };
+}
+
+/**
+ * Adapter for the existing Gemini fallback client. It deliberately returns a
+ * specialist result rather than touching any canonical extraction tables.
+ */
+export function createGeminiExpertInvoker(
+  options: GeminiExpertInvokerOptions,
+): ExpertInvoker {
+  return async (job, prompt): Promise<ExpertInvocationResult> => {
+    const startedAt = Date.now();
+    if (!isGeminiModelProfile(job.model_profile)) {
+      throw new Error(`No Gemini model profile configured for ${job.model_profile}`);
+    }
+    const models = options.models ?? GEMINI_MODEL_PROFILES[job.model_profile];
+    if (!models) throw new Error(`No Gemini model profile configured for ${job.model_profile}`);
+
+    const response = await callGeminiWithFallback(
+      {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: job.max_output_tokens ?? options.max_output_tokens ?? 65_536,
+          responseMimeType: "application/json",
+        },
+      },
+      options.api_key,
+      {
+        timeoutMs: options.timeout_ms ?? 60_000,
+        models,
+      },
+    );
+
+    if (!response.success) {
+      throw new Error(`Gemini expert invocation failed: ${response.error}`);
+    }
+
+    const responseText = getGeminiResponseText(response.data);
+    if (!responseText) throw new Error(`Gemini returned no usable text for ${job.role}`);
+
+    return {
+      model: response.modelUsed,
+      raw_response: response.data,
+      response_text: responseText,
+      usage: normalizeGeminiTokenUsage(response.data),
+      latency_ms: response.latencyMs || Date.now() - startedAt,
+    };
+  };
 }

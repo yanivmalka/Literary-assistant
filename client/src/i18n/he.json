@@ -253,6 +253,12 @@
       "completedSummary": "נמצאו {{entities}} ישויות ו-{{events}} אירועים",
       "cancelled": "חילוץ הישויות בוטל",
       "cancelledDescription": "הישויות שכבר חולצו נשמרו. ניתן להפעיל מחדש בכל עת.",
+      "paused": "חילוץ הישויות מושהה",
+      "pausedDescription": "האצווה הנוכחית הסתיימה. ניתן להמשיך את אותו חילוץ מאותה נקודה.",
+      "pauseButton": "עצור זמנית",
+      "pausing": "עוצר לאחר האצווה הנוכחית...",
+      "resumeButton": "המשך חילוץ",
+      "resumeUnavailable": "לא ניתן להמשיך את החילוץ כי תוכן המסמך השתנה. יש להפעיל חילוץ חדש.",
       "cancelButton": "בטל חילוץ",
       "cancelWarning": "האם לבטל את חילוץ הישויות? הישויות שכבר חולצו יישמרו, אך החילוץ לא יושלם.",
       "dismiss": "סגור",
@@ -506,6 +512,10 @@
       "viewDetails": "הצג פרטים",
       "edit": "ערוך",
       "saving": "שמירה..."
+    },
+    "theme": {
+      "switchToDark": "עבור למצב לילה",
+      "switchToLight": "עבור למצב יום"
     },
     "documents": {
       "extractKnowledge": "חלץ",
