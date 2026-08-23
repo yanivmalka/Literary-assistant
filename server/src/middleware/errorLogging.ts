@@ -117,6 +117,8 @@ export const userErrorLoggingMiddleware: RequestHandler = (req: Request, res: Re
   res.setHeader('X-Request-ID', requestId)
 
   res.on('finish', () => {
+    if (res.locals.skipRequestLogging) return
+
     const completedAt = new Date()
     const request: RequestLog = {
       request_id: requestId,

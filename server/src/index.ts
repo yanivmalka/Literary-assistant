@@ -7,6 +7,7 @@ import { entityRoutes } from './entities/index.js'
 import { profileRoutes } from './profiles/index.js'
 import { qaRoutes } from './qa/index.js'
 import { userErrorLoggingMiddleware } from './middleware/errorLogging.js'
+import adminRoutes from './admin/routes.js'
 
 dotenv.config()
 
@@ -17,6 +18,7 @@ const HF_API_KEY = process.env.HUGGINGFACE_API_KEY || ''
 app.use(cors())
 app.use(express.json())
 app.use(userErrorLoggingMiddleware)
+app.use(adminRoutes)
 
 // Health check
 app.get('/api/health', (_req, res) => {
