@@ -61,6 +61,8 @@ export interface ExpertJob {
   window: ExpertWindow;
   chunks: ExpertChunk[];
   model_profile: string;
+  /** Profile-specific rules carried into the specialist prompt. */
+  profile_instructions?: string;
   attempt?: number;
   max_output_tokens?: number;
 }
@@ -125,6 +127,7 @@ Do not infer missing facts, merge ambiguous identities, or delete conflicting ob
 Return JSON only and follow the contract exactly.
 </instructions>
 
+${job.profile_instructions ? `<profile_instructions>\n${job.profile_instructions}\n</profile_instructions>\n` : ""}
 <output_contract>
 {
   "contract_version": 1,

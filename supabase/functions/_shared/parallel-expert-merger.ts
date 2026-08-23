@@ -24,6 +24,7 @@ import {
   type ExpertJob,
 } from "./parallel-expert-runner.ts";
 import type { GeminiModelConfig, GeminiModelProfile } from "./gemini-config.ts";
+import { buildSubBaseLocationsInstructions } from "./rules/prompt.ts";
 
 export interface ExpertArtifactLoadContext {
   project_id: string;
@@ -72,6 +73,8 @@ export interface ParallelExpertExecutionContext {
   extraction_run_id: string;
   branch_id: string | null;
   model_profile: GeminiModelProfile;
+  project_place_fields?: Array<{ place_type_key: string; field_key: string; label: string }>;
+  project_character_fields?: Array<{ field_key: string; label: string; group_key: string }>;
   chunks: ExpertChunk[];
   offset: number;
   limit: number;
