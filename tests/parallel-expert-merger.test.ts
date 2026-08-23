@@ -59,6 +59,8 @@ Deno.test("merger deterministically deduplicates candidates and preserves artifa
       confidence: 0.8,
     }],
   });
+  first.model = "gemini-3.5-flash";
+  second.model = "gemini-3.5-flash-lite";
 
   const merged = mergeValidatedExpertArtifacts([first, second]);
   const characters = merged.extraction.characters as Array<Record<string, unknown>>;
@@ -71,6 +73,11 @@ Deno.test("merger deterministically deduplicates candidates and preserves artifa
   assertEquals(mara.chunk_positions, [0, 2]);
   assertEquals((metadata.parallel_expert_artifacts as unknown[]).length, 2);
   assertEquals(merged.artifact_ids, ["artifact-1", "artifact-2"]);
+  assertEquals(merged.expert_models, [
+    { id: "artifact-1", role: "characters", window_id: "window-1", model: "gemini-3.5-flash" },
+    { id: "artifact-2", role: "characters", window_id: "window-2", model: "gemini-3.5-flash-lite" },
+  ]);
+  assertEquals(merged.extraction.__parallel_expert_artifacts, merged.expert_models);
   assertEquals(merged.usage.total_tokens, 32);
   assert((mara.source_references as Array<Record<string, unknown>>).every((reference) => reference.artifact_id));
 });

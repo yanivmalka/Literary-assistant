@@ -18,6 +18,7 @@ import {
 } from "./parallel-expert-artifacts.ts";
 import {
   createGeminiExpertInvoker,
+  PARALLEL_EXPERT_MODEL_ASSIGNMENTS,
   runParallelExpertJobs,
   type ExpertChunk,
   type ExpertJob,
@@ -47,9 +48,15 @@ export interface ValidatedExpertArtifact {
 
 export interface MergedParallelExtraction {
   extraction: Record<string, unknown[]> & {
-    __parallel_expert_artifacts?: Array<{ id: string; role: ExpertRole; window_id: string }>;
+    __parallel_expert_artifacts?: Array<{
+      id: string;
+      role: ExpertRole;
+      window_id: string;
+      model: string | null;
+    }>;
   };
   artifact_ids: string[];
+  expert_models: Array<{ id: string; role: ExpertRole; window_id: string; model: string | null }>;
   usage: TokenUsage;
   model: string;
   latency_ms: number;
@@ -69,6 +76,7 @@ export interface ParallelExpertExecutionContext {
   offset: number;
   limit: number;
   models?: GeminiModelConfig[];
+  models_by_role?: Partial<Record<ExpertRole, GeminiModelConfig[]>>;
   timeout_ms?: number;
   max_concurrent_roles?: number;
   min_interval_ms_per_role?: number;
@@ -453,15 +461,30 @@ export function mergeValidatedExpertArtifacts(
   artifacts: ValidatedExpertArtifact[],
 ): MergedParallelExtraction {
   const extraction: Record<string, unknown[]> & {
-    __parallel_expert_artifacts?: Array<{ id: string; role: ExpertRole; window_id: string }>;
+    __parallel_expert_artifacts?: Array<{
+      id: string;
+      role: ExpertRole;
+      window_id: string;
+      model: string | null;
+    }>;
   } = {};
-  const artifactMetadata: Array<{ id: string; role: ExpertRole; window_id: string }> = [];
+  const artifactMetadata: Array<{
+    id: string;
+    role: ExpertRole;
+    window_id: string;
+    model: string | null;
+  }> = [];
   const usage = emptyUsage();
   let latency_ms = 0;
 
   for (const artifact of artifacts) {
     const result = artifact.parsed_response;
-    artifactMetadata.push({ id: artifact.id, role: artifact.role, window_id: artifact.window.window_id });
+    artifactMetadata.push({
+      id: artifact.id,
+      role: artifact.role,
+      window_id: artifact.window.window_id,
+      model: artifact.model,
+    });
     addUsage(usage, artifact.usage);
     latency_ms += artifact.latency_ms;
     for (const entity of result.entities) addEntity(extraction, entity, artifact);
@@ -473,6 +496,7 @@ export function mergeValidatedExpertArtifacts(
   return {
     extraction,
     artifact_ids: artifactMetadata.map((artifact) => artifact.id),
+    expert_models: artifactMetadata,
     usage,
     model: "parallel-experts",
     latency_ms,
@@ -498,6 +522,7 @@ export async function executeParallelExpertExtraction(
   const invoker = createGeminiExpertInvoker({
     api_key: context.api_key,
     models: context.models,
+    models_by_role: context.models_by_role ?? PARALLEL_EXPERT_MODEL_ASSIGNMENTS,
     timeout_ms: context.timeout_ms,
   });
   const runResults = await runParallelExpertJobs(

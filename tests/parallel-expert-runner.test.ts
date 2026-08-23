@@ -1,6 +1,8 @@
 import {
   buildExpertPrompt,
+  createGeminiExpertInvoker,
   normalizeGeminiTokenUsage,
+  PARALLEL_EXPERT_MODEL_ASSIGNMENTS,
   runParallelExpertJobs,
   type ExpertArtifactContext,
   type ExpertInvocationResult,
@@ -18,6 +20,59 @@ const context: ExpertArtifactContext = {
   extraction_run_id: "run-1",
   branch_id: "branch-1",
 };
+
+Deno.test("parallel experts assign distinct primary models by specialist role", () => {
+  const primaryModels = [
+    PARALLEL_EXPERT_MODEL_ASSIGNMENTS.characters[0].id,
+    PARALLEL_EXPERT_MODEL_ASSIGNMENTS.locations[0].id,
+    PARALLEL_EXPERT_MODEL_ASSIGNMENTS.events[0].id,
+  ];
+
+  assertEquals(primaryModels, [
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+  ]);
+  assertEquals(new Set(primaryModels).size, 3);
+  assertEquals(PARALLEL_EXPERT_MODEL_ASSIGNMENTS.characters.length, 3);
+  assertEquals(PARALLEL_EXPERT_MODEL_ASSIGNMENTS.locations.length, 3);
+  assertEquals(PARALLEL_EXPERT_MODEL_ASSIGNMENTS.events.length, 3);
+});
+
+Deno.test("Gemini invoker propagates the model chain selected for each role", async () => {
+  const calls: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    calls.push(String(input));
+    return new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: "{}" }] } }],
+      usageMetadata: { totalTokenCount: 1 },
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }) as typeof fetch;
+
+  try {
+    const invoker = createGeminiExpertInvoker({
+      api_key: "test-key",
+      models_by_role: {
+        characters: [PARALLEL_EXPERT_MODEL_ASSIGNMENTS.characters[0]],
+        locations: [PARALLEL_EXPERT_MODEL_ASSIGNMENTS.locations[0]],
+        events: [PARALLEL_EXPERT_MODEL_ASSIGNMENTS.events[0]],
+      },
+    });
+
+    for (const role of ["characters", "locations", "events"] as const) {
+      await invoker(makeJob(role, `${role}-model`), "{}");
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assertEquals(calls.map((url) => url.split("/").pop()?.split(":")[0]), [
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+  ]);
+});
 
 function makeJob(role: ExpertJob["role"], windowId: string, offset = 0): ExpertJob {
   return {

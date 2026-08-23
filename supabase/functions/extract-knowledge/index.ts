@@ -1334,6 +1334,12 @@ Deno.serve(async (req) => {
     let modelUsed: string;
     let latencyMs: number;
     let usage: Record<string, unknown>;
+    let expertModels: Array<{
+      id: string;
+      role: string;
+      window_id: string;
+      model: string | null;
+    }> = [];
 
     if (extractionStrategy === "parallel-experts") {
       if (!extractionRunId) {
@@ -1355,6 +1361,7 @@ Deno.serve(async (req) => {
           limit,
         });
         extraction = merged.extraction as GeminiExtraction;
+        expertModels = merged.expert_models;
         modelUsed = merged.model;
         latencyMs = merged.latency_ms;
         usage = {
@@ -2285,6 +2292,7 @@ Deno.serve(async (req) => {
           model: modelUsed,
           model_profile: modelProfile,
           extraction_strategy: extractionStrategy,
+          expert_models: expertModels,
           input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
           output_tokens: (usage as Record<string, unknown>).candidatesTokenCount ?? null,
           thinking_tokens: (usage as Record<string, unknown>).thoughtsTokenCount ?? null,

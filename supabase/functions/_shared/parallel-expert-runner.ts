@@ -15,10 +15,40 @@ import type { ExpertArtifactInput } from "./parallel-expert-artifacts.ts";
 import { parseExtractionJson } from "../extract-knowledge/testable-pipeline.ts";
 import { callGeminiWithFallback, getGeminiResponseText } from "./gemini-client.ts";
 import {
+  GEMINI_MODELS,
   GEMINI_MODEL_PROFILES,
   isGeminiModelProfile,
   type GeminiModelConfig,
 } from "./gemini-config.ts";
+
+function configuredGeminiModel(id: string): GeminiModelConfig {
+  const model = GEMINI_MODELS.find((candidate) => candidate.id === id);
+  if (!model) throw new Error(`Parallel expert model is not configured: ${id}`);
+  return model;
+}
+
+/**
+ * Distinct primary models per specialist role. Each array remains an ordered
+ * fallback chain, so a transient failure falls back without collapsing roles
+ * onto one primary model.
+ */
+export const PARALLEL_EXPERT_MODEL_ASSIGNMENTS: Record<ExpertRole, GeminiModelConfig[]> = {
+  characters: [
+    configuredGeminiModel("gemini-3.5-flash"),
+    configuredGeminiModel("gemini-3.5-flash-lite"),
+    configuredGeminiModel("gemini-2.5-flash"),
+  ],
+  locations: [
+    configuredGeminiModel("gemini-3.5-flash-lite"),
+    configuredGeminiModel("gemini-2.5-flash"),
+    configuredGeminiModel("gemini-3.5-flash"),
+  ],
+  events: [
+    configuredGeminiModel("gemini-2.5-flash"),
+    configuredGeminiModel("gemini-3.5-flash"),
+    configuredGeminiModel("gemini-3.5-flash-lite"),
+  ],
+};
 
 export interface ExpertChunk {
   position: number;
@@ -334,6 +364,7 @@ export interface GeminiExpertInvokerOptions {
   api_key: string;
   timeout_ms?: number;
   models?: GeminiModelConfig[];
+  models_by_role?: Partial<Record<ExpertRole, GeminiModelConfig[]>>;
   max_output_tokens?: number;
 }
 
@@ -370,7 +401,10 @@ export function createGeminiExpertInvoker(
     if (!isGeminiModelProfile(job.model_profile)) {
       throw new Error(`No Gemini model profile configured for ${job.model_profile}`);
     }
-    const models = options.models ?? GEMINI_MODEL_PROFILES[job.model_profile];
+    const models = options.models_by_role?.[job.role]
+      ?? options.models
+      ?? PARALLEL_EXPERT_MODEL_ASSIGNMENTS[job.role]
+      ?? GEMINI_MODEL_PROFILES[job.model_profile];
     if (!models) throw new Error(`No Gemini model profile configured for ${job.model_profile}`);
 
     const response = await callGeminiWithFallback(
