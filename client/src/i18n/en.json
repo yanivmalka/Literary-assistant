@@ -827,6 +827,25 @@
         "contained_in": "Contained in"
       }
     },
+    "dev": {
+      "title": "Gemini Smoke Test",
+      "description": "Test connectivity: Frontend → Supabase Edge Function → Gemini 2.5 Flash → Frontend",
+      "prompt": "Prompt",
+      "promptPlaceholder": "Enter a prompt to send to Gemini...",
+      "waiting": "Waiting for Gemini...",
+      "test": "Test Gemini",
+      "networkError": "Network / Edge Function Error",
+      "geminiError": "Gemini Error (HTTP {{status}})",
+      "rawErrorDetails": "Raw error details",
+      "success": "Connection successful!",
+      "model": "Model",
+      "inputTokens": "Input Tokens",
+      "outputTokens": "Output Tokens",
+      "totalTokens": "Total Tokens",
+      "cachedTokens": "Cached Tokens",
+      "latency": "Latency",
+      "response": "Gemini Response"
+    },
     "character": {
       "addFieldTitle": "Add Character Field",
       "addFieldHint": "Choose a field from the catalog. It will be added to future extraction instructions and shown here even when it has no value yet.",

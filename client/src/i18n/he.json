@@ -827,6 +827,25 @@
         "contained_in": "מוכל בתוך"
       }
     },
+    "dev": {
+      "title": "בדיקת Gemini",
+      "description": "בדיקת תקשורת: Frontend → Supabase Edge Function → Gemini 2.5 Flash → Frontend",
+      "prompt": "פרומפט",
+      "promptPlaceholder": "הזן פרומפט לשליחה ל-Gemini...",
+      "waiting": "ממתין ל-Gemini...",
+      "test": "בדוק את Gemini",
+      "networkError": "שגיאת רשת / Edge Function",
+      "geminiError": "שגיאת Gemini (HTTP {{status}})",
+      "rawErrorDetails": "פרטי שגיאה גולמיים",
+      "success": "החיבור הצליח!",
+      "model": "מודל",
+      "inputTokens": "טוקני קלט",
+      "outputTokens": "טוקני פלט",
+      "totalTokens": "סך הטוקנים",
+      "cachedTokens": "טוקנים במטמון",
+      "latency": "השהיה",
+      "response": "תשובת Gemini"
+    },
     "character": {
       "addFieldTitle": "הוספת שדה דמות",
       "addFieldHint": "בחר שדה מהקטלוג. הוא יתווסף להוראות החילוץ העתידיות ויוצג כאן גם אם עדיין אין לו ערך.",

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase'
 import { Zap, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 
@@ -29,6 +30,7 @@ type GeminiResponse = SuccessResponse | ErrorResponse
 const DEFAULT_PROMPT = 'Describe a fantasy character in 2 sentences.'
 
 export default function DevTestPage() {
+  const { t } = useTranslation()
   const [prompt, setPrompt] = useState(DEFAULT_PROMPT)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<GeminiResponse | null>(null)
@@ -61,16 +63,16 @@ export default function DevTestPage() {
     <div className="max-w-4xl mx-auto p-6">
       <div className="flex items-center gap-3 mb-6">
         <Zap className="h-6 w-6 text-yellow-500" />
-        <h2 className="text-2xl font-bold">Gemini Smoke Test</h2>
+        <h2 className="text-2xl font-bold">{t('ui.dev.title')}</h2>
       </div>
 
       <p className="text-muted-foreground mb-6">
-        Tests connectivity: Frontend → Supabase Edge Function → Gemini 2.5 Flash → Frontend
+        {t('ui.dev.description')}
       </p>
 
       {/* Prompt input */}
       <div className="mb-4">
-        <label htmlFor="dev-test-prompt" className="block text-sm font-medium mb-2">Prompt</label>
+        <label htmlFor="dev-test-prompt" className="block text-sm font-medium mb-2">{t('ui.dev.prompt')}</label>
         <textarea
           id="dev-test-prompt"
           name="prompt"
@@ -79,7 +81,7 @@ export default function DevTestPage() {
           autoComplete="off"
           rows={4}
           className="w-full rounded-lg border bg-background p-3 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-primary/50"
-          placeholder="Enter a prompt to send to Gemini..."
+          placeholder={t('ui.dev.promptPlaceholder')}
         />
       </div>
 
@@ -92,12 +94,12 @@ export default function DevTestPage() {
         {loading ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            Waiting for Gemini...
+            {t('ui.dev.waiting')}
           </>
         ) : (
           <>
             <Zap className="h-4 w-4" />
-            Test Gemini
+            {t('ui.dev.test')}
           </>
         )}
       </button>
@@ -107,7 +109,7 @@ export default function DevTestPage() {
         <div className="mt-6 p-4 border border-destructive/50 bg-destructive/5 rounded-lg">
           <div className="flex items-center gap-2 text-destructive font-medium mb-1">
             <AlertCircle className="h-4 w-4" />
-            Network / Edge Function Error
+            {t('ui.dev.networkError')}
           </div>
           <p className="text-sm text-destructive/80">{networkError}</p>
         </div>
@@ -118,7 +120,7 @@ export default function DevTestPage() {
         <div className="mt-6 p-4 border border-destructive/50 bg-destructive/5 rounded-lg">
           <div className="flex items-center gap-2 text-destructive font-medium mb-2">
             <AlertCircle className="h-4 w-4" />
-            Gemini Error (HTTP {result.status})
+            {t('ui.dev.geminiError', { status: result.status })}
           </div>
           <p className="text-sm font-medium">{result.error}</p>
           {result.details && (
