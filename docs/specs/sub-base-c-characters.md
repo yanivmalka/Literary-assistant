@@ -341,17 +341,19 @@ Model A מקבל את כל ה־chunks של ה־batch, אך instruction שלו מ
 - [x] לתעד את מטרת C ואת גבולות Model A.
 - [x] להגדיר שדות קבועים, קשרים, שדות דינמיים והרחבות עתידיות.
 - [x] לבחור `gemini-3.5-flash-lite` כמודל ראשי.
-- [ ] לאשר את המזהה הפנימי `sub-base-c-characters`.
+- [x] לאשר את המזהה הפנימי `sub-base-c-characters`.
 
 ### שלב 1 — חוזה טהור ובדיקות
 
-- [ ] ליצור חוזה/validator ל־Character Specialist.
-- [ ] לאכוף `first_name` חובה לפני persistence.
-- [ ] להגדיר field evidence, confidence ו־inferred.
-- [ ] להגדיר taxonomy מנורמל של relationships.
-- [ ] להוסיף fixtures לדמויות מפורשות ומוסקות.
-- [ ] להוסיף בדיקות aliases, duplicate names, missing first name ו־conflicting fields.
-- [ ] לוודא שהחוזה מתעלם בשלב זה מ־objects/abilities/events/locations.
+- [x] ליצור חוזה/validator ל־Character Specialist.
+- [x] לאכוף `first_name` חובה לפני persistence.
+- [x] להגדיר field evidence, confidence ו־inferred.
+- [x] להגדיר taxonomy מנורמל של relationships.
+- [x] להוסיף fixtures לדמויות מפורשות ומוסקות.
+- [x] להוסיף בדיקות aliases, duplicate names, missing first name ו־conflicting fields.
+- [x] לוודא שהחוזה מתעלם בשלב זה מ־objects/abilities/events/locations.
+
+> שלב 1 אומת בבדיקות pure: 6 בדיקות Deno עברו, כולל validation, adapter, provenance, conflicts והרחבות עתידיות.
 
 ### שלב 2 — Prompt ו־Model A
 
