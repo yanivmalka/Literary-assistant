@@ -393,14 +393,16 @@ Model A מקבל את כל ה־chunks של ה־batch, אך instruction שלו מ
 
 > שלב 5 ממומש על גבי ה־Knowledge Layer הקיים: פרופיל C והפרופיל הישן של locations משתמשים בחוזה dynamic profile-aware, ה־Hub מציג Main או Effective Branch עם חיפוש מקומי, וה־tile/detail/expanded profile מציגים רק ערכים מאוכלסים. העריכה משתמשת במנגנון Main/Branch הקיים, מסנכרנת aliases בסקופ המתאים, ותומכת בהוספת שדות מהקטלוג או שדות עצמאיים מסוג `text`/`long_text`. ה־detail modal מציג provenance/evidence כאשר קיימים values/evidence, בעוד Objects ו־Abilities נשארים placeholders עבור C ללא fallback חילוץ פעיל.
 
-### שלב 6 — אימות חי
+### שלב 6 — אימות חי ✅
 
-- [ ] להריץ על fixture קטן ב־Free Tier.
-- [ ] לבדוק שלושה artifacts, role, actual model ו־fallback chain.
-- [ ] לבדוק raw response → artifact → merger → canonical entity.
-- [ ] לבדוק evidence, values ו־Main/Branch.
-- [ ] לבדוק UI מול נתונים חסרים, מוסקים, ידניים ודינמיים.
-- [ ] לתעד quota, latency, token usage ו־failure modes.
+- [x] להריץ על fixture קטן ומבודד ב־Free Tier.
+- [x] לבדוק artifact יחיד צפוי ל־C, role, actual model ו־fallback chain.
+- [x] לבדוק raw response → artifact → merger → canonical entity.
+- [x] לבדוק evidence, values ו־Main/Branch.
+- [x] לבדוק את מסלול ה־UI מול נתונים חסרים, provenance, עריכה ידנית ושדות דינמיים; בדיקת browser אינטראקטיבית נשארה מחוץ לסביבת האימות.
+- [x] לתעד quota, latency, token usage ו־failure modes.
+
+> אימות חי בוצע ב־23 באוגוסט 2026 על fixture ייעודי `tests/fixtures/SUB_BASE_C_CHARACTERS_TEST_DOCUMENT.md` וב־project מבודד. נוצר artifact אחד של `characters`, עם `character-specialist-v1`, primary ו־actual `gemini-3.5-flash-lite`, 4,199 tokens ו־6,329ms latency; fallback chain נשמר עם ניסיון primary מוצלח. ה־raw response עבר דרך ה־merger ונשמרו שתי ישויות `character`, 27 ערכים, 27 רשומות evidence וקשר `alliance` אחד. כל הכתיבה הייתה Main (`branch_id=NULL`), ללא Branch overlays וללא buckets של locations/events/objects/abilities. ה־wallet חויב ב־0 Quills וה־token remainder לאחר הריצה הוא 4,199. בהרצה זו המודל לא החזיר שדה עם `inferred=true` ולא בוצעה עריכת user חיה; מסלולי התצוגה והעריכה עבור שני המצבים נבדקו בקוד ובבדיקות המקומיות.
 
 ### שלב 7 — הרחבות עתידיות
 

@@ -334,3 +334,18 @@ All three profiles use the same Gemini fallback chain initially. Their Branch da
 Routing is project-wide rather than profile-specific: the first extraction run for a project with an empty Main layer uses `bootstrap` and writes to Main, regardless of the selected profile. Once Main contains entities, every later run uses the active Branch for the selected profile. Continuation batches keep the run's original profile, mode, and target Branch.
 
 Migration `supabase/migrations/133_sub_base_extraction_profiles.sql` renames persisted `current`/`development` values and expands the database constraints to include `sub-base-locations`.
+
+
+---
+
+## Execution addendum — Sub-base C Characters (2026-08-23)
+
+The preparation protocol in this file has now been complemented by a successful C-only live verification. The legacy four-scenario document remains historical and covers locations/objects/abilities that are not active C acceptance criteria. The authoritative result for `sub-base-c-characters` is:
+
+- `docs/reports/verification/SUB_BASE_C_CHARACTERS_LIVE_VERIFICATION.md`
+- Fixture: `tests/fixtures/SUB_BASE_C_CHARACTERS_TEST_DOCUMENT.md`
+- Project: `95ab8555-f335-45f2-a160-6a57dd243edf`
+- Extraction run: `89bc82ff-2bb6-4199-83d1-01f1fe7ab45f`
+- Result: one succeeded `characters` artifact, `gemini-3.5-flash-lite`, 4,199 tokens, 6,329ms artifact latency, 2 canonical characters, 27 values, 27 evidence rows, one relationship, Main-only routing, no future buckets, 0 Quills charged.
+
+The live run did not exercise a fallback response, a user-edited value, an `inferred=true` observation, or browser click-through. These limitations are recorded rather than treated as passes.
