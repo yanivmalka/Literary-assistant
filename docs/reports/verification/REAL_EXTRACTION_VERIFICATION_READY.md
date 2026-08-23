@@ -302,3 +302,16 @@ All preparation complete. Waiting for you to trigger extraction and run verifica
 **Prepared By:** Kiro AI Development Agent  
 **Version:** Final (Ready for verification)  
 
+
+
+---
+
+## Additional Required Verification: Full Character and Location Fields
+
+The four-scenario controlled extraction verification above is a baseline and does **not** prove complete Character or Location field coverage. The next required verification is documented in:
+
+- `docs/reports/verification/FULL_CHARACTER_LOCATION_EXTRACTION_VERIFICATION.md`
+- `tests/fixtures/FULL_CHARACTER_LOCATION_TEST_DOCUMENT.md`
+- `supabase/sql/verification/VERIFY_CHARACTER_LOCATION_FIELDS.sql`
+
+This additional gate covers all 20 active `CharacterFields` and all 9 active `LocationFields`, including raw Gemini output, normalized `knowledge_entities.structured_fields`, `knowledge_entity_values`, Main routing, provenance, and separate UI coverage. It also explicitly distinguishes extraction-contract gaps from normalization, persistence, value-sync, routing, and UI failures.
