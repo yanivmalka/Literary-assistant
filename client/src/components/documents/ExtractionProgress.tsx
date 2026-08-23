@@ -12,6 +12,7 @@ export default function ExtractionProgress() {
     extractionDone,
     extractionCancelled,
     extractionError,
+    extractionWarnings,
     extractionProgress,
     cancelExtraction,
     dismissExtractionStatus,
@@ -54,6 +55,36 @@ export default function ExtractionProgress() {
   const handleDismiss = () => {
     setShowCancelWarning(false)
     dismissExtractionStatus()
+  }
+
+  // Completed with warnings state
+  if (extractionDone && extractionWarnings.length > 0) {
+    const hasSafetySkips = extractionWarnings.some((warning) => warning.reason === 'safety_block')
+    const hasTransientSkips = extractionWarnings.some((warning) => warning.reason === 'transient_failure')
+
+    return (
+      <div className="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-amber-700">
+            <AlertTriangle className="h-5 w-5" />
+            <span className="text-sm font-medium">{t('documents.extraction.completedWithWarnings')}</span>
+          </div>
+        </div>
+        {progress && (
+          <p className="text-xs text-amber-700 ps-7">
+            {t('documents.extraction.completedWithWarningsSummary', {
+              entities: progress.entitiesSaved,
+              events: progress.eventsSaved,
+              chunks: progress.skippedChunks,
+            })}
+          </p>
+        )}
+        <div className="space-y-1 ps-7 text-xs text-amber-700">
+          {hasSafetySkips && <p>{t('documents.extraction.safetySkipped')}</p>}
+          {hasTransientSkips && <p>{t('documents.extraction.transientSkipped')}</p>}
+        </div>
+      </div>
+    )
   }
 
   // Completed state

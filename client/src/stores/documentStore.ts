@@ -384,8 +384,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         eventsSaved: 0,
         skippedBatches: 0,
         skippedChunks: 0,
+      },
+    })
 
-      console.error('[DIAGNOSTIC] triggerEntityExtraction() - No document chunks available for extraction - versionId:', versionId)
+    if (total === 0) {
       set({
         extractionInProgress: false,
         extractionError: 'ui.documents.extractionError',
@@ -586,7 +588,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     // so the client falls back to the individual entity/event/relationship
     // counters above.
     if (done) {
-      if (totalPersisted === 0) {
+      if (totalPersisted === 0 && extractionWarnings.length === 0) {
         console.warn('[Knowledge] Extraction completed without persisting any entities, relationships, or events')
         set({
           extractionInProgress: false,
@@ -599,6 +601,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       set({
         extractionInProgress: false,
         extractionDone: true,
+        extractionWarnings,
       })
       // The extraction and entity stores are independent; refresh the cache
       // before the completion message is dismissed or the user opens Knowledge.
@@ -616,6 +619,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       extractionDone: false,
       extractionCancelled: false,
       extractionError: null,
+      extractionWarnings: [],
       extractionProgress: null,
       extractionDocumentId: null,
     })

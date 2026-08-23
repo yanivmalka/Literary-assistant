@@ -77,6 +77,8 @@ interface ExtractRequest {
   // CRITICAL FIX: Extraction-level context instead of per-batch decisions
   extraction_mode?: 'bootstrap' | 'branch';
   extraction_run_id?: string;
+  /** Server-side allowlisted model profile, fixed for every batch in a run. */
+  model_profile?: GeminiModelProfile;
   /** Allow only sub-base-locations to continue after a classified Gemini batch failure. */
   skip_per_batch?: boolean;
 }
