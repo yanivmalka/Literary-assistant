@@ -90,7 +90,7 @@ export default function TimelinePage() {
                     {/* Location */}
                     {event.location && (
                       <div className="text-sm mb-2">
-                        <span className="font-medium">Location:</span>{' '}
+                        <span className="font-medium">{t('timeline.location')}:</span>{' '}
                         <span className="text-muted-foreground">{event.location}</span>
                       </div>
                     )}
@@ -99,7 +99,7 @@ export default function TimelinePage() {
                     {event.participants.length > 0 && (
                       <div className="mt-3 pt-3 border-t">
                         <p className="text-xs font-medium mb-2 text-muted-foreground">
-                          Participants
+                          {t('timeline.participants')}
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {event.participants.map(participant => (
@@ -125,7 +125,7 @@ export default function TimelinePage() {
                     {/* Branch indicator */}
                     {event.branch_id && (
                       <div className="mt-3 text-xs text-amber-600 bg-amber-50 rounded px-2 py-1 inline-block">
-                        Branch proposal
+                        {t('timeline.branchProposal')}
                       </div>
                     )}
                   </div>

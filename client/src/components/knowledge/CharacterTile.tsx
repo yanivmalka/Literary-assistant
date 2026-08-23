@@ -58,7 +58,7 @@ export default function CharacterTile({ character, modelProfile, onClick, onEdit
           <div className="grid grid-cols-2 gap-3 mb-4">
             {dynamicFields.map(({ key, value, definition }) => (
               <div key={key}>
-                <p className="text-xs text-muted-foreground font-medium">{definition?.label || key}</p>
+                <p className="text-xs text-muted-foreground font-medium">{t(`entityFields.dynamic.${key}`, { defaultValue: definition?.label || key })}</p>
                 <p className="text-sm">{Array.isArray(value) ? value.join(', ') : String(value)}</p>
               </div>
             ))}

@@ -544,6 +544,7 @@
     "aliasesPlaceholder": "כינויים מופרדים בפסיק",
     "aliasesHint": "שמות נוספים או כינויים של הישות, מופרדים בפסיקים",
     "basicInfo": "מידע בסיסי",
+    "dynamicFields": "שדות שחולצו",
     "location": "מיקום",
     "dynamic": {
       "last_name": "שם משפחה",
@@ -574,6 +575,7 @@
       "narrative_impact": "השפעה על העלילה",
       "groups": {
         "identity": "זהות ופרטים אישיים",
+        "identityShort": "זהות",
         "traits": "תכונות",
         "appearance": "מראה חיצוני",
         "world": "עולם הדמות",

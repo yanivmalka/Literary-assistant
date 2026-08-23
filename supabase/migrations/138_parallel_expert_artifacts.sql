@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.extraction_expert_artifacts (
   role TEXT NOT NULL
     CHECK (role IN ('characters', 'locations', 'events')),
   window_id TEXT NOT NULL,
-  offset INTEGER NOT NULL CHECK (offset >= 0),
+  "offset" INTEGER NOT NULL CHECK ("offset" >= 0),
   chunk_limit INTEGER NOT NULL CHECK (chunk_limit > 0),
   chunk_positions JSONB NOT NULL DEFAULT '[]'::jsonb,
   status TEXT NOT NULL DEFAULT 'pending'

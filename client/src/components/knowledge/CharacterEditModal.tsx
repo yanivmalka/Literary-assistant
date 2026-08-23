@@ -31,6 +31,19 @@ interface FormData {
   [key: string]: string | null
 }
 
+const DYNAMIC_GROUP_TRANSLATION_KEYS: Record<string, string> = {
+  'זהות': 'entityFields.dynamic.groups.identityShort',
+  'זהות ופרטים אישיים': 'entityFields.dynamic.groups.identity',
+  'תכונות': 'entityFields.dynamic.groups.traits',
+  'מראה חיצוני': 'entityFields.dynamic.groups.appearance',
+  'עולם הדמות': 'entityFields.dynamic.groups.world',
+  'ניתוח ותיאור': 'entityFields.dynamic.groups.analysis',
+}
+
+function dynamicGroupLabel(groupKey: string, translate: (key: string, options?: { defaultValue?: string }) => string) {
+  return translate(DYNAMIC_GROUP_TRANSLATION_KEYS[groupKey] || groupKey, { defaultValue: groupKey })
+}
+
 export default function CharacterEditModal({
   isOpen,
   character,
@@ -88,7 +101,7 @@ export default function CharacterEditModal({
     groups.set('זהות', [{
       model_profile: DYNAMIC_CHARACTER_PROFILE,
       field_key: 'name',
-      label: 'שם פרטי',
+      label: t('entityFields.name'),
       field_type: 'text',
       group_key: 'זהות',
       options: [],
@@ -301,7 +314,7 @@ export default function CharacterEditModal({
                 className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
               >
                 <h3 className="font-semibold text-muted-foreground">
-                  {isDynamicProfile ? ('label' in group ? group.label : group.labelKey) : t(group.labelKey)}
+                  {isDynamicProfile ? dynamicGroupLabel(group.key, t) : t(group.labelKey)}
                 </h3>
                 {expandedGroups.has(group.key) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
@@ -313,7 +326,7 @@ export default function CharacterEditModal({
                     const value = formData[fieldKey] ?? ''
                     const isTextarea = fieldDefinition?.field_type === 'long_text' || TEXTAREA_FIELDS.has(fieldKey)
                     const fieldLabel = isDynamicProfile && fieldDefinition
-                      ? fieldDefinition.label
+                      ? t(`entityFields.dynamic.${fieldKey}`, { defaultValue: fieldDefinition?.label || fieldKey })
                       : t(`entityFields.${fieldKey}`, { defaultValue: fieldKey })
                     return (
                       <div key={fieldKey}>

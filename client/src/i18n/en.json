@@ -544,6 +544,7 @@
     "aliasesPlaceholder": "Aliases separated by comma",
     "aliasesHint": "Alternative names or nicknames for this entity, separated by commas",
     "basicInfo": "Basic Information",
+    "dynamicFields": "Extracted Fields",
     "location": "Location",
     "dynamic": {
       "last_name": "Last Name",
@@ -574,6 +575,7 @@
       "narrative_impact": "Narrative Impact",
       "groups": {
         "identity": "Identity and Personal Details",
+        "identityShort": "Identity",
         "traits": "Traits",
         "appearance": "Appearance",
         "world": "World of the Character",

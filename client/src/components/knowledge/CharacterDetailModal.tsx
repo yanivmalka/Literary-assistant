@@ -202,13 +202,13 @@ export default function CharacterDetailModal({
               {modelProfile === DYNAMIC_CHARACTER_PROFILE && dynamicFields.length > 0 && (
                 <div>
                   <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                    שדות שחולצו
+                    {t('entityFields.dynamicFields')}
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     {dynamicFields.map(({ key, value, definition }) => (
                       <div key={key} className="p-3 bg-muted/50 rounded">
                         <p className="text-xs text-muted-foreground font-medium mb-1">
-                          {definition?.label || key}
+                          {t(`entityFields.dynamic.${key}`, { defaultValue: definition?.label || key })}
                         </p>
                         <p className="font-medium">
                           {Array.isArray(value) ? value.join(', ') : String(value)}

@@ -156,15 +156,15 @@ export default function AccountSettingsPage() {
         <div className="border rounded-lg p-6 bg-card mb-6">
           <h2 className="text-xl font-semibold mb-4">{t('ui.account.accountInformation')}</h2>
           <div className="space-y-2 text-sm">
-            <p><span className="text-muted-foreground">Email:</span> {user.email}</p>
-            <p><span className="text-muted-foreground">User ID:</span> <code className="text-xs bg-muted px-2 py-1 rounded">{user.id.slice(0, 8)}...</code></p>
-            <p><span className="text-muted-foreground">Created:</span> {new Date(user.created_at || '').toLocaleDateString()}</p>
+            <p><span className="text-muted-foreground">{t('ui.account.email')}</span> {user.email}</p>
+            <p><span className="text-muted-foreground">{t('ui.account.userId')}</span> <code className="text-xs bg-muted px-2 py-1 rounded">{user.id.slice(0, 8)}...</code></p>
+            <p><span className="text-muted-foreground">{t('ui.account.created')}</span> {new Date(user.created_at || '').toLocaleDateString()}</p>
           </div>
         </div>
 
         {/* Authentication Methods */}
         <div className="border rounded-lg p-6 bg-card mb-6">
-          <h2 className="text-xl font-semibold mb-6">Authentication Methods</h2>
+          <h2 className="text-xl font-semibold mb-6">{t('ui.account.authenticationMethods')}</h2>
           
           <div className="space-y-4">
             {/* Email/Password */}
@@ -173,15 +173,15 @@ export default function AccountSettingsPage() {
                 <div className="flex items-center gap-3">
                   <Mail className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">Email & Password</p>
+                    <p className="font-medium">{t('ui.account.emailPassword')}</p>
                     <p className="text-sm text-muted-foreground">
-                      {hasEmailIdentity ? 'Connected ✓' : 'Not connected'}
+                      {hasEmailIdentity ? t('ui.account.connected') : t('ui.account.notConnected')}
                     </p>
                   </div>
                 </div>
                 {hasEmailIdentity && (
                   <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                    Active
+                    {t('ui.account.active')}
                   </span>
                 )}
               </div>
@@ -195,7 +195,7 @@ export default function AccountSettingsPage() {
                       className="flex items-center gap-2 text-sm text-primary hover:underline"
                     >
                       <Lock className="h-4 w-4" />
-                      Add Password
+                      {t('ui.account.addPassword')}
                     </button>
                   ) : (
                     <form onSubmit={handleAddPassword} className="space-y-3">
@@ -203,7 +203,7 @@ export default function AccountSettingsPage() {
                         id="new-password"
                         name="new-password"
                         type="password"
-                        placeholder="New password"
+                        placeholder={t('ui.account.newPassword')}
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
                         className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
@@ -215,7 +215,7 @@ export default function AccountSettingsPage() {
                         id="confirm-password"
                         name="confirm-password"
                         type="password"
-                        placeholder="Confirm password"
+                        placeholder={t('ui.account.confirmPassword')}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm"
@@ -229,7 +229,7 @@ export default function AccountSettingsPage() {
                           disabled={passwordLoading}
                           className="flex-1 py-2 px-3 bg-primary text-primary-foreground text-sm rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
                         >
-                          {passwordLoading ? 'Adding...' : 'Add Password'}
+                          {passwordLoading ? t('ui.account.adding') : t('ui.account.addPassword')}
                         </button>
                         <button
                           type="button"
@@ -240,7 +240,7 @@ export default function AccountSettingsPage() {
                           }}
                           className="flex-1 py-2 px-3 border text-sm rounded-md hover:bg-muted transition-colors"
                         >
-                          Cancel
+                          {t('ui.account.cancel')}
                         </button>
                       </div>
                     </form>
@@ -255,15 +255,15 @@ export default function AccountSettingsPage() {
                 <div className="flex items-center gap-3">
                   <Chrome className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">Google Account</p>
+                    <p className="font-medium">{t('ui.account.googleAccount')}</p>
                     <p className="text-sm text-muted-foreground">
-                      {hasGoogleIdentity ? 'Connected ✓' : 'Not connected'}
+                      {hasGoogleIdentity ? t('ui.account.connected') : t('ui.account.notConnected')}
                     </p>
                   </div>
                 </div>
                 {hasGoogleIdentity && (
                   <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                    Active
+                    {t('ui.account.active')}
                   </span>
                 )}
               </div>
@@ -277,14 +277,14 @@ export default function AccountSettingsPage() {
                     className="flex items-center gap-2 text-sm text-primary hover:underline disabled:opacity-50"
                   >
                     <Chrome className="h-4 w-4" />
-                    {linkingLoading ? 'Linking...' : 'Link Google Account'}
+                    {linkingLoading ? t('ui.account.linking') : t('ui.account.linkGoogle')}
                   </button>
                 </div>
               )}
 
               {hasGoogleIdentity && (
                 <div className="mt-4 pt-4 border-t text-xs text-muted-foreground">
-                  <p>You can sign in with your Google account.</p>
+                  <p>{t('ui.account.canSignInGoogle')}</p>
                 </div>
               )}
             </div>
@@ -293,13 +293,13 @@ export default function AccountSettingsPage() {
           {/* Summary */}
           <div className="mt-6 pt-6 border-t">
             <p className="text-sm text-muted-foreground">
-              {hasEmailIdentity && hasGoogleIdentity
-                ? '✓ Both authentication methods are linked to this account.'
+                  {hasEmailIdentity && hasGoogleIdentity
+                ? t('ui.account.bothLinked')
                 : hasEmailIdentity
-                ? 'You can link a Google account for easier sign-in.'
+                ? t('ui.account.linkGoogleHint')
                 : hasGoogleIdentity
-                ? 'You can add a password for email-based sign-in.'
-                : 'Unknown authentication state'}
+                ? t('ui.account.addPasswordHint')
+                : t('ui.account.unknownAuthState')}
             </p>
           </div>
         </div>
@@ -307,8 +307,7 @@ export default function AccountSettingsPage() {
         {/* Info Box */}
         <div className="border border-muted rounded-lg p-4 bg-muted/20 text-sm text-muted-foreground">
           <p>
-            <strong>Note:</strong> When you link multiple authentication methods, they all use the same account. 
-            You can sign in using any linked method and access the same data and settings.
+            <strong>{t('ui.account.note')}</strong> {t('ui.account.sameAccount')} {t('ui.account.sameData')}
           </p>
         </div>
       </div>
