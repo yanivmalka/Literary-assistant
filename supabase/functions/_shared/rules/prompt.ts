@@ -229,7 +229,7 @@ ${chunksText}`;
 
 
 
-export type ExtractionPromptProfile = "sub-base" | "sub-base-2" | "sub-base-locations";
+export type ExtractionPromptProfile = "sub-base" | "sub-base-2" | "sub-base-locations" | "sub-base-c-characters";
 
 const SUB_BASE_2_PROFILE_INSTRUCTIONS = `=== SUB-BASE-2 PROFILE INSTRUCTIONS ===
 This is the sub-base-2 extraction profile. Keep the same JSON schema and evidence requirements as the sub-base profile, but this section is intentionally isolated so this profile's extraction instructions can evolve without changing the other profiles.
@@ -255,6 +255,25 @@ PLACE TYPE CATALOG (choose the closest type; do not impose a fixed hierarchy):
 - Do not invent location fields or containment when the text provides no evidence.
 `;
 
+const CHARACTER_PROFILE_INSTRUCTIONS = `=== SUB-BASE C CHARACTER MODEL A INSTRUCTIONS ===
+This is the isolated Sub-base C character-only profile. Extract only named or clearly identifiable characters, their grounded character fields, and relationships between characters.
+
+IDENTITY AND FIELD RULES:
+- first_name is mandatory. Do not return a character candidate without a confidently identified first name.
+- Keep first_name and last_name separate. Do not put the ordinary first name in aliases.
+- aliases may include nicknames, shortened forms, pseudonyms, insults, or humorous names that refer to the same character.
+- Extract only populated fields. Never emit null, empty, or guessed values for absent fields.
+- You may infer personality, fears, habits, motives, and appearance traits from repeated or strongly supported behavior, but every inferred field must include evidence, confidence, inferred=true, and a short inference_note.
+- Explicit facts must still include evidence, confidence, and inferred=false.
+- Use the fixed field names supplied by the Model A contract. Project-defined fields may be returned only when listed in the selected project fields section.
+
+SUPPORTED FIXED FIELDS:
+first_name, last_name, aliases, age, gender, sexual_orientation, pronouns, occupation, hobbies, favorite_foods, disliked_foods, religion, beliefs, race, height, narrative_role, status, personality_traits, strengths, weaknesses, fears, goals_and_desires, values_and_principles, habits_and_mannerisms, speech_style, secrets, emotional_state, eye_color, eye_shape, eye_size, skin_color, hair_color, hair_type, tattoos, scars, jewelry, body_type, facial_features, distinguishing_features, typical_clothing, posture_and_body_language, appearance_traits.
+
+RELATIONSHIPS:
+Use only these relationship_type values: acquaintance, friendship, friendship_deep, family, romantic_relationship, hostility, rivalry, alliance, mentorship, work_subordinate, work_supervisor, protection_or_dependency, no_significant_bond.
+`;
+
 const DYNAMIC_CHARACTER_FIELD_INSTRUCTIONS = `=== DYNAMIC CHARACTER FIELDS — SUB-BASE-LOCATIONS ONLY ===
 For characters in this profile, use attributes.character_fields for the selected project fields listed below.
 Keep the exact field_key. Extract a field only when the source explicitly supports it; otherwise omit the key entirely.
@@ -273,6 +292,20 @@ export interface ProjectPlaceFieldPromptDefinition {
   place_type_key: string;
   field_key: string;
   label: string;
+}
+
+export function buildSubBaseCCharactersInstructions(
+  dynamicCharacterFields: DynamicCharacterFieldPromptDefinition[] = [],
+): string {
+  const sections = [CHARACTER_PROFILE_INSTRUCTIONS];
+  if (dynamicCharacterFields.length > 0) {
+    sections.push(`=== PROJECT-SPECIFIC CHARACTER FIELDS ===
+Return these fields only when the source supports them. Keep the exact field_key and include the same evidence/confidence/inferred metadata as fixed fields.
+${dynamicCharacterFields
+  .map(field => `- ${field.field_key} (${field.label}; group: ${field.group_key})`)
+  .join("\n")}`);
+  }
+  return sections.join("\n");
 }
 
 /**
@@ -320,6 +353,10 @@ export function buildExtractionPromptForProfile(
 
   if (profile === "sub-base") {
     return basePrompt;
+  }
+
+  if (profile === "sub-base-c-characters") {
+    return `${basePrompt}\n${buildSubBaseCCharactersInstructions(dynamicCharacterFields)}`;
   }
 
   const subBase2Prompt = `${basePrompt}\n${SUB_BASE_2_PROFILE_INSTRUCTIONS}`;

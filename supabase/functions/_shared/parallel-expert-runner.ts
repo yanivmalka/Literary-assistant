@@ -19,7 +19,14 @@ import {
   GEMINI_MODEL_PROFILES,
   isGeminiModelProfile,
   type GeminiModelConfig,
+  type GeminiModelProfile,
 } from "./gemini-config.ts";
+import type { FallbackAttempt } from "./gemini-client.ts";
+import {
+  CHARACTER_SPECIALIST_PROFILE,
+  characterSpecialistToExpertExtractionResult,
+  validateCharacterSpecialistResult,
+} from "./character-specialist.ts";
 
 function configuredGeminiModel(id: string): GeminiModelConfig {
   const model = GEMINI_MODELS.find((candidate) => candidate.id === id);
@@ -50,6 +57,15 @@ export const PARALLEL_EXPERT_MODEL_ASSIGNMENTS: Record<ExpertRole, GeminiModelCo
   ],
 };
 
+/** Profile-specific role assignments take precedence over legacy role defaults. */
+export const PARALLEL_EXPERT_MODEL_ASSIGNMENTS_BY_PROFILE: Partial<
+  Record<GeminiModelProfile, Partial<Record<ExpertRole, GeminiModelConfig[]>>>
+> = {
+  [CHARACTER_SPECIALIST_PROFILE]: {
+    characters: GEMINI_MODEL_PROFILES[CHARACTER_SPECIALIST_PROFILE],
+  },
+};
+
 export interface ExpertChunk {
   position: number;
   content: string;
@@ -72,6 +88,27 @@ export interface ExpertInvocationResult {
   response_text: string;
   usage: TokenUsage;
   latency_ms: number;
+  primary_model: string;
+  fallback_chain: FallbackAttempt[];
+}
+
+export interface ExpertInvocationTelemetry {
+  model?: string | null;
+  raw_response?: Record<string, unknown> | null;
+  usage?: Partial<TokenUsage> | null;
+  latency_ms?: number | null;
+  primary_model?: string | null;
+  fallback_chain?: FallbackAttempt[] | null;
+}
+
+export class ExpertInvocationError extends Error {
+  readonly telemetry: ExpertInvocationTelemetry;
+
+  constructor(message: string, telemetry: ExpertInvocationTelemetry = {}) {
+    super(message);
+    this.name = "ExpertInvocationError";
+    this.telemetry = telemetry;
+  }
 }
 
 export type ExpertInvoker = (job: ExpertJob, prompt: string) => Promise<ExpertInvocationResult>;
@@ -113,22 +150,53 @@ export function buildExpertPrompt(job: ExpertJob): string {
   const chunks = job.chunks
     .map((chunk) => `<chunk position="${chunk.position}">\n${chunk.content}\n</chunk>`)
     .join("\n\n");
-
-  return `<role>
-You are the ${job.role} specialist in a multi-stage literary extraction pipeline.
-</role>
-
-<instructions>
-${ROLE_INSTRUCTIONS[job.role]}
-Extract only facts explicitly supported by the supplied source text.
-Preserve exact evidence and chunk positions for every candidate.
-Do not infer missing facts, merge ambiguous identities, or delete conflicting observations.
-Return JSON only and follow the contract exactly.
-</instructions>
-
-${job.profile_instructions ? `<profile_instructions>\n${job.profile_instructions}\n</profile_instructions>\n` : ""}
-<output_contract>
-{
+  const isCharacterModelA = job.model_profile === CHARACTER_SPECIALIST_PROFILE;
+  const instructions = isCharacterModelA
+    ? "Extract only characters, character fields, and relationships between characters. Do not return locations, events, objects, abilities, or magic abilities. Inference is allowed only when the Model A profile rules require evidence, confidence, inferred, and inference_note metadata."
+    : ROLE_INSTRUCTIONS[job.role];
+  const outputContract = isCharacterModelA
+    ? `{
+  "contract_version": 1,
+  "role": "characters",
+  "window": {
+    "window_id": "${job.window.window_id}",
+    "offset": ${job.window.offset},
+    "limit": ${job.window.limit},
+    "chunk_positions": [number]
+  },
+  "characters": [{
+    "name": "string",
+    "first_name": "string",
+    "last_name": "string or null",
+    "aliases": ["string"],
+    "fields": {
+      "field_key": {
+        "value": "any JSON value",
+        "evidence": [{"chunk_position": number, "quote": "string or null", "page": number or null}],
+        "confidence": number or null,
+        "inferred": boolean,
+        "inference_note": "string or null"
+      }
+    },
+    "evidence": ["string"],
+    "chunk_positions": [number],
+    "source_references": [{"chunk_position": number, "quote": "string or null", "page": number or null}],
+    "confidence": number or null
+  }],
+  "relationships": [{
+    "source": "character name",
+    "target": "character name",
+    "relationship_type": "acquaintance | friendship | friendship_deep | family | romantic_relationship | hostility | rivalry | alliance | mentorship | work_subordinate | work_supervisor | protection_or_dependency | no_significant_bond",
+    "evidence": ["string"],
+    "chunk_positions": [number],
+    "source_references": [{"chunk_position": number, "quote": "string or null", "page": number or null}],
+    "confidence": number or null,
+    "inferred": boolean,
+    "inference_note": "string or null"
+  }],
+  "unresolved_references": ["string"]
+}`
+    : `{
   "contract_version": 1,
   "role": "${job.role}",
   "window": {
@@ -167,12 +235,9 @@ ${job.profile_instructions ? `<profile_instructions>\n${job.profile_instructions
     "confidence": number or null
   }],
   "unresolved_references": ["string"]
-}
-</output_contract>
+}`;
 
-<source_context>
-${chunks}
-</source_context>`;
+  return `<role>\nYou are the ${job.role} specialist in a multi-stage literary extraction pipeline.\n</role>\n\n<instructions>\n${instructions}\nExtract only facts supported by the supplied source text and the profile rules.\nPreserve exact evidence and chunk positions for every candidate.\nDo not merge ambiguous identities or delete conflicting observations.\nReturn JSON only and follow the contract exactly.\n</instructions>\n\n${job.profile_instructions ? `<profile_instructions>\n${job.profile_instructions}\n</profile_instructions>\n` : ""}\n<output_contract>\n${outputContract}\n</output_contract>\n\n<source_context>\n${chunks}\n</source_context>`;
 }
 
 function emptyUsage(): TokenUsage {
@@ -221,10 +286,11 @@ async function invokeWithTimeout(
 function artifactInput(
   job: ExpertJob,
   status: ExpertArtifactInput["status"],
-  invocation: ExpertInvocationResult | null,
+  invocation: ExpertInvocationTelemetry | null,
   parsed: ExpertExtractionResult | null,
   error: string | null,
   attempt: number,
+  artifact_contract = "expert-extraction-v1",
 ): ExpertArtifactInput {
   return {
     project_id: "",
@@ -238,7 +304,10 @@ function artifactInput(
     window: job.window,
     status,
     attempt,
+    artifact_contract,
+    primary_model: invocation?.primary_model ?? null,
     model: invocation?.model ?? null,
+    fallback_chain: invocation?.fallback_chain ?? null,
     raw_response: invocation?.raw_response ?? null,
     parsed_response: parsed,
     error_message: error,
@@ -261,6 +330,25 @@ function withArtifactContext(
   context: ExpertArtifactContext,
 ): ExpertArtifactInput {
   return { ...input, ...context };
+}
+
+function validateJobResult(
+  value: unknown,
+  job: ExpertJob,
+): { valid: true; value: ExpertExtractionResult; artifact_contract: string } | { valid: false; errors: string[] } {
+  if (job.model_profile === CHARACTER_SPECIALIST_PROFILE) {
+    const validation = validateCharacterSpecialistResult(value);
+    if (!validation.valid) return validation;
+    return {
+      valid: true,
+      value: characterSpecialistToExpertExtractionResult(validation.value),
+      artifact_contract: "character-specialist-v1",
+    };
+  }
+
+  const validation = validateExpertExtractionResult(value);
+  if (!validation.valid) return validation;
+  return { valid: true, value: validation.value, artifact_contract: "expert-extraction-v1" };
 }
 
 async function runOneExpertJob(
@@ -304,12 +392,20 @@ async function runOneExpertJob(
       buildExpertPrompt(job),
       options.timeout_ms ?? DEFAULT_EXPERT_TIMEOUT_MS,
     );
-    const parsed = parseExtractionJson<unknown>(invocation.response_text);
-    const validation = validateExpertExtractionResult(parsed);
+    const parsedPayload = parseExtractionJson<unknown>(invocation.response_text);
+    const validation = validateJobResult(parsedPayload, job);
     if (!validation.valid) {
       const error = `Invalid expert result: ${validation.errors.join("; ")}`;
       logExpertFailure(job, "result-validation", error);
-      await persist(artifactInput(job, "failed", invocation, null, error, attempt));
+      await persist(artifactInput(
+        job,
+        "failed",
+        invocation,
+        null,
+        error,
+        attempt,
+        job.model_profile === CHARACTER_SPECIALIST_PROFILE ? "character-specialist-v1" : "expert-extraction-v1",
+      ));
       return { role: job.role, window_id: job.window.window_id, status: "failed", model: invocation.model, result: null, usage: invocation.usage, error };
     }
 
@@ -319,17 +415,42 @@ async function runOneExpertJob(
     if (!budgetResult.ok) {
       const error = `Token budget exceeded for ${job.role}: ${budgetResult.state.consumed}/${budgetResult.state.limit}`;
       logExpertFailure(job, "token-budget-after-invocation", error);
-      await persist(artifactInput(job, "failed", invocation, null, error, attempt));
+      await persist(artifactInput(job, "failed", invocation, null, error, attempt, validation.artifact_contract));
       return { role: job.role, window_id: job.window.window_id, status: "failed", model: invocation.model, result: null, usage: invocation.usage, error };
     }
 
-    await persist(artifactInput(job, "succeeded", invocation, validation.value, null, attempt));
+    await persist(artifactInput(job, "succeeded", invocation, validation.value, null, attempt, validation.artifact_contract));
     return { role: job.role, window_id: job.window.window_id, status: "succeeded", model: invocation.model, result: validation.value, usage: invocation.usage, error: null };
   } catch (error) {
     const message = errorMessage(error);
+    const failureTelemetry = error instanceof ExpertInvocationError
+      ? error.telemetry
+      : invocation;
     logExpertFailure(job, "invocation-or-persistence", message);
-    await persist(artifactInput(job, "failed", invocation, null, message, attempt));
-    return { role: job.role, window_id: job.window.window_id, status: "failed", model: invocation?.model ?? null, result: null, usage: invocation?.usage ?? null, error: message };
+    await persist(artifactInput(
+      job,
+      "failed",
+      failureTelemetry,
+      null,
+      message,
+      attempt,
+      job.model_profile === CHARACTER_SPECIALIST_PROFILE ? "character-specialist-v1" : "expert-extraction-v1",
+    ));
+    return {
+      role: job.role,
+      window_id: job.window.window_id,
+      status: "failed",
+      model: failureTelemetry?.model ?? null,
+      result: null,
+      usage: failureTelemetry?.usage ? {
+        input_tokens: failureTelemetry.usage.input_tokens ?? 0,
+        output_tokens: failureTelemetry.usage.output_tokens ?? 0,
+        thinking_tokens: failureTelemetry.usage.thinking_tokens ?? 0,
+        cached_tokens: failureTelemetry.usage.cached_tokens ?? 0,
+        total_tokens: failureTelemetry.usage.total_tokens ?? 0,
+      } : null,
+      error: message,
+    };
   }
 }
 
@@ -427,6 +548,7 @@ export function createGeminiExpertInvoker(
     }
     const models = options.models_by_role?.[job.role]
       ?? options.models
+      ?? PARALLEL_EXPERT_MODEL_ASSIGNMENTS_BY_PROFILE[job.model_profile]?.[job.role]
       ?? PARALLEL_EXPERT_MODEL_ASSIGNMENTS[job.role]
       ?? GEMINI_MODEL_PROFILES[job.model_profile];
     if (!models) throw new Error(`No Gemini model profile configured for ${job.model_profile}`);
@@ -448,18 +570,37 @@ export function createGeminiExpertInvoker(
     );
 
     if (!response.success) {
-      throw new Error(`Gemini expert invocation failed: ${response.error}`);
+      throw new ExpertInvocationError(
+        `Gemini expert invocation failed: ${response.error}`,
+        {
+          model: response.modelUsed,
+          primary_model: models[0]?.id ?? null,
+          fallback_chain: response.fallbackChain,
+          latency_ms: Date.now() - startedAt,
+        },
+      );
     }
 
     const responseText = getGeminiResponseText(response.data);
-    if (!responseText) throw new Error(`Gemini returned no usable text for ${job.role}`);
+    if (!responseText) {
+      throw new ExpertInvocationError(`Gemini returned no usable text for ${job.role}`, {
+        model: response.modelUsed,
+        primary_model: models[0]?.id ?? null,
+        raw_response: response.data,
+        fallback_chain: response.fallbackChain,
+        latency_ms: response.latencyMs || Date.now() - startedAt,
+        usage: normalizeGeminiTokenUsage(response.data),
+      });
+    }
 
     return {
       model: response.modelUsed,
+      primary_model: models[0]?.id ?? response.modelUsed,
       raw_response: response.data,
       response_text: responseText,
       usage: normalizeGeminiTokenUsage(response.data),
       latency_ms: response.latencyMs || Date.now() - startedAt,
+      fallback_chain: response.fallbackChain,
     };
   };
 }

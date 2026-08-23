@@ -581,7 +581,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         // validation error; never retry arbitrary extraction failures.
         const invalidProfileResponse = typeof data?.error === 'string'
           && /invalid model_profile/i.test(data.error)
-        if (!error && !data?.success && invalidProfileResponse) {
+        if (!error && !data?.success && invalidProfileResponse && modelProfile !== 'sub-base-c-characters') {
           const legacyProfile = getLegacyExtractionModelProfile(
             modelProfile,
             extractionMode === 'bootstrap' ? 'bootstrap' : 'branch',

@@ -1,4 +1,8 @@
-export type ExtractionModelProfile = 'sub-base' | 'sub-base-2' | 'sub-base-locations'
+export type ExtractionModelProfile =
+  | 'sub-base'
+  | 'sub-base-2'
+  | 'sub-base-locations'
+  | 'sub-base-c-characters'
 
 export type ExtractionStrategy = 'legacy-sequential' | 'parallel-experts'
 
@@ -19,6 +23,7 @@ export const EXTRACTION_MODEL_PROFILES: readonly ExtractionModelProfile[] = [
   'sub-base',
   'sub-base-2',
   'sub-base-locations',
+  'sub-base-c-characters',
 ]
 
 const EXTRACTION_MODEL_PROFILE_STORAGE_KEY = 'literary-assistant.extraction-model-profile'

@@ -2,6 +2,7 @@
 // This module only writes extraction_expert_artifacts; it has no path to the
 // canonical Knowledge Layer tables.
 
+import type { FallbackAttempt } from "./gemini-client.ts";
 import type {
   ExpertExtractionResult,
   ExpertRole,
@@ -24,7 +25,10 @@ export interface ExpertArtifactInput {
   window: ExpertWindow;
   status: ExpertArtifactStatus;
   attempt: number;
+  artifact_contract?: string | null;
+  primary_model?: string | null;
   model?: string | null;
+  fallback_chain?: FallbackAttempt[] | null;
   raw_response?: unknown;
   parsed_response?: ExpertExtractionResult | null;
   error_message?: string | null;
@@ -69,7 +73,10 @@ export function buildExpertArtifactRecord(input: ExpertArtifactInput): Record<st
     chunk_positions: input.window.chunk_positions,
     status: input.status,
     attempt: input.attempt,
+    artifact_contract: input.artifact_contract ?? "expert-extraction-v1",
+    primary_model: input.primary_model ?? null,
     model: input.model ?? null,
+    fallback_chain: input.fallback_chain ?? null,
     raw_response: input.raw_response ?? null,
     parsed_response: input.parsed_response ?? null,
     error_message: input.error_message ?? null,

@@ -1075,6 +1075,12 @@ Deno.serve(async (req) => {
       return errorResponse(`Invalid extraction strategy: ${strategyValidation.error}`, 400);
     }
     const extractionStrategy: ExtractionStrategy = strategyValidation.strategy;
+    if (modelProfile === "sub-base-c-characters" && extractionStrategy !== "parallel-experts") {
+      return errorResponse(
+        "sub-base-c-characters requires the explicit parallel-experts strategy; legacy-sequential remains unchanged for existing profiles.",
+        400,
+      );
+    }
     const rolloutValidation = validateExtractionStrategyRollout(
       extractionStrategy,
       isParallelExpertsRolloutEnabled(Deno.env.get(PARALLEL_EXPERTS_ROLLOUT_ENV)),
@@ -1310,12 +1316,14 @@ Deno.serve(async (req) => {
         console.warn("[extract-knowledge] Could not load project place fields:", error.message);
       }
       projectPlaceFields = (data || []) as Array<{ place_type_key: string; field_key: string; label: string }>;
+    }
 
+    if (modelProfile === "sub-base-locations" || modelProfile === "sub-base-c-characters") {
       const { data: characterData, error: characterError } = await supabase
         .from("knowledge_character_field_definitions")
         .select("field_key, label, group_key")
         .eq("project_id", body.project_id)
-        .eq("model_profile", "sub-base-locations")
+        .eq("model_profile", modelProfile)
         .eq("is_active", true)
         .order("sort_order");
       if (characterError) {
@@ -1338,6 +1346,9 @@ Deno.serve(async (req) => {
       role: string;
       window_id: string;
       model: string | null;
+      primary_model: string | null;
+      artifact_contract: string;
+      fallback_chain: Array<Record<string, unknown>>;
     }> = [];
 
     if (extractionStrategy === "parallel-experts") {

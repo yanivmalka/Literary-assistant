@@ -10,7 +10,11 @@ export interface GeminiModelConfig {
   priority: number;
 }
 
-export type GeminiModelProfile = "sub-base" | "sub-base-2" | "sub-base-locations";
+export type GeminiModelProfile =
+  | "sub-base"
+  | "sub-base-2"
+  | "sub-base-locations"
+  | "sub-base-c-characters";
 
 /**
  * Ordered list of Gemini models used by the active extraction behavior.
@@ -39,6 +43,12 @@ export const GEMINI_MODEL_PROFILES: Record<GeminiModelProfile, GeminiModelConfig
     { id: "gemini-3.5-flash-lite", priority: 2 },
     { id: "gemini-2.5-flash", priority: 3 },
   ],
+  // Model A is intentionally isolated from the legacy profiles. Its primary
+  // and fallback IDs are both lite models so C can be evaluated independently.
+  "sub-base-c-characters": [
+    { id: "gemini-3.5-flash-lite", priority: 1 },
+    { id: "gemini-2.5-flash-lite", priority: 2 },
+  ],
 };
 
 export const DEFAULT_MODEL_PROFILE: GeminiModelProfile = "sub-base";
@@ -47,7 +57,10 @@ export const DEFAULT_MODEL_PROFILE: GeminiModelProfile = "sub-base";
 export const DEFAULT_MODEL = GEMINI_MODELS[0].id;
 
 export function isGeminiModelProfile(value: unknown): value is GeminiModelProfile {
-  return value === "sub-base" || value === "sub-base-2" || value === "sub-base-locations";
+  return value === "sub-base"
+    || value === "sub-base-2"
+    || value === "sub-base-locations"
+    || value === "sub-base-c-characters";
 }
 
 /** Base URL for Gemini API */

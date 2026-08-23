@@ -772,7 +772,8 @@
       "modelProfiles": {
         "sub-base": "Sub-base model",
         "sub-base-2": "Sub-base model 2",
-        "sub-base-locations": "Sub-base model - Locations"
+        "sub-base-locations": "Sub-base model - Locations",
+        "sub-base-c-characters": "Sub-base C model - Characters"
       },
       "extractionStrategies": {
         "legacy-sequential": "Legacy Sequential",

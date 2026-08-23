@@ -93,7 +93,7 @@ export interface GeminiExtraction {
   relationships?: ExtractedRelationship[];
 }
 
-export type ExtractionProfile = "sub-base" | "sub-base-2" | "sub-base-locations";
+export type ExtractionProfile = "sub-base" | "sub-base-2" | "sub-base-locations" | "sub-base-c-characters";
 
 export interface NormalizedEntity {
   canonical_name: string;
@@ -174,7 +174,16 @@ export function buildStructuredFields(
   fields.description = entity.description || entity.significance || null;
 
   if (type === "character") {
-    if (profile === "sub-base-locations") {
+    if (profile === "sub-base-c-characters") {
+      const entityAttributes = entity.attributes || {};
+      const characterFields = entity.character_fields
+        || (entityAttributes.character_fields as Record<string, unknown> | undefined)
+        || entityAttributes;
+      for (const [key, value] of Object.entries(characterFields)) {
+        if (key === "extraction_meta" || key === "character_field_observations") continue;
+        if (hasExtractedValue(value)) fields[key] = value;
+      }
+    } else if (profile === "sub-base-locations") {
       const entityAttributes = entity.attributes || {};
       const dynamicFields = entity.character_fields
         || (entityAttributes.character_fields as Record<string, unknown> | undefined)

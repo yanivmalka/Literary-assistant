@@ -33,16 +33,25 @@ afterEach(() => {
 
 describe('Entity Extraction model matrix contract (offline)', () => {
   it('contains every configured model in every extraction profile', () => {
-    expect(Object.keys(GEMINI_MODEL_PROFILES)).toEqual(['sub-base', 'sub-base-2', 'sub-base-locations'])
+    expect(Object.keys(GEMINI_MODEL_PROFILES)).toEqual([
+      'sub-base',
+      'sub-base-2',
+      'sub-base-locations',
+      'sub-base-c-characters',
+    ])
     expect(modelConfigs.map((model) => model.id)).toEqual([
       'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
+      'gemini-2.5-flash-lite',
       'gemini-2.5-flash',
     ])
 
     for (const [profile, models] of Object.entries(GEMINI_MODEL_PROFILES)) {
-      expect(models.length, `[profile:${profile}] model count`).toBe(3)
-      expect(models.map((model) => model.priority), `[profile:${profile}] priorities`).toEqual([1, 2, 3])
+      const expectedCount = profile === 'sub-base-c-characters' ? 2 : 3
+      expect(models.length, `[profile:${profile}] model count`).toBe(expectedCount)
+      expect(models.map((model) => model.priority), `[profile:${profile}] priorities`).toEqual(
+        profile === 'sub-base-c-characters' ? [1, 2] : [1, 2, 3],
+      )
     }
   })
 

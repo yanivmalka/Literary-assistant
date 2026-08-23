@@ -18,13 +18,16 @@ import {
 } from "./parallel-expert-artifacts.ts";
 import {
   createGeminiExpertInvoker,
-  PARALLEL_EXPERT_MODEL_ASSIGNMENTS,
   runParallelExpertJobs,
   type ExpertChunk,
   type ExpertJob,
 } from "./parallel-expert-runner.ts";
 import type { GeminiModelConfig, GeminiModelProfile } from "./gemini-config.ts";
-import { buildSubBaseLocationsInstructions } from "./rules/prompt.ts";
+import {
+  buildSubBaseCCharactersInstructions,
+  buildSubBaseLocationsInstructions,
+} from "./rules/prompt.ts";
+import { CHARACTER_SPECIALIST_PROFILE } from "./character-specialist.ts";
 
 export interface ExpertArtifactLoadContext {
   project_id: string;
@@ -42,7 +45,10 @@ export interface ValidatedExpertArtifact {
   role: ExpertRole;
   window: ExpertWindow;
   parsed_response: ExpertExtractionResult;
+  artifact_contract: string;
+  primary_model: string | null;
   model: string | null;
+  fallback_chain: Array<Record<string, unknown>>;
   usage: TokenUsage;
   latency_ms: number;
 }
@@ -54,10 +60,21 @@ export interface MergedParallelExtraction {
       role: ExpertRole;
       window_id: string;
       model: string | null;
+      primary_model: string | null;
+      artifact_contract: string;
+      fallback_chain: Array<Record<string, unknown>>;
     }>;
   };
   artifact_ids: string[];
-  expert_models: Array<{ id: string; role: ExpertRole; window_id: string; model: string | null }>;
+  expert_models: Array<{
+    id: string;
+    role: ExpertRole;
+    window_id: string;
+    model: string | null;
+    primary_model: string | null;
+    artifact_contract: string;
+    fallback_chain: Array<Record<string, unknown>>;
+  }>;
   usage: TokenUsage;
   model: string;
   latency_ms: number;
@@ -143,6 +160,9 @@ function artifactMarker(artifact: ValidatedExpertArtifact): Record<string, unkno
     artifact_id: artifact.id,
     role: artifact.role,
     window_id: artifact.window.window_id,
+    primary_model: artifact.primary_model,
+    model: artifact.model,
+    fallback_chain: artifact.fallback_chain,
   };
 }
 
@@ -223,6 +243,16 @@ function mergeEntity(
       conflicts.conflicts = fieldConflicts;
       attributes.extraction_meta = conflicts;
     }
+  }
+
+  if (candidate.field_observations && Object.keys(candidate.field_observations).length > 0) {
+    const existingObservations = isRecord(attributes.character_field_observations)
+      ? attributes.character_field_observations
+      : {};
+    attributes.character_field_observations = {
+      ...existingObservations,
+      ...candidate.field_observations,
+    };
   }
 
   const metadata = isRecord(attributes.extraction_meta) ? attributes.extraction_meta : {};
@@ -341,6 +371,16 @@ function addRelationship(
       ...((existing.source_references as ExpertSourceReference[] | undefined) ?? []),
       ...sourceReferencesWithArtifact(candidate.source_references, artifact.id, candidate.chunk_positions[0]),
     ]);
+    if (candidate.confidence !== null && candidate.confidence !== undefined) {
+      const existingConfidence = typeof existing.confidence === "number" ? existing.confidence : null;
+      existing.confidence = existingConfidence === null
+        ? candidate.confidence
+        : Math.max(existingConfidence, candidate.confidence);
+    }
+    existing.inferred = existing.inferred === true && candidate.inferred !== false;
+    if (!existing.inference_note && candidate.inference_note) {
+      existing.inference_note = candidate.inference_note;
+    }
     return;
   }
 
@@ -353,6 +393,9 @@ function addRelationship(
     evidence: uniqueStrings(candidate.evidence),
     chunk_positions: uniqueNumbers(candidate.chunk_positions),
     source_references: sourceReferencesWithArtifact(candidate.source_references, artifact.id, candidate.chunk_positions[0]),
+    confidence: candidate.confidence,
+    inferred: candidate.inferred ?? false,
+    inference_note: candidate.inference_note ?? null,
   });
 }
 
@@ -435,7 +478,14 @@ export async function loadValidatedExpertArtifacts(
       role: parsed.role,
       window: parsed.window,
       parsed_response: parsed,
+      artifact_contract: typeof row.artifact_contract === "string"
+        ? row.artifact_contract
+        : "expert-extraction-v1",
+      primary_model: typeof row.primary_model === "string" ? row.primary_model : null,
       model: typeof row.model === "string" ? row.model : null,
+      fallback_chain: Array.isArray(row.fallback_chain)
+        ? row.fallback_chain.filter(isRecord)
+        : [],
       usage: {
         input_tokens: Number(row.input_tokens) || 0,
         output_tokens: Number(row.output_tokens) || 0,
@@ -462,13 +512,18 @@ export async function loadValidatedExpertArtifacts(
 
 export function mergeValidatedExpertArtifacts(
   artifacts: ValidatedExpertArtifact[],
+  model_profile?: string,
 ): MergedParallelExtraction {
+  const characterOnly = model_profile === CHARACTER_SPECIALIST_PROFILE;
   const extraction: Record<string, unknown[]> & {
     __parallel_expert_artifacts?: Array<{
       id: string;
       role: ExpertRole;
       window_id: string;
       model: string | null;
+      primary_model: string | null;
+      artifact_contract: string;
+      fallback_chain: Array<Record<string, unknown>>;
     }>;
   } = {};
   const artifactMetadata: Array<{
@@ -476,6 +531,9 @@ export function mergeValidatedExpertArtifacts(
     role: ExpertRole;
     window_id: string;
     model: string | null;
+    primary_model: string | null;
+    artifact_contract: string;
+    fallback_chain: Array<Record<string, unknown>>;
   }> = [];
   const usage = emptyUsage();
   let latency_ms = 0;
@@ -487,11 +545,20 @@ export function mergeValidatedExpertArtifacts(
       role: artifact.role,
       window_id: artifact.window.window_id,
       model: artifact.model,
+      primary_model: artifact.primary_model,
+      artifact_contract: artifact.artifact_contract,
+      fallback_chain: artifact.fallback_chain,
     });
     addUsage(usage, artifact.usage);
     latency_ms += artifact.latency_ms;
-    for (const entity of result.entities) addEntity(extraction, entity, artifact);
-    for (const event of result.events) addEvent((extraction.events ??= []) as Record<string, unknown>[], event, artifact);
+    for (const entity of result.entities) {
+      if (!characterOnly || entityBucket(entity.entity_type) === "characters") {
+        addEntity(extraction, entity, artifact);
+      }
+    }
+    if (!characterOnly) {
+      for (const event of result.events) addEvent((extraction.events ??= []) as Record<string, unknown>[], event, artifact);
+    }
     for (const relationship of result.relationships) addRelationship((extraction.relationships ??= []) as Record<string, unknown>[], relationship, artifact);
   }
 
@@ -515,20 +582,25 @@ export async function executeParallelExpertExtraction(
     limit: context.limit,
     chunk_positions: context.chunks.map((chunk) => chunk.position),
   };
-  const jobs: ExpertJob[] = EXPERT_ROLES.map((role) => ({
+  const roles: ExpertRole[] = context.model_profile === CHARACTER_SPECIALIST_PROFILE
+    ? ["characters"]
+    : [...EXPERT_ROLES];
+  const jobs: ExpertJob[] = roles.map((role) => ({
     role,
     window,
     chunks: context.chunks,
     model_profile: context.model_profile,
-    profile_instructions: context.model_profile === "sub-base-locations"
-      ? buildSubBaseLocationsInstructions(context.project_place_fields, context.project_character_fields)
-      : undefined,
+    profile_instructions: context.model_profile === CHARACTER_SPECIALIST_PROFILE
+      ? buildSubBaseCCharactersInstructions(context.project_character_fields)
+      : context.model_profile === "sub-base-locations"
+        ? buildSubBaseLocationsInstructions(context.project_place_fields, context.project_character_fields)
+        : undefined,
   }));
 
   const invoker = createGeminiExpertInvoker({
     api_key: context.api_key,
     models: context.models,
-    models_by_role: context.models_by_role ?? PARALLEL_EXPERT_MODEL_ASSIGNMENTS,
+    models_by_role: context.models_by_role,
     timeout_ms: context.timeout_ms,
   });
   const runResults = await runParallelExpertJobs(
@@ -565,5 +637,5 @@ export async function executeParallelExpertExtraction(
     model_profile: context.model_profile,
     expected_windows: jobs.map((job) => ({ role: job.role, window: job.window })),
   });
-  return mergeValidatedExpertArtifacts(artifacts);
+  return mergeValidatedExpertArtifacts(artifacts, context.model_profile);
 }

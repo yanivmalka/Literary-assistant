@@ -772,7 +772,8 @@
       "modelProfiles": {
         "sub-base": "מודל תת-בסיס",
         "sub-base-2": "מודל תת-בסיס 2",
-        "sub-base-locations": "מודל תת-בסיס - מקומות"
+        "sub-base-locations": "מודל תת-בסיס - מקומות",
+        "sub-base-c-characters": "תת־בסיס C דמויות"
       },
       "extractionStrategies": {
         "legacy-sequential": "חילוץ סדרתי",

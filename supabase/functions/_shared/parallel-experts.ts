@@ -29,6 +29,8 @@ export interface ExpertEntityCandidate {
   entity_type: string;
   aliases: string[];
   fields: Record<string, unknown>;
+  /** Character Model A field observations preserved through the generic merger. */
+  field_observations?: Record<string, unknown>;
   evidence: string[];
   chunk_positions: number[];
   source_references: ExpertSourceReference[];
@@ -54,6 +56,8 @@ export interface ExpertRelationshipCandidate {
   chunk_positions: number[];
   source_references: ExpertSourceReference[];
   confidence: number | null;
+  inferred?: boolean;
+  inference_note?: string | null;
 }
 
 export interface ExpertExtractionResult {

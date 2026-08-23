@@ -1,4 +1,5 @@
 import type {
+  ExpertExtractionResult,
   ExpertSourceReference,
   ExpertWindow,
 } from "./parallel-experts.ts";
@@ -8,7 +9,7 @@ export const CHARACTER_SPECIALIST_PROFILE = "sub-base-c-characters" as const;
 export const CHARACTER_SPECIALIST_ROLE = "characters" as const;
 export const CHARACTER_SPECIALIST_CONTRACT_VERSION = 1 as const;
 
-/** Model selection is wired in a later rollout step; these are the planned IDs. */
+/** Model A's isolated model chain for the explicit Sub-base C rollout. */
 export const CHARACTER_SPECIALIST_PRIMARY_MODEL = "gemini-3.5-flash-lite" as const;
 export const CHARACTER_SPECIALIST_FALLBACK_MODEL = "gemini-2.5-flash-lite" as const;
 
@@ -280,4 +281,54 @@ export function validateCharacterSpecialistResult(value: unknown): CharacterSpec
 
   if (errors.length > 0) return { valid: false, errors };
   return { valid: true, value: value as unknown as CharacterSpecialistResult };
+}
+
+/**
+ * Adapts the validated Model A contract to the generic artifact contract.
+ * The original character contract remains in raw_response; this adapter keeps
+ * the existing merger/writer shape while preserving field-level provenance.
+ */
+export function characterSpecialistToExpertExtractionResult(
+  result: CharacterSpecialistResult,
+): ExpertExtractionResult {
+  return {
+    contract_version: 1,
+    role: CHARACTER_SPECIALIST_ROLE,
+    window: result.window,
+    entities: result.characters.map((character) => {
+      const fields: Record<string, unknown> = {
+        first_name: character.first_name,
+      };
+      if (character.last_name !== undefined && character.last_name !== null) {
+        fields.last_name = character.last_name;
+      }
+      for (const [key, observation] of Object.entries(character.fields)) {
+        fields[key] = observation.value;
+      }
+      return {
+        name: character.name,
+        entity_type: "character",
+        aliases: character.aliases,
+        fields,
+        field_observations: character.fields,
+        evidence: character.evidence,
+        chunk_positions: character.chunk_positions,
+        source_references: character.source_references,
+        confidence: character.confidence,
+      };
+    }),
+    events: [],
+    relationships: result.relationships.map((relationship) => ({
+      source: relationship.source,
+      target: relationship.target,
+      relationship_type: relationship.relationship_type,
+      evidence: relationship.evidence,
+      chunk_positions: relationship.chunk_positions,
+      source_references: relationship.source_references,
+      confidence: relationship.confidence,
+      inferred: relationship.inferred,
+      inference_note: relationship.inference_note ?? null,
+    })),
+    unresolved_references: result.unresolved_references,
+  };
 }

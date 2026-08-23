@@ -355,19 +355,21 @@ Model A מקבל את כל ה־chunks של ה־batch, אך instruction שלו מ
 
 ### שלב 2 — Prompt ו־Model A
 
-- [ ] להוסיף profile/instructions ייעודיים ל־C.
-- [ ] לקשר את role `characters` ל־`gemini-3.5-flash-lite`.
-- [ ] להגדיר fallback ל־`gemini-2.5-flash-lite`.
-- [ ] לשמור את `legacy-sequential` כברירת מחדל.
-- [ ] להפעיל רק ב־explicit opt-in/rollout.
+- [x] להוסיף profile/instructions ייעודיים ל־C.
+- [x] לקשר את role `characters` ל־`gemini-3.5-flash-lite`.
+- [x] להגדיר fallback ל־`gemini-2.5-flash-lite`.
+- [x] לשמור את `legacy-sequential` כברירת מחדל.
+- [x] להפעיל רק ב־explicit opt-in/rollout.
 
 ### שלב 3 — Artifacts ו־merger
 
-- [ ] להרחיב את artifact metadata ל־C.
-- [ ] לשמור fallback attempts מלאים.
-- [ ] לחבר את חוזה הדמויות ל־merger.
-- [ ] לוודא ש־relationships נשמרים כ־edges ולא כטקסט בלבד.
+- [x] להרחיב את artifact metadata ל־C.
+- [x] לשמור fallback attempts מלאים.
+- [x] לחבר את חוזה הדמויות ל־merger.
+- [x] לוודא ש־relationships נשמרים כ־edges ולא כטקסט בלבד.
 - [ ] להשוות תוצאה חדשה מול התוצאה הקיימת ב־shadow mode.
+
+> Shadow comparison intentionally remains open: the current extraction endpoint has no isolated comparison sink, and enabling it requires a separate non-canonical result path before live C runs.
 
 ### שלב 4 — Normalization ו־Knowledge Layer
 
