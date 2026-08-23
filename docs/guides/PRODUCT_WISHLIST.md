@@ -819,6 +819,86 @@ Create a visual folder/gallery for important story material, including character
 
 Gallery items should link back to the relevant canonical entities, Timeline Events, chapters, and evidence. The gallery should support Main/Branch scope, asset provenance, captions, review status, and references to the prompts or source descriptions used to create an image. It should remain useful as a user-managed visualization workspace even when no AI image generation is available.
 
+### **Future Prioritization and Task Management**
+
+This section is a planning backlog for post-v2.0 work. It is **not an authorization to implement these features now**. All tasks below remain deferred until the current Knowledge Layer, Main/Branch workflow, Timeline, and v2.0 integration work are stable.
+
+#### **Priority Scale**
+
+| Priority | Meaning | Planning rule |
+|----------|---------|---------------|
+| **P0 — Critical foundation** | Required to make later analysis reliable | Must be designed before dependent feature work begins |
+| **P1 — High** | Core user value that depends on the foundation | Start after all P0 exit criteria pass |
+| **P2 — Medium** | Valuable visualization or creation capability | Can proceed in parallel only after its data contracts are stable |
+| **P3 — Low** | Enhancement that depends on several mature systems | Start after higher-priority systems are proven with real projects |
+
+#### **Ranked Future Capability Plan**
+
+| Rank | Capability | Priority | Why it matters | Main dependencies | Planned phase | Status |
+|------|------------|----------|----------------|------------------|---------------|--------|
+| 1 | **Story Knowledge Graph** | **P0 — Critical foundation** | Provides the temporal, state-aware model required for continuity and causality | Knowledge Layer, canonical entity UUIDs, relationships, Timeline Events, provenance, Main/Branch | Phase 1 | Backlog — deferred |
+| 2 | **Evidence-Based Diagnostics** | **P0 — Critical foundation** | Makes every future warning explainable, reviewable, and less prone to false positives | Provenance/evidence model, diagnostic schema, Effective Branch View | Phase 1 | Backlog — deferred |
+| 3 | **Narrative Consistency Engine** | **P1 — High** | Delivers the primary automated analysis after the graph and diagnostics can support trustworthy findings | Story Knowledge Graph, Evidence-Based Diagnostics, effective timeline, contradiction data | Phase 2 | Backlog — deferred |
+| 4 | **Visual Worldbuilding System** | **P2 — Medium** | Gives users an independent visual planning tool while reusing the location hierarchy | Location entities, place hierarchy, relationship model, Branch proposals, asset storage | Phase 3 | Backlog — deferred |
+| 5 | **Character Image Generation** | **P2 — Medium** | Adds visual character representation after structured appearance data and asset provenance are stable | Character structured fields, visual identity metadata, reference assets, review workflow | Phase 4 | Backlog — deferred |
+| 6 | **Story Event Gallery** | **P3 — Low** | Provides the broadest presentation layer and benefits from all entity, event, image, and evidence links | Canonical entities, Timeline Events, chapters, asset storage, optional image generation | Phase 5 | Backlog — deferred |
+
+#### **Execution Phases and Future Backlog**
+
+**Phase 0 — Readiness and contracts**
+
+| ID | Task | Priority | Depends on | Definition of done | Status |
+|----|------|----------|------------|-------------------|--------|
+| FUT-001 | Freeze the cross-feature data contracts for canonical entities, structured fields, relationships, Timeline Events, provenance, and Main/Branch scope | P0 | v1.4–v2.0 foundation | Contracts document the source of truth, identifiers, branch behavior, and migration boundaries | Backlog — deferred |
+| FUT-002 | Resolve the boundary between an `event` entity and a `Timeline Event`, and define the Effective Timeline contract | P0 | FUT-001 | One documented model explains identity, participants, temporal fields, and Branch behavior | Backlog — deferred |
+| FUT-003 | Define shared review, certainty, severity, evidence, and resolution status values | P0 | FUT-001 | All future diagnostics and AI outputs use the same review vocabulary | Backlog — deferred |
+| FUT-004 | Define asset storage, provenance, permissions, and versioning for maps, generated images, and gallery items | P1 | FUT-001 | Every visual asset can be traced to its entity/event, inputs, Branch, and approval state | Backlog — deferred |
+
+**Phase 1 — Reliable story model and diagnostics foundation**
+
+| ID | Task | Priority | Depends on | Definition of done | Status |
+|----|------|----------|------------|-------------------|--------|
+| FUT-101 | Model temporal and state transitions for characters, objects, locations, abilities, knowledge, relationships, and events | P0 | FUT-001, FUT-002 | State changes have timestamps or narrative positions, actors, sources, and affected canonical entities | Backlog — deferred |
+| FUT-102 | Build the Main/Branch Effective Graph View with isolated Branch proposals and promotion-safe diffs | P0 | FUT-101 | Main, Branch, and merged views return consistent graph data without writing inferred changes directly to Main | Backlog — deferred |
+| FUT-201 | Create the shared evidence-backed diagnostic record and source-reference model | P0 | FUT-003, FUT-101 | Each finding stores supporting facts/events, source references, confidence state, severity, explanation, and Branch context | Backlog — deferred |
+| FUT-202 | Add diagnostic review workflow, educational concept pages, dismissals, intentional-choice records, and false-positive feedback | P0 | FUT-201 | Users can inspect why a finding exists, learn the concept, resolve or dismiss it, and preserve the decision | Backlog — deferred |
+
+**Phase 2 — Narrative analysis**
+
+| ID | Task | Priority | Depends on | Definition of done | Status |
+|----|------|----------|------------|-------------------|--------|
+| FUT-301 | Implement rule families for plot holes, Deus Ex Machina, forced coincidence, inconsistent character, unmotivated action, continuity, contradictions, setup/payoff, and causality | P1 | FUT-102, FUT-201 | Each rule produces evidence-backed findings with confirmed/possible certainty and no direct Main mutation | Backlog — deferred |
+| FUT-302 | Add analysis runs, incremental re-checks, explainable results, and Branch-aware comparison | P1 | FUT-301 | Users can run analysis for a project or Branch, compare findings, and trace every result to source data | Backlog — deferred |
+
+**Phase 3 — Visual worldbuilding**
+
+| ID | Task | Priority | Depends on | Definition of done | Status |
+|----|------|----------|------------|-------------------|--------|
+| FUT-401 | Define map primitives for places, regions, boundaries, routes, annotations, and nested place hierarchy | P2 | FUT-001, FUT-004 | Users can create and edit a map independently and link elements to canonical locations | Backlog — deferred |
+| FUT-402 | Add Main map, Branch map proposals, comparison, approval, and links from map elements to events and chapters | P2 | FUT-401, FUT-102 | Map changes are isolated, reviewable, and promotable without duplicating location entities | Backlog — deferred |
+
+**Phase 4 — Character visualization**
+
+| ID | Task | Priority | Depends on | Definition of done | Status |
+|----|------|----------|------------|-------------------|--------|
+| FUT-501 | Define a visual identity profile from structured appearance fields, user inputs, approved references, and stable style metadata | P2 | FUT-004, character structured fields | A character's approved visual identity is reusable and distinguishable from manuscript facts | Backlog — deferred |
+| FUT-502 | Add profile-image generation, review, versioning, and Branch-safe approval | P2 | FUT-501 | Generated images preserve prompts, inputs, provenance, and approval history and cannot silently overwrite Main | Backlog — deferred |
+
+**Phase 5 — Story event gallery**
+
+| ID | Task | Priority | Depends on | Definition of done | Status |
+|----|------|----------|------------|-------------------|--------|
+| FUT-601 | Build user-managed gallery folders and links to entities, chapters, Timeline Events, and scenes | P3 | FUT-004, Timeline integration | Users can organize visual material by entity, chapter, event, and custom collection | Backlog — deferred |
+| FUT-602 | Add captions, evidence links, Branch scope, asset review, filtering, and optional generated-image references | P3 | FUT-601, FUT-202, FUT-502 | Every gallery item is traceable, reviewable, and usable with or without AI generation | Backlog — deferred |
+
+#### **Future Task Management Rules**
+
+- Do not start a task while a required dependency is `Blocked` or incomplete.
+- Promote a task from **Backlog — deferred** to **Ready** only after its dependencies and exit criteria are verified.
+- Any inferred story fact, graph state, map change, diagnostic resolution, or generated asset must remain Branch-scoped or reviewable until explicitly promoted to Main.
+- Track progress by task ID, not by capability name alone; a capability is complete only when all of its tasks and exit criteria are complete.
+- Re-evaluate priorities after real-project validation; P2 and P3 items may move only after the P0/P1 reliability criteria are met.
+
 ### **Deferred Features**
 These features are identified but explicitly deferred to post-v2.0:
 
