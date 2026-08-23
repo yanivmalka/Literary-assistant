@@ -13,11 +13,13 @@ import { callGeminiWithFallback } from "../_shared/gemini-client.ts";
 import { assertQuillsAvailable, consumeGeminiUsage } from "../_shared/quills.ts";
 import { DEFAULT_MODEL } from "../_shared/gemini-config.ts";
 import {
-  adjacentPositions,
-  buildRetrievalTerms,
-  mergeAdjacentRetrievalChunks,
-  type RetrievalChunk,
-} from "../_shared/qa-retrieval.ts";
+  isNotebookSchemaUnavailable,
+  NotebookConversationAccessError,
+  persistNotebookTurn,
+  resolveNotebookConversation,
+  type NotebookTurnResult,
+} from "../_shared/notebook-persistence.ts";
+import type { QASource } from "../_shared/notebook-types.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
