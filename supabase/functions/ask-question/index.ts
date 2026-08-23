@@ -13,6 +13,12 @@ import { callGeminiWithFallback } from "../_shared/gemini-client.ts";
 import { assertQuillsAvailable, consumeGeminiUsage } from "../_shared/quills.ts";
 import { DEFAULT_MODEL } from "../_shared/gemini-config.ts";
 import {
+  adjacentPositions,
+  buildRetrievalTerms,
+  mergeAdjacentRetrievalChunks,
+  type RetrievalChunk,
+} from "../_shared/qa-retrieval.ts";
+import {
   isNotebookSchemaUnavailable,
   NotebookConversationAccessError,
   persistNotebookTurn,
@@ -36,6 +42,8 @@ interface AskQuestionRequest {
   question: string;
   top_k?: number;
   branch_id?: string | null;
+  conversation_id?: string | null;
+  client_request_id?: string;
   /** Optional source scope used only by the enhanced retrieval rollout. */
   source_version_ids?: string[];
   chapter_numbers?: number[];
@@ -53,21 +61,15 @@ interface DocumentChunk {
   version_id: string;
 }
 
-interface QASource {
-  chunkId: string;
-  content: string;
-  chapterNumber: number | null;
-  chapterTitle: string | null;
-  page: number | null;
-  score: number;
-  documentName?: string;
-}
-
 interface QAResult {
   answer: string;
   sources: QASource[];
   entitiesReferenced: string[];
   noSufficientContext: boolean;
+  conversationId?: string;
+  userMessageId?: string;
+  messageId?: string;
+  citationIds?: string[];
   modelUsed?: string;
   latencyMs?: number;
 }
@@ -105,6 +107,34 @@ function errorResponse(
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     }
   );
+}
+
+async function persistNotebookTurnSafely(
+  supabase: any,
+  input: Parameters<typeof persistNotebookTurn>[1] | null,
+): Promise<NotebookTurnResult | null> {
+  if (!input) return null;
+  try {
+    return await persistNotebookTurn(supabase, input);
+  } catch (error) {
+    console.warn(
+      "[ask-question] Notebook persistence unavailable; continuing with legacy QA response",
+      error instanceof Error ? error.message : error,
+    );
+    return null;
+  }
+}
+
+function notebookResponseFields(
+  result: NotebookTurnResult | null,
+): Pick<QAResult, "conversationId" | "userMessageId" | "messageId" | "citationIds"> {
+  if (!result) return {};
+  return {
+    conversationId: result.conversation_id,
+    userMessageId: result.user_message_id,
+    messageId: result.assistant_message_id,
+    citationIds: result.citation_ids,
+  };
 }
 
 // ============================================
@@ -199,6 +229,8 @@ async function legacyHybridSearch(
     chapterNumber: chunk.chapter_number,
     chapterTitle: chunk.chapter_title,
     page: chunk.page,
+    position: chunk.position,
+    versionId: chunk.version_id,
     score: topK - idx, // Simple scoring: first result gets higher score
     documentName: undefined,
   }));
@@ -345,6 +377,8 @@ async function enhancedHybridSearch(
       chapterNumber: chunk.chapter_number,
       chapterTitle: chunk.chapter_title,
       page: chunk.page,
+      position: chunk.position,
+      versionId: chunk.version_id,
       score: chunk.score,
       documentName: chunk.document_name,
     }));
@@ -548,6 +582,61 @@ Deno.serve(async (req) => {
       return errorResponse("Project not found or unauthorized", 403);
     }
 
+    const requestedConversationId = typeof body.conversation_id === "string"
+      ? body.conversation_id.trim() || null
+      : null;
+    const clientRequestId = typeof body.client_request_id === "string"
+      ? body.client_request_id.trim() || crypto.randomUUID()
+      : crypto.randomUUID();
+    if (clientRequestId.length > 200) {
+      return errorResponse("client_request_id is too long", 400);
+    }
+
+    let notebookConversationId: string | null = null;
+    try {
+      notebookConversationId = await resolveNotebookConversation(
+        supabase,
+        projectId,
+        user.id,
+        requestedConversationId,
+        question,
+      );
+    } catch (error) {
+      if (error instanceof NotebookConversationAccessError) {
+        return errorResponse(error.message, 403);
+      }
+      if (isNotebookSchemaUnavailable(error)) {
+        console.warn("[ask-question] Notebook migration is not available yet; using legacy QA mode");
+      } else {
+        console.warn(
+          "[ask-question] Could not initialize Notebook conversation; using legacy QA mode",
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+
+    const persistTurn = (
+      answer: string,
+      turnSources: QASource[],
+      noSufficientContext: boolean,
+      metadata: Record<string, unknown> = {},
+    ) => persistNotebookTurnSafely(
+      supabase,
+      notebookConversationId
+        ? {
+            conversation_id: notebookConversationId,
+            project_id: projectId,
+            user_id: user.id,
+            client_request_id: clientRequestId,
+            question,
+            answer,
+            sources: turnSources,
+            no_sufficient_context: noSufficientContext,
+            metadata,
+          }
+        : null,
+    );
+
     // --- Step 1: Hybrid search for relevant chunks ---
     const sources = await hybridSearch(
       supabase,
@@ -578,6 +667,7 @@ Deno.serve(async (req) => {
 
     // --- No results: insufficient context ---
     if (sources.length === 0) {
+      const persisted = await persistTurn("", [], true, { mode: "no-context" });
       return new Response(
         JSON.stringify({
           success: true,
@@ -586,6 +676,7 @@ Deno.serve(async (req) => {
             sources: [],
             entitiesReferenced: entityNames,
             noSufficientContext: true,
+            ...notebookResponseFields(persisted),
           } as QAResult,
         }),
         {
@@ -599,6 +690,7 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("GEMINI_API_KEY");
     if (!apiKey) {
       // No API key: return sources without generated answer
+      const persisted = await persistTurn("", sources, false, { mode: "retrieval-only" });
       return new Response(
         JSON.stringify({
           success: true,
@@ -607,6 +699,7 @@ Deno.serve(async (req) => {
             sources,
             entitiesReferenced: entityNames,
             noSufficientContext: false,
+            ...notebookResponseFields(persisted),
           } as QAResult,
         }),
         {
@@ -658,6 +751,7 @@ Deno.serve(async (req) => {
         JSON.stringify(geminiResult)
       );
       // Return sources without answer on LLM failure
+      const persisted = await persistTurn("", sources, false, { mode: "generation-failure" });
       return new Response(
         JSON.stringify({
           success: true,
@@ -666,6 +760,7 @@ Deno.serve(async (req) => {
             sources,
             entitiesReferenced: entityNames,
             noSufficientContext: false,
+            ...notebookResponseFields(persisted),
           } as QAResult,
         }),
         {
@@ -725,6 +820,12 @@ Deno.serve(async (req) => {
       `[ask-question] Generated answer (${latencyMs}ms, model: ${geminiResult.modelUsed})`
     );
 
+    const persisted = await persistTurn(answer, sources, noSufficientContext, {
+      mode: "generated",
+      model_used: geminiResult.modelUsed,
+      latency_ms: latencyMs,
+    });
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -733,6 +834,7 @@ Deno.serve(async (req) => {
           sources,
           entitiesReferenced: entityNames,
           noSufficientContext,
+          ...notebookResponseFields(persisted),
           modelUsed: geminiResult.modelUsed,
           latencyMs,
           usage: usagePayload,

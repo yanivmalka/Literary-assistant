@@ -9,8 +9,11 @@ export interface QASource {
   chapterNumber: number | null
   chapterTitle: string | null
   page: number | null
+  position?: number
+  versionId?: string
   score: number
   documentName?: string
+  citationId?: string
 }
 
 export interface QAMessage {
@@ -25,10 +28,12 @@ export interface QAMessage {
 
 interface QAState {
   messages: QAMessage[]
+  conversationId: string | null
   loading: boolean
   error: string | null
 
   ask: (projectId: string, question: string) => Promise<void>
+  loadConversation: (projectId: string) => Promise<void>
   clearHistory: () => void
 }
 
@@ -45,6 +50,10 @@ interface EdgeFunctionResponse {
     sources: QASource[]
     entitiesReferenced: string[]
     noSufficientContext: boolean
+    conversationId?: string
+    userMessageId?: string
+    messageId?: string
+    citationIds?: string[]
     quills?: QuillResponse
     usage?: {
       input_tokens: number | null
