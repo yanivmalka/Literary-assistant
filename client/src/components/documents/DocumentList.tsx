@@ -123,7 +123,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                     <>
                       {' • '}
                       <span className={isReady ? 'text-green-600' : ''}>
-                        {(doc.latest_version.file_size / 1024 / 1024).toFixed(1)} MB
+                        {(doc.latest_version.file_size / 1024 / 1024).toFixed(2)} MB
                       </span>
                     </>
                   )}
