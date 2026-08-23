@@ -44,6 +44,7 @@ export default function RelationshipPanel({
   onReviewRelationship,
   onRemoveRelationship,
 }: RelationshipPanelProps) {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [selectedType, setSelectedType] = useState<typeof RELATIONSHIP_TYPES[number]>('knows')
   const [selectedTarget, setSelectedTarget] = useState<string>('')
@@ -72,21 +73,21 @@ export default function RelationshipPanel({
   }
 
   const getEntityName = (entityId: string) => {
-    return allEntities.find(e => e.id === entityId)?.name || 'Unknown'
+    return allEntities.find(e => e.id === entityId)?.name || t('ui.relationships.unknown')
   }
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold text-lg">Relationships</h3>
+      <h3 className="font-semibold text-lg">{t('ui.relationships.title')}</h3>
 
       {/* Existing relationships */}
       <div className="space-y-3">
         {Object.entries(relationshipsByType).length === 0 ? (
-          <p className="text-sm text-gray-500">No relationships yet.</p>
+          <p className="text-sm text-muted-foreground">{t('ui.relationships.empty')}</p>
         ) : (
           Object.entries(relationshipsByType).map(([type, rels]) => (
             <div key={type} className="border rounded-lg p-3 space-y-2">
-              <h4 className="font-medium text-sm capitalize">{type}</h4>
+              <h4 className="font-medium text-sm capitalize">{relationshipLabel(type, t)}</h4>
               {rels.map(rel => {
                 const targetName = getEntityName(rel.target_entity_id)
                 const isPending = rel.review_status === 'pending'
@@ -108,14 +109,14 @@ export default function RelationshipPanel({
                         <button
                           onClick={() => onReviewRelationship(rel.id, true)}
                           className="p-1 hover:bg-green-200 rounded"
-                          title="Approve"
+                          title={t('ui.relationships.approve')}
                         >
                           <Check className="w-4 h-4 text-green-600" />
                         </button>
                         <button
                           onClick={() => onReviewRelationship(rel.id, false)}
                           className="p-1 hover:bg-red-200 rounded"
-                          title="Reject"
+                          title={t('ui.relationships.reject')}
                         >
                           <X className="w-4 h-4 text-red-600" />
                         </button>
@@ -140,7 +141,7 @@ export default function RelationshipPanel({
       {/* Add new relationship (edit mode only) */}
       {isEditMode && (
         <div className="border-t pt-4 space-y-3">
-          <h4 className="font-medium text-sm">Add Relationship</h4>
+          <h4 className="font-medium text-sm">{t('ui.relationships.addTitle')}</h4>
           <div className="space-y-2">
             <select
               id="relationship-type"
@@ -152,7 +153,7 @@ export default function RelationshipPanel({
             >
               {RELATIONSHIP_TYPES.map(type => (
                 <option key={type} value={type}>
-                  {type}
+                  {relationshipLabel(type, t)}
                 </option>
               ))}
             </select>
@@ -165,10 +166,10 @@ export default function RelationshipPanel({
               onChange={e => setSelectedTarget(e.target.value)}
               className="w-full px-3 py-2 border rounded-md text-sm"
             >
-              <option value="">Select target entity...</option>
+              <option value="">{t('ui.relationships.selectTarget')}</option>
               {availableTargets.map(target => (
                 <option key={target.id} value={target.id}>
-                  {target.name} ({target.entity_type})
+                  {target.name} ({t(`entities.typesSingular.${target.entity_type}`, { defaultValue: target.entity_type })})
                 </option>
               ))}
             </select>
@@ -179,7 +180,7 @@ export default function RelationshipPanel({
               className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
-              Add
+              {t('ui.relationships.add')}
             </button>
           </div>
         </div>

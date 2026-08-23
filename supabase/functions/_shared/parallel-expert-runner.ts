@@ -186,6 +186,23 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Expert invocation failed";
 }
 
+function logExpertFailure(job: ExpertJob, phase: string, message: string): void {
+  // Keep observability metadata limited to job scope; never log prompts or
+  // extracted document content.
+  console.error(
+    "[parallel-expert-runner] Expert job failed",
+    JSON.stringify({
+      role: job.role,
+      window_id: job.window.window_id,
+      offset: job.window.offset,
+      limit: job.window.limit,
+      model_profile: job.model_profile,
+      phase,
+      error: message,
+    }),
+  );
+}
+
 async function invokeWithTimeout(
   invoker: ExpertInvoker,
   job: ExpertJob,
@@ -269,6 +286,7 @@ async function runOneExpertJob(
   budgets.set(job.role, budget);
   if (budget.consumed >= budget.limit) {
     const error = `Token budget exhausted for ${job.role}: ${budget.consumed}/${budget.limit}`;
+    logExpertFailure(job, "token-budget-before-invocation", error);
     await persist(artifactInput(job, "failed", null, null, error, attempt));
     return { role: job.role, window_id: job.window.window_id, status: "failed", model: null, result: null, usage: null, error };
   }
@@ -287,6 +305,7 @@ async function runOneExpertJob(
     const validation = validateExpertExtractionResult(parsed);
     if (!validation.valid) {
       const error = `Invalid expert result: ${validation.errors.join("; ")}`;
+      logExpertFailure(job, "result-validation", error);
       await persist(artifactInput(job, "failed", invocation, null, error, attempt));
       return { role: job.role, window_id: job.window.window_id, status: "failed", model: invocation.model, result: null, usage: invocation.usage, error };
     }
@@ -296,6 +315,7 @@ async function runOneExpertJob(
     budgets.set(job.role, budgetResult.state);
     if (!budgetResult.ok) {
       const error = `Token budget exceeded for ${job.role}: ${budgetResult.state.consumed}/${budgetResult.state.limit}`;
+      logExpertFailure(job, "token-budget-after-invocation", error);
       await persist(artifactInput(job, "failed", invocation, null, error, attempt));
       return { role: job.role, window_id: job.window.window_id, status: "failed", model: invocation.model, result: null, usage: invocation.usage, error };
     }
@@ -304,6 +324,7 @@ async function runOneExpertJob(
     return { role: job.role, window_id: job.window.window_id, status: "succeeded", model: invocation.model, result: validation.value, usage: invocation.usage, error: null };
   } catch (error) {
     const message = errorMessage(error);
+    logExpertFailure(job, "invocation-or-persistence", message);
     await persist(artifactInput(job, "failed", invocation, null, message, attempt));
     return { role: job.role, window_id: job.window.window_id, status: "failed", model: invocation?.model ?? null, result: null, usage: invocation?.usage ?? null, error: message };
   }

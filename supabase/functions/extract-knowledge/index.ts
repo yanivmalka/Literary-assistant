@@ -662,6 +662,18 @@ function normalizeEntities(
 // ============================================
 
 function errorResponse(message: string, status: number, details?: string): Response {
+  // Preserve the existing HTTP 200 envelope contract for the client, but make
+  // the internal error status visible in Supabase Edge Function logs.
+  console.error(
+    "[extract-knowledge] Application error",
+    JSON.stringify({
+      response_status: 200,
+      error_status: status,
+      message,
+      details: details || null,
+    }),
+  );
+
   return new Response(
     JSON.stringify({ success: false, error: message, status, details: details || null }),
     { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -1381,6 +1393,20 @@ Deno.serve(async (req) => {
         }
       } catch (parallelError) {
         const message = parallelError instanceof Error ? parallelError.message : "Parallel expert execution failed";
+        console.error(
+          "[extract-knowledge] Parallel expert execution failed",
+          JSON.stringify({
+            response_status: 200,
+            error_status: 502,
+            extraction_run_id: extractionRunId,
+            version_id: body.version_id,
+            offset,
+            limit,
+            model_profile: modelProfile,
+            extraction_strategy: extractionStrategy,
+            error: message,
+          }),
+        );
         return errorResponse(message, 502);
       }
     } else {

@@ -23,6 +23,18 @@ function errorResponse(
   status: number,
   details?: string
 ): Response {
+  // Preserve the existing HTTP 200 envelope contract while logging the
+  // application status that would otherwise be visible only in the JSON body.
+  console.error(
+    "[test-gemini] Application error",
+    JSON.stringify({
+      response_status: 200,
+      error_status: status,
+      message,
+      details: details || null,
+    }),
+  );
+
   return new Response(
     JSON.stringify({
       success: false,
