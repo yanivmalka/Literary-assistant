@@ -21,7 +21,7 @@
 // ============================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { callGeminiWithFallback } from "../_shared/gemini-client.ts";
+import { callGeminiWithFallback, getGeminiResponseText } from "../_shared/gemini-client.ts";
 import { assertQuillsAvailable, consumeGeminiUsage } from "../_shared/quills.ts";
 import {
   DEFAULT_MODEL,
@@ -1284,21 +1284,19 @@ Deno.serve(async (req) => {
     }
 
     const { data: geminiData, modelUsed, latencyMs } = geminiResult;
-    const candidate = (geminiData as any)?.candidates?.[0];
-    const parts = candidate?.content?.parts || [];
-    const textParts = parts.filter((p: any) => p.text && !p.thought);
-    const responseText = textParts.length > 0
-      ? textParts.map((p: any) => p.text).join("")
-      : parts.map((p: any) => p.text || "").filter(Boolean).join("");
-    console.log(`[extract-knowledge] Model: ${modelUsed}, Response length: ${responseText.length}, Parts: ${parts.length}, TextParts: ${textParts.length}`);
+    const responseText = getGeminiResponseText(geminiData) || "";
+    const candidates = Array.isArray((geminiData as Record<string, unknown>).candidates)
+      ? (geminiData as Record<string, unknown>).candidates as unknown[]
+      : [];
+    console.log(`[extract-knowledge] Model: ${modelUsed}, Response length: ${responseText.length}, Candidates: ${candidates.length}`);
 
-    if (!responseText || responseText.trim().length === 0) {
+    if (!responseText) {
       const message = `Gemini returned an empty response from ${modelUsed}.`;
       console.error(`[extract-knowledge] ${message}`);
       return errorResponse(
         message,
         502,
-        `model=${modelUsed}, parts=${parts.length}, text_parts=${textParts.length}`,
+        `model=${modelUsed}, candidates=${candidates.length}`,
       );
     }
     const usage = (geminiData as Record<string, unknown>)?.usageMetadata || {};

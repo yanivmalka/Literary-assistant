@@ -49,6 +49,88 @@ export interface FallbackAttempt {
   timestampMs: number;
 }
 
+interface GeminiResponsePart {
+  text?: unknown;
+  thought?: unknown;
+  [key: string]: unknown;
+}
+
+interface GeminiResponseCandidate {
+  content?: {
+    parts?: GeminiResponsePart[];
+  };
+  finishReason?: unknown;
+  [key: string]: unknown;
+}
+
+interface GeminiResponseBody extends Record<string, unknown> {
+  candidates?: GeminiResponseCandidate[];
+  promptFeedback?: {
+    blockReason?: unknown;
+    [key: string]: unknown;
+  };
+  usageMetadata?: Record<string, unknown>;
+}
+
+/**
+ * Return the first usable non-thought text candidate from a Gemini response.
+ * Gemini can return multiple candidates, and newer models may include thought
+ * parts alongside the final answer. All callers must use this same selection
+ * rule so a response is not accepted here and then rejected by the handler.
+ */
+export function getGeminiResponseText(data: Record<string, unknown>): string | null {
+  const candidates = Array.isArray(data.candidates)
+    ? data.candidates as GeminiResponseCandidate[]
+    : [];
+
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts)
+      ? candidate.content.parts
+      : [];
+    const text = parts
+      .filter((part) => part?.thought !== true)
+      .map((part) => typeof part?.text === "string" ? part.text : "")
+      .join("")
+      .trim();
+    if (text) return text;
+  }
+
+  return null;
+}
+
+/**
+ * Summarize an unusable 2xx response without logging prompt or document text.
+ * These fields distinguish safety blocks, empty candidates, thought-only
+ * responses, and output-limit terminations in the Edge Function logs/UI.
+ */
+function summarizeEmptyGeminiResponse(data: Record<string, unknown>): string {
+  const body = data as GeminiResponseBody;
+  const candidates = Array.isArray(body.candidates) ? body.candidates : [];
+  const candidateSummary = candidates.slice(0, 5).map((candidate) => {
+    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
+    return {
+      finish_reason: candidate?.finishReason ?? null,
+      parts: parts.length,
+      text_parts: parts.filter((part) => typeof part?.text === "string" && part.text.trim().length > 0).length,
+      thought_parts: parts.filter((part) => part?.thought === true).length,
+      part_types: parts.map((part) => Object.keys(part || {}).filter((key) => key !== "text")).flat().slice(0, 10),
+    };
+  });
+  const usage = body.usageMetadata || {};
+
+  return JSON.stringify({
+    candidate_count: candidates.length,
+    candidates: candidateSummary,
+    prompt_block_reason: body.promptFeedback?.blockReason ?? null,
+    usage: {
+      prompt_tokens: usage.promptTokenCount ?? null,
+      candidate_tokens: usage.candidatesTokenCount ?? null,
+      thought_tokens: usage.thoughtsTokenCount ?? null,
+      total_tokens: usage.totalTokenCount ?? null,
+    },
+  });
+}
+
 // ============================================
 // In-Memory Cooldown Tracker
 // Simple per-isolate cooldown. Each Deno edge function isolate
@@ -226,25 +308,21 @@ export async function callGeminiWithFallback(
       const latencyMs = Date.now() - startTime;
 
       if (response.ok) {
-        const data = await response.json();
-        const candidates = (data as { candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }> }).candidates || [];
-        const hasText = candidates.some((candidate) =>
-          (candidate.content?.parts || []).some((part) =>
-            typeof part.text === "string" && part.text.trim().length > 0,
-          ),
-        );
+        const data = await response.json() as Record<string, unknown>;
+        const responseText = getGeminiResponseText(data);
 
         // A successful HTTP response can still be unusable (for example when
         // the model is blocked or returns only metadata/thought parts). Treat
         // that as a retriable model failure so another configured model gets
         // a chance instead of returning an empty extraction as success.
-        if (!hasText) {
+        if (!responseText) {
           const reason = "Model returned no text candidate";
-          console.warn(`[Gemini Fallback] ${reason}: ${modelId}`);
+          const diagnostics = summarizeEmptyGeminiResponse(data);
+          console.warn(`[Gemini Fallback] ${reason}: ${modelId}`, diagnostics);
           fallbackChain.push({
             model: modelId,
             status: response.status,
-            error: reason,
+            error: `${reason}; ${diagnostics}`,
             reason: "empty model response",
             timestampMs: Date.now(),
           });
