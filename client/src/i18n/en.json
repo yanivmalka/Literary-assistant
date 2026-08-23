@@ -108,7 +108,8 @@
     "projectsCardDescription": "Add Quills for AI features. Free demo packages are available.",
     "warning10": "You have 10 Quills or fewer remaining. Consider adding more.",
     "warning5": "You have 5 Quills or fewer remaining. Consider adding more soon.",
-    "loadError": "Could not load your Quill balance. Please run the Quills migration and try again.",
+    "loadError": "Could not load your Quill balance right now. Please try again.",
+    "retry": "Try again",
     "purchaseError": "Could not add Quills. Please try again.",
     "insufficient": "You do not have enough Quills. Add more Quills to continue."
   },

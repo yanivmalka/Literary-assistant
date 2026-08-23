@@ -44,8 +44,16 @@ export default function QuillsStorePage() {
       </div>
 
       {error && (
-        <div className="mb-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          {t(error)}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <span>{t(error)}</span>
+          <button
+            type="button"
+            onClick={() => loadWallet()}
+            disabled={loading}
+            className="shrink-0 rounded-md border border-red-300 px-3 py-1.5 font-medium hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? '…' : t('quills.retry')}
+          </button>
         </div>
       )}
 
