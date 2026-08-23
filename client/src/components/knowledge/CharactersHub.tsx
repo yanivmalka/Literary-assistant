@@ -103,7 +103,7 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
           {/* Main Version Tile */}
           <button
             onClick={() => setSelectedVersion('main')}
-            className={`border-2 rounded-lg p-6 text-left transition-all ${
+            className={`border-2 rounded-lg p-6 text-start transition-all ${
               selectedVersion === 'main'
                 ? 'border-primary bg-primary/5'
                 : 'border-muted hover:border-muted-foreground/50'
@@ -121,7 +121,7 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
           {currentBranch ? (
             <button
               onClick={() => setSelectedVersion('branch')}
-              className={`border-2 rounded-lg p-6 text-left transition-all ${
+              className={`border-2 rounded-lg p-6 text-start transition-all ${
                 selectedVersion === 'branch'
                   ? 'border-primary bg-primary/5'
                   : 'border-muted hover:border-muted-foreground/50'

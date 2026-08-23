@@ -181,7 +181,7 @@ export default function EntityModal({
         await syncAliases(entity.id, branchId)
       } else {
         // Create new entity
-        const name = (structuredFields.name as string) || 'ישות חדשה'
+        const name = (structuredFields.name as string) || t('entities.newEntity')
         structuredFields.name = name
         // Route based on selectedVersion, not currentBranch existence
         const branchContext = selectedVersion === 'branch' && currentBranch

@@ -59,7 +59,7 @@ export default function TimelinePage() {
             <div key={event.id} className="relative">
               {/* Timeline connector */}
               {index < events.length - 1 && (
-                <div className="absolute left-6 top-12 w-0.5 h-12 bg-border" />
+                <div className="absolute start-6 top-12 w-0.5 h-12 bg-border" />
               )}
 
               {/* Event card */}

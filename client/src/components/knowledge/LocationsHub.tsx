@@ -54,14 +54,14 @@ export default function LocationsHub({ projectId, modelProfile }: LocationsHubPr
       <div className="mb-8">
         <h2 className="text-lg font-semibold mb-4">{t('branch.version')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button onClick={() => setSelectedVersion('main')} className={`border-2 rounded-lg p-6 text-left transition-all ${selectedVersion === 'main' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/50'}`}>
+          <button onClick={() => setSelectedVersion('main')} className={`border-2 rounded-lg p-6 text-start transition-all ${selectedVersion === 'main' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/50'}`}>
             <div className="font-semibold text-lg mb-2">{t('branch.main')}</div>
             <p className="text-sm text-muted-foreground mb-4">{t('branch.mainDescription')}</p>
             <div className="text-2xl font-bold text-primary">{mainLocations.length}</div>
             <p className="text-xs text-muted-foreground mt-1">{t('entities.types.location')}</p>
           </button>
           {currentBranch ? (
-            <button onClick={() => setSelectedVersion('branch')} className={`border-2 rounded-lg p-6 text-left transition-all ${selectedVersion === 'branch' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/50'}`}>
+            <button onClick={() => setSelectedVersion('branch')} className={`border-2 rounded-lg p-6 text-start transition-all ${selectedVersion === 'branch' ? 'border-primary bg-primary/5' : 'border-muted hover:border-muted-foreground/50'}`}>
               <div className="flex items-center gap-2 mb-2"><GitBranch className="h-4 w-4" /><div className="font-semibold text-lg">{currentBranch.name}</div></div>
               <p className="text-sm text-muted-foreground mb-4">{t('branch.branchDescription')}</p>
               <div className="text-2xl font-bold text-primary">{branchLocations.length}</div>

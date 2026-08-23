@@ -19,7 +19,7 @@ function translateAuthError(error: AuthError, fallbackKey: string) {
   return i18n.t(fallbackKey)
 }
 
-
+interface AuthState {
   user: User | null
   session: Session | null
   profile: Profile | null

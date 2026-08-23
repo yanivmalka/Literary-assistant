@@ -43,14 +43,14 @@ export default function CharacterTile({ character, modelProfile, onClick, onEdit
       {/* Edit button - appears on hover */}
       <button
         onClick={onEditClick}
-        className="absolute top-3 right-3 p-2 opacity-0 group-hover:opacity-100 bg-primary text-primary-foreground rounded-md transition-all hover:bg-primary/90 z-10"
+        className="absolute top-3 end-3 p-2 opacity-0 group-hover:opacity-100 bg-primary text-primary-foreground rounded-md transition-all hover:bg-primary/90 z-10"
         title={t('common.edit')}
       >
         <Edit3 className="h-4 w-4" />
       </button>
 
       {/* Character Name */}
-      <h3 className="font-semibold text-lg mb-3 pr-10">{character.name}</h3>
+      <h3 className="font-semibold text-lg mb-3 pe-10">{character.name}</h3>
 
       {/* Character Attributes Grid */}
       {modelProfile === DYNAMIC_CHARACTER_PROFILE ? (

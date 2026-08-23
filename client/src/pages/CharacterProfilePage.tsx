@@ -183,7 +183,7 @@ export default function CharacterProfilePage() {
             <p className="text-sm text-muted-foreground mt-1">
               {t('entities.typesSingular.character')}
               {currentBranch && (
-                <span className="ml-2 text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                <span className="ms-2 text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
                   {currentBranch.name}
                 </span>
               )}

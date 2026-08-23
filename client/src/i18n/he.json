@@ -85,7 +85,7 @@
     "passwordMismatch": "הסיסמאות אינן תואמות",
     "passwordMinLength": "הסיסמה חייבת להכיל לפחות 6 תווים",
     "confirmationTitle": "בדוק את האימייל שלך",
-    "confirmationBody": "שלחנו אליך קישור אישור. אמת את כתובת האימייל לפני ההתחברות.",
+    "confirmationBody": "שלחנו קישור אישור אל {{email}}. לחץ על הקישור כדי להפעיל את החשבון.",
     "emailRequired": "יש להזין אימייל וסיסמה.",
     "emailNotConfirmed": "בדוק את האימייל כדי לאשר את החשבון לפני ההתחברות.",
     "invalidCredentials": "האימייל או הסיסמה אינם תקינים.",
@@ -344,6 +344,7 @@
     "newCharacter": "דמות חדשה",
     "newLocation": "מקום חדש",
     "newObject": "חפץ חדש",
+    "newEntity": "ישות חדשה",
     "basicInfo": "מידע בסיסי",
     "status": {
       "pending": "ממתין",

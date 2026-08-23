@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import i18n from '@/i18n'
 import { type EntityType } from '@/lib/entityTypes'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
 
@@ -441,7 +442,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return null
 
-      const name = (structuredFields.name as string) || 'ישות חדשה'
+      const name = (structuredFields.name as string) || i18n.t('entities.newEntity')
       const layer = branchContext?.layer || 'main'
       const branchId = branchContext?.branchId || null
 

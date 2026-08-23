@@ -47,14 +47,14 @@ export default function SignUpPage() {
   if (success) {
     return (
       <div className="relative min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="absolute right-4 top-4">
+        <div className="absolute end-4 top-4">
           <ThemeToggle />
         </div>
         <div className="w-full max-w-md text-center">
           <Map className="h-12 w-12 text-primary mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-4">{t('ui.auth.confirmationTitle')}</h2>
           <p className="text-muted-foreground mb-6">
-            {t('ui.auth.confirmationBody')}
+            {t('ui.auth.confirmationBody', { email })}
           </p>
           <button
             onClick={() => navigate('/login')}
