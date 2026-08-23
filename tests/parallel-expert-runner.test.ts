@@ -127,6 +127,8 @@ function validResponse(job: ExpertJob, totalTokens = 1): ExpertInvocationResult 
       total_tokens: totalTokens,
     },
     latency_ms: 1,
+    primary_model: "test-primary-model",
+    fallback_chain: [],
   };
 }
 
@@ -197,6 +199,8 @@ Deno.test("runner rejects invalid specialist JSON without writing a successful a
       response_text: "not json",
       usage: { input_tokens: 2, output_tokens: 1, thinking_tokens: 0, cached_tokens: 0, total_tokens: 3 },
       latency_ms: 2,
+      primary_model: "test-primary-model",
+      fallback_chain: [],
     }),
     {
       persist_artifact: async (artifact) => {

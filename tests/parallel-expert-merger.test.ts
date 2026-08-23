@@ -18,6 +18,9 @@ function artifact(
     role,
     window,
     model: "test-model",
+    primary_model: "test-primary-model",
+    artifact_contract: "expert-extraction-v1",
+    fallback_chain: [],
     usage: { input_tokens: 10, output_tokens: 5, thinking_tokens: 1, cached_tokens: 0, total_tokens: 16 },
     latency_ms: 3,
     parsed_response: {
@@ -74,8 +77,24 @@ Deno.test("merger deterministically deduplicates candidates and preserves artifa
   assertEquals((metadata.parallel_expert_artifacts as unknown[]).length, 2);
   assertEquals(merged.artifact_ids, ["artifact-1", "artifact-2"]);
   assertEquals(merged.expert_models, [
-    { id: "artifact-1", role: "characters", window_id: "window-1", model: "gemini-3.5-flash" },
-    { id: "artifact-2", role: "characters", window_id: "window-2", model: "gemini-3.5-flash-lite" },
+    {
+      id: "artifact-1",
+      role: "characters",
+      window_id: "window-1",
+      model: "gemini-3.5-flash",
+      primary_model: "test-primary-model",
+      artifact_contract: "expert-extraction-v1",
+      fallback_chain: [],
+    },
+    {
+      id: "artifact-2",
+      role: "characters",
+      window_id: "window-2",
+      model: "gemini-3.5-flash-lite",
+      primary_model: "test-primary-model",
+      artifact_contract: "expert-extraction-v1",
+      fallback_chain: [],
+    },
   ]);
   assertEquals(merged.extraction.__parallel_expert_artifacts, merged.expert_models);
   assertEquals(merged.usage.total_tokens, 32);
@@ -113,6 +132,9 @@ function artifactRow(id: string, role: "characters" | "locations" | "events", wi
     chunk_positions: window.chunk_positions,
     status,
     model: "test-model",
+    primary_model: "test-primary-model",
+    artifact_contract: "expert-extraction-v1",
+    fallback_chain: [],
     input_tokens: 1,
     output_tokens: 2,
     thinking_tokens: 0,
