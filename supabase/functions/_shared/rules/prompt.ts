@@ -93,10 +93,8 @@ CHARACTERS - key fields requiring evidence:
 
 LOCATIONS - key fields:
 - name: How the location is named/referenced
-- place_type: The place type, using the catalog below or a precise world-specific label, with supporting quote
-- containment: If the text explicitly says the place is inside another place, emit a relationship with type contained_in from the child to the container
-- custom_fields: Any named, story-specific location property grounded in the text; preserve the field name in attributes or location_fields
-- Do not infer missing levels. A place may be directly inside any other place, and intermediate places may be absent.
+- location_type: What type of place it is (city, forest, castle, etc.) with supporting quote
+- related_characters: Which characters are mentioned at this location
 
 OBJECTS - key fields:
 - name: Exact textual reference
@@ -170,28 +168,23 @@ PHYSICAL ATTRIBUTES — pay special attention to: age, height, eye_color, hair_c
 - If vague ("גבוה למדי") and cannot be converted to a concrete value → null.
 
 === LOCATIONS ===
+**ONLY extract locations with a DISTINCT IDENTITY and NARRATIVE IMPORTANCE.**
+NEVER EXTRACT (these WILL be FILTERED OUT):
+- Generic indoor spaces: חדר, מטבח, דירה, סלון, חצר, מרתף, גג, עליית גג, שירותים, מסדרון, מרפסת, פרוזדור, מחסן
+- Generic outdoor spaces: שדה, רחוב, שביל, כביש, דרך, גינה, חצר
+- Generic nature (without specific name): יער, נהר, הר, גבעה, אגם, ים, חוף, מערה, גשר, בקעה, עמק, מדבר
+- Generic buildings/structures: בית, בניין, מגדל, חומה, שער, גדר
+- Generic urban: עיר, כפר, שוק, רחבה, ככר
 
-Extract named or narratively important places, including places that are generic in real life but have a distinct identity in this story. Do not create an entity for an anonymous noun such as "a city" or "the room" unless the text gives it a distinct identity or narrative importance.
-
-PLACE TYPE CATALOG (choose the closest type; do not invent a hierarchy):
-- cosmic: universe, parallel_universe, dimension, plane, galaxy, star_system, world, moon
-- geography: continent, subcontinent, island, archipelago, peninsula, sea, ocean, lake, river, mountain, mountain_range, desert, forest, natural_region
-- governance: country, province, kingdom, colony, empire, territory, principality, duchy, republic, city_state
-- settlement: city, capital, town, village, colony_settlement, settlement, farm, fief, trading_post, outpost
-- structure: neighborhood, district, street, square, market, harbor, complex, building, villa, fort, castle, palace, temple, place_of_worship, tower
-- dwelling: house, cabin, apartment, room, tent, basement, attic, courtyard, garden
-
-For a location, put the selected type in attributes.place_type and include exact support in field_evidence.place_type. If no catalog type is accurate, put the story-specific type in attributes.place_type and preserve it; use "other" only when no meaningful type can be identified.
-
-CONTAINMENT AND STORY-SPECIFIC FIELDS:
-- When the text explicitly establishes that one place is inside, part of, under, surrounding, or contained by another place, emit a relationship with type "contained_in" from the child place to the container place.
-- Do not require or infer every intermediate level. Examples that are valid: world -> island -> village -> farm; dimension -> plane -> city; world -> continent -> country -> city -> neighborhood -> building.
-- Do not put child places into the parent place's fields. A continent tile should show only its containers, if any; it should not show countries or cities merely because they are inside it.
-- Preserve story-specific location facts in attributes.location_fields as key/value pairs, with field names grounded in the text. User-defined fields may be unknown to this prompt and must not be discarded.
+DO EXTRACT (places with distinct identity):
+- Named places: "יער אירויין", "המבצר", "טרונהיים", "המישור הארצי", "האקדמיה"
+- Places with specific narrative importance
+- Unique location identifiers within the story
 
 CONSOLIDATION:
-- If "the city" refers to a named city, use the named city as canonical and keep "the city" as an alias.
-- Merge spelling/definite-article variants only when the context proves they refer to the same place.
+- If "העיר" refers to "טרונהיים" → canonical = "טרונהיים", aliases = ["העיר"]
+- If "יער" and "יער אירויין" = same → canonical = "יער אירויין", aliases = ["היער"]
+- "המישור הארצי" and "מישור הארצי" = same → use the most frequent form as canonical
 
 === OBJECTS ===
 
@@ -238,12 +231,34 @@ ${chunksText}`;
 
 export type ExtractionPromptProfile = "sub-base" | "sub-base-2" | "sub-base-locations";
 
+const SUB_BASE_2_PROFILE_INSTRUCTIONS = `=== SUB-BASE-2 PROFILE INSTRUCTIONS ===
+This is the sub-base-2 extraction profile. Keep the same JSON schema and evidence requirements as the sub-base profile, but this section is intentionally isolated so this profile's extraction instructions can evolve without changing the other profiles.
+`;
+
+const LOCATIONS_PROFILE_INSTRUCTIONS = `=== LOCATION EXTRACTION PROFILE INSTRUCTIONS ===
+This profile is a clone of sub-base-2 with additional dynamic place extraction rules. Apply the following rules only to entities whose type is location:
+
+PLACE TYPE CATALOG (choose the closest type; do not impose a fixed hierarchy):
+- cosmic: universe, parallel_universe, dimension, plane, galaxy, star_system, world, moon
+- geography: continent, subcontinent, island, archipelago, peninsula, sea, ocean, lake, river, mountain, mountain_range, desert, forest, natural_region
+- governance: country, province, kingdom, colony, empire, territory, principality, duchy, republic, city_state
+- settlement: city, capital, town, village, colony_settlement, settlement, farm, fief, trading_post, outpost
+- structure: neighborhood, district, street, square, market, harbor, complex, building, villa, fort, castle, palace, temple, place_of_worship, tower
+- dwelling: house, cabin, apartment, room, tent, basement, attic, courtyard, garden
+
+- Put the selected type in attributes.place_type and support it with field_evidence.place_type.
+- If no catalog type is accurate, preserve the precise story-specific type in attributes.place_type. Use other only when no meaningful type can be identified.
+- When the text explicitly establishes that one place is inside, part of, under, surrounding, or contained by another, emit contained_in from the child place to the container place.
+- Do not require or infer intermediate levels. A place may be directly inside any other place.
+- Do not put child places into the parent place's fields. A place should expose only its direct containers through relationships.
+- Preserve story-specific location facts in attributes.location_fields as grounded key/value pairs. Keep exact user-defined field_key values when they are provided.
+- Do not invent location fields or containment when the text provides no evidence.
+`;
+
 /**
- * Profile-aware prompt entry point.
- * The shared extraction contract remains identical initially, while each
- * non-base profile has an isolated instruction section that can evolve
- * without changing sub-base. Promotion should transfer reviewed results, not
- * prompt behavior or raw model output automatically.
+ * Builds the prompt for the selected extraction profile.
+ * sub-base-2 remains the existing development profile; the locations profile
+ * is exactly that profile plus an isolated location-specific instruction block.
  */
 export function buildExtractionPromptForProfile(
   chunks: { position: number; content: string }[],
@@ -255,11 +270,10 @@ export function buildExtractionPromptForProfile(
     return basePrompt;
   }
 
-  const profileLabel = profile === "sub-base-locations" ? "locations" : "sub-base-2"
+  const subBase2Prompt = `${basePrompt}\n${SUB_BASE_2_PROFILE_INSTRUCTIONS}`;
+  if (profile === "sub-base-2") {
+    return subBase2Prompt;
+  }
 
-  return `${basePrompt}
-
-=== ${profileLabel.toUpperCase()} PROFILE INSTRUCTIONS ===
-This is the ${profileLabel} extraction profile. Keep the same JSON schema and evidence requirements as the sub-base profile, but this section is intentionally isolated so this profile's extraction instructions can evolve without changing the other profiles.
-`;
+  return `${subBase2Prompt}\n${LOCATIONS_PROFILE_INSTRUCTIONS}`;
 }

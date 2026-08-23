@@ -191,7 +191,7 @@ function buildPrompt(
   customPlaceFields: Array<{ place_type_key: string; field_key: string; label: string }> = [],
 ): string {
   const basePrompt = buildExtractionPromptForProfile(chunks, profile);
-  if (customPlaceFields.length === 0) return basePrompt;
+  if (profile !== "sub-base-locations" || customPlaceFields.length === 0) return basePrompt;
 
   const fieldInstructions = customPlaceFields
     .map(field => `- ${field.place_type_key}: ${field.field_key} (${field.label})`)
@@ -1228,21 +1228,21 @@ Deno.serve(async (req) => {
     // ==============================
     // Step 2: Call Gemini (with multi-model fallback)
     // ==============================
-    const { data: projectPlaceFields, error: projectPlaceFieldsError } = await supabase
-      .from("knowledge_place_field_definitions")
-      .select("place_type_key, field_key, label")
-      .eq("project_id", body.project_id)
-      .eq("is_active", true)
-      .order("sort_order");
-    if (projectPlaceFieldsError) {
-      console.warn("[extract-knowledge] Could not load project place fields:", projectPlaceFieldsError.message);
+    let projectPlaceFields: Array<{ place_type_key: string; field_key: string; label: string }> = [];
+    if (modelProfile === "sub-base-locations") {
+      const { data, error } = await supabase
+        .from("knowledge_place_field_definitions")
+        .select("place_type_key, field_key, label")
+        .eq("project_id", body.project_id)
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error) {
+        console.warn("[extract-knowledge] Could not load project place fields:", error.message);
+      }
+      projectPlaceFields = (data || []) as Array<{ place_type_key: string; field_key: string; label: string }>;
     }
 
-    const prompt = buildPrompt(
-      chunkData,
-      modelProfile,
-      (projectPlaceFields || []) as Array<{ place_type_key: string; field_key: string; label: string }>,
-    );
+    const prompt = buildPrompt(chunkData, modelProfile, projectPlaceFields);
     const totalChars = chunkData.reduce((sum, c) => sum + c.content.length, 0);
 
     const geminiResult = await callGeminiWithFallback(
@@ -1404,7 +1404,7 @@ Deno.serve(async (req) => {
     }
     // ================================================
 
-    const normalizedEntities = normalizeEntitiesForExtraction(extraction, chunkLookup);
+    const normalizedEntities = normalizeEntitiesForExtraction(extraction, chunkLookup, modelProfile);
     const entityIdEntries: Array<{ entity: NormalizedEntity; id: string }> = [];
     let entitiesSaved = 0;
     let mentionsSaved = 0;
@@ -1856,30 +1856,32 @@ Deno.serve(async (req) => {
     // ==============================
     // Step 6: Save relationships in the target layer
     // ==============================
-    // Convert explicit location containment hints to graph edges. The graph is
-    // intentionally flat: no intermediate hierarchy levels are inferred.
     const containmentRelationships: ExtractedRelationship[] = [];
-    for (const location of extraction.locations || []) {
-      const attributes = location.attributes || {};
-      const rawContainers = location.container_places || attributes.container_places;
-      const containers = Array.isArray(rawContainers) ? rawContainers : rawContainers ? [rawContainers] : [];
-      const legacyParent = location.parent_location ? [location.parent_location] : [];
-      for (const container of [...containers, ...legacyParent]) {
-        const containerName = typeof container === "string"
-          ? container.trim()
-          : container && typeof container === "object" && "name" in container
-            ? String((container as { name?: unknown }).name || "").trim()
-            : "";
-        if (!containerName || containerName === location.name.trim()) continue;
-        containmentRelationships.push({
-          character_a: location.name.trim(),
-          character_b: containerName,
-          relationship_type: "contained_in",
-          source_type: "location",
-          target_type: "location",
-          evidence: location.field_evidence?.container_places || [],
-          chunk_positions: location.chunk_positions || [],
-        });
+    if (modelProfile === "sub-base-locations") {
+      // Convert explicit location containment hints to graph edges. The graph is
+      // intentionally flat: no intermediate hierarchy levels are inferred.
+      for (const location of extraction.locations || []) {
+        const attributes = location.attributes || {};
+        const rawContainers = location.container_places || attributes.container_places;
+        const containers = Array.isArray(rawContainers) ? rawContainers : rawContainers ? [rawContainers] : [];
+        const legacyParent = location.parent_location ? [location.parent_location] : [];
+        for (const container of [...containers, ...legacyParent]) {
+          const containerName = typeof container === "string"
+            ? container.trim()
+            : container && typeof container === "object" && "name" in container
+              ? String((container as { name?: unknown }).name || "").trim()
+              : "";
+          if (!containerName || containerName === location.name.trim()) continue;
+          containmentRelationships.push({
+            character_a: location.name.trim(),
+            character_b: containerName,
+            relationship_type: "contained_in",
+            source_type: "location",
+            target_type: "location",
+            evidence: location.field_evidence?.container_places || [],
+            chunk_positions: location.chunk_positions || [],
+          });
+        }
       }
     }
 

@@ -92,6 +92,8 @@ export interface GeminiExtraction {
   relationships?: ExtractedRelationship[];
 }
 
+export type ExtractionProfile = "sub-base" | "sub-base-2" | "sub-base-locations";
+
 export interface NormalizedEntity {
   canonical_name: string;
   entity_type: string;
@@ -120,7 +122,11 @@ function normalizeStringList(value: unknown): string[] {
 }
 
 /** Builds the structured fields used by persistence from one extracted entity. */
-export function buildStructuredFields(type: string, entity: ExtractedEntity): Record<string, unknown> {
+export function buildStructuredFields(
+  type: string,
+  entity: ExtractedEntity,
+  profile: ExtractionProfile = "sub-base",
+): Record<string, unknown> {
   const fields: Record<string, unknown> = {};
   fields.name = entity.name ? stripNikud(entity.name) : null;
   fields.description = entity.description || entity.significance || null;
@@ -145,23 +151,34 @@ export function buildStructuredFields(type: string, entity: ExtractedEntity): Re
     fields.narrative_role = entity.narrative_role || null;
     fields.narrative_impact = null;
   } else if (type === "location") {
-    const entityAttributes = entity.attributes || {};
-    const locationFields = entity.location_fields || (entityAttributes.location_fields as Record<string, unknown> | undefined) || {};
-    const placeType = entity.place_type || entity.location_type || (entityAttributes.place_type as string | undefined) || "other";
-    fields.place_type = placeType;
-    fields.location_type = placeType;
-    fields.description = entity.description || entity.significance || null;
-    for (const [key, value] of Object.entries(locationFields)) {
-      if (key && value !== undefined) fields[key] = value;
+    if (profile !== "sub-base-locations") {
+      fields.location_type = entity.location_type || null;
+      fields.parent_location = entity.parent_location || null;
+      fields.continent = entity.continent || null;
+      fields.country = entity.country || null;
+      fields.region = entity.region || null;
+      fields.city = entity.city || null;
+      fields.narrative_impact = null;
+      fields.narrative_importance = entity.narrative_importance || null;
+      fields.related_events = null;
+      fields.related_characters = entity.related_characters || null;
+    } else {
+      const entityAttributes = entity.attributes || {};
+      const locationFields = entity.location_fields || (entityAttributes.location_fields as Record<string, unknown> | undefined) || {};
+      const placeType = entity.place_type || entity.location_type || (entityAttributes.place_type as string | undefined) || "other";
+      fields.place_type = placeType;
+      fields.location_type = placeType;
+      fields.description = entity.description || entity.significance || null;
+      for (const [key, value] of Object.entries(locationFields)) {
+        if (key && value !== undefined) fields[key] = value;
+      }
+      for (const key of ["continent", "country", "region", "city"] as const) {
+        if (entity[key] !== undefined) fields[key] = entity[key];
+      }
+      if (entity.parent_location) fields.parent_location = entity.parent_location;
+      fields.narrative_importance = entity.narrative_importance || null;
+      fields.narrative_impact = null;
     }
-    for (const key of ["continent", "country", "region", "city"] as const) {
-      if (entity[key] !== undefined) fields[key] = entity[key];
-    }
-    // Keep legacy parent_location as a compatibility hint; containment is
-    // persisted from explicit relationships, never inferred from this field.
-    if (entity.parent_location) fields.parent_location = entity.parent_location;
-    fields.narrative_importance = entity.narrative_importance || null;
-    fields.narrative_impact = null;
   } else if (type === "object") {
     fields.object_type = entity.object_type || null;
     fields.appearance = entity.appearance || null;
@@ -227,6 +244,7 @@ function buildExtractionMetadata(entity: ExtractedEntity): Record<string, unknow
 export function normalizeEntities(
   extraction: GeminiExtraction,
   chunkLookup: Map<number, { id: string; page: number | null }>,
+  profile: ExtractionProfile = "sub-base",
 ): NormalizedEntity[] {
   const entityMap = new Map<string, NormalizedEntity>();
 
@@ -236,7 +254,7 @@ export function normalizeEntities(
     const key = normalizeKey(cleanName);
     if (!key) return;
 
-    const incomingStructuredFields = buildStructuredFields(type, entity);
+    const incomingStructuredFields = buildStructuredFields(type, entity, profile);
     const incomingContext: EntityResolutionRecord = {
       canonical_name: cleanName,
       entity_type: type,

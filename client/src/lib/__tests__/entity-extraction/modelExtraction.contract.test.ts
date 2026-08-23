@@ -4,7 +4,10 @@ import {
   type GeminiModelConfig,
 } from '../../../../../supabase/functions/_shared/gemini-config.ts'
 import { callGeminiWithFallback } from '../../../../../supabase/functions/_shared/gemini-client.ts'
-import { buildExtractionPrompt } from '../../../../../supabase/functions/_shared/rules/prompt.ts'
+import {
+  buildExtractionPrompt,
+  buildExtractionPromptForProfile,
+} from '../../../../../supabase/functions/_shared/rules/prompt.ts'
 import {
   normalizeEntities,
   type GeminiExtraction,
@@ -41,6 +44,52 @@ describe('Entity Extraction model matrix contract (offline)', () => {
       expect(models.length, `[profile:${profile}] model count`).toBe(3)
       expect(models.map((model) => model.priority), `[profile:${profile}] priorities`).toEqual([1, 2, 3])
     }
+  })
+
+  it('isolates location prompt rules to sub-base-locations', () => {
+    const subBasePrompt = buildExtractionPromptForProfile(modelExtractionChunks, 'sub-base')
+    const subBase2Prompt = buildExtractionPromptForProfile(modelExtractionChunks, 'sub-base-2')
+    const locationsPrompt = buildExtractionPromptForProfile(modelExtractionChunks, 'sub-base-locations')
+
+    expect(subBasePrompt).not.toContain('SUB-BASE-2 PROFILE INSTRUCTIONS')
+    expect(subBasePrompt).not.toContain('LOCATION EXTRACTION PROFILE INSTRUCTIONS')
+    expect(subBasePrompt).not.toContain('attributes.location_fields')
+
+    expect(subBase2Prompt).toContain('SUB-BASE-2 PROFILE INSTRUCTIONS')
+    expect(subBase2Prompt).not.toContain('LOCATION EXTRACTION PROFILE INSTRUCTIONS')
+    expect(subBase2Prompt).not.toContain('attributes.location_fields')
+
+    expect(locationsPrompt.startsWith(subBase2Prompt)).toBe(true)
+    expect(locationsPrompt).toContain('LOCATION EXTRACTION PROFILE INSTRUCTIONS')
+    expect(locationsPrompt).toContain('attributes.place_type')
+    expect(locationsPrompt).toContain('attributes.location_fields')
+    expect(locationsPrompt).toContain('contained_in')
+  })
+
+  it('keeps dynamic location fields out of legacy profile normalization', () => {
+    const extraction: GeminiExtraction = {
+      locations: [{
+        name: 'ריון',
+        location_type: 'city',
+        place_type: 'city',
+        location_fields: { climate: 'גשום' },
+        continent: 'אסיה',
+        parent_location: 'ממלכת אור',
+        narrative_importance: 'מרכז העלילה',
+      }],
+    }
+
+    const legacy = normalizeEntities(extraction, modelExtractionChunkLookup, 'sub-base-2')[0]
+    const locations = normalizeEntities(extraction, modelExtractionChunkLookup, 'sub-base-locations')[0]
+
+    expect(legacy.structured_fields.location_type).toBe('city')
+    expect(legacy.structured_fields.parent_location).toBe('ממלכת אור')
+    expect(legacy.structured_fields.climate).toBeUndefined()
+    expect(legacy.structured_fields.place_type).toBeUndefined()
+
+    expect(locations.structured_fields.place_type).toBe('city')
+    expect(locations.structured_fields.climate).toBe('גשום')
+    expect(locations.structured_fields.continent).toBe('אסיה')
   })
 
   for (const model of modelConfigs) {
