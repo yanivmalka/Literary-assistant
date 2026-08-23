@@ -58,12 +58,12 @@ export default function AccountSettingsPage() {
     setSuccess(null)
 
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match')
+      setError(t('auth.passwordMismatch'))
       return
     }
 
     if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters')
+      setError(t('auth.passwordMinLength'))
       return
     }
 
@@ -73,7 +73,7 @@ export default function AccountSettingsPage() {
     if (err) {
       setError(err)
     } else {
-      setSuccess('Password added successfully!')
+      setSuccess(t('auth.passwordAdded'))
       setNewPassword('')
       setConfirmPassword('')
       setShowPasswordForm(false)
@@ -96,7 +96,7 @@ export default function AccountSettingsPage() {
     if (err) {
       setError(err)
     } else {
-      setSuccess('Google linking initiated. Complete the sign-in process.')
+      setSuccess(t('auth.googleLinkingStarted'))
     }
     
     setLinkingLoading(false)
@@ -114,12 +114,12 @@ export default function AccountSettingsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <p className="text-muted-foreground mb-4">Please log in to view account settings</p>
+          <p className="text-muted-foreground mb-4">{t('ui.account.loginRequired')}</p>
           <button
             onClick={() => navigate('/login')}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
           >
-            Go to Login
+            {t('ui.account.goToLogin')}
           </button>
         </div>
       </div>
@@ -137,7 +137,7 @@ export default function AccountSettingsPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <h1 className="text-3xl font-bold">Account Settings</h1>
+          <h1 className="text-3xl font-bold">{t('ui.account.settings')}</h1>
         </div>
 
         {/* Error/Success Messages */}
@@ -154,7 +154,7 @@ export default function AccountSettingsPage() {
 
         {/* User Info */}
         <div className="border rounded-lg p-6 bg-card mb-6">
-          <h2 className="text-xl font-semibold mb-4">Account Information</h2>
+          <h2 className="text-xl font-semibold mb-4">{t('ui.account.accountInformation')}</h2>
           <div className="space-y-2 text-sm">
             <p><span className="text-muted-foreground">Email:</span> {user.email}</p>
             <p><span className="text-muted-foreground">User ID:</span> <code className="text-xs bg-muted px-2 py-1 rounded">{user.id.slice(0, 8)}...</code></p>
