@@ -4,8 +4,11 @@ import { useEntityStore } from '@/stores/entityStore'
 import { buildExtractionRequest, getExtractionMode, hasMainEntities, getOrCreateActiveBranch } from '@/lib/extractionBranching'
 import {
   DEFAULT_EXTRACTION_MODEL_PROFILE,
+  DEFAULT_EXTRACTION_STRATEGY,
   getLegacyExtractionModelProfile,
+  isExtractionStrategy,
   type ExtractionModelProfile,
+  type ExtractionStrategy,
   type LegacyExtractionModelProfile,
 } from '@/lib/extractionModels'
 import { useQuillStore } from '@/stores/quillStore'
@@ -57,6 +60,7 @@ export interface PausedExtraction {
   documentId: string
   modelProfile: ExtractionModelProfile
   requestModelProfile: ExtractionModelProfile | LegacyExtractionModelProfile
+  extractionStrategy: ExtractionStrategy
   extractionMode: 'bootstrap' | 'branch'
   activeBranchId: string | null
   nextOffset: number
@@ -97,6 +101,7 @@ interface DocumentState {
     documentId: string,
     modelProfile?: ExtractionModelProfile,
     resumeState?: PausedExtraction,
+    extractionStrategy?: ExtractionStrategy,
   ) => Promise<void>
   pauseExtraction: () => void
   resumeExtraction: (documentId: string) => Promise<void>
@@ -326,6 +331,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     documentId: string,
     modelProfile: ExtractionModelProfile = DEFAULT_EXTRACTION_MODEL_PROFILE,
     resumeState?: PausedExtraction,
+    requestedStrategy: ExtractionStrategy = DEFAULT_EXTRACTION_STRATEGY,
   ) => {
     if (get().extractionInProgress) return
 
@@ -371,6 +377,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       : null
     let extractionMode: 'bootstrap' | 'branch' | null = resumeState?.extractionMode ?? null
     let extractionRunId: string | null = resumeState?.runId ?? null
+    const extractionStrategy: ExtractionStrategy = isExtractionStrategy(
+      resumeState?.extractionStrategy ?? requestedStrategy,
+    )
+      ? (resumeState?.extractionStrategy ?? requestedStrategy) as ExtractionStrategy
+      : DEFAULT_EXTRACTION_STRATEGY
 
     if (!resumeState) {
       try {
@@ -503,6 +514,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         documentId,
         modelProfile,
         requestModelProfile,
+        extractionStrategy,
         extractionMode,
         activeBranchId: activeBranch?.id ?? null,
         nextOffset: offset,
@@ -547,6 +559,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             extractionMode === 'branch' ? activeBranch?.id || null : null,
             offset,
             BATCH_SIZE,
+            extractionStrategy,
           ),
           // CRITICAL: Add extraction-level context
           extraction_mode: extractionMode,

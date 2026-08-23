@@ -45,6 +45,13 @@ describe('AI extraction branch routing', () => {
     })
   })
 
+  it('forwards an explicitly selected strategy without changing the default', () => {
+    expect(buildExtractionRequest('v1', 'p1', 'd1', 'u1', 'branch-1', 0, 2, 'parallel-experts').extraction_strategy)
+      .toBe('parallel-experts')
+    expect(buildExtractionRequest('v1', 'p1', 'd1', 'u1', 'branch-1', 0, 2, 'invalid' as never).extraction_strategy)
+      .toBe('legacy-sequential')
+  })
+
   it('creates a new AI entity as Branch-only, never Main', () => {
     const row = buildBranchEntityRecord('p1', 'u1', 'branch-1', {
       canonical_name: 'New Character',
