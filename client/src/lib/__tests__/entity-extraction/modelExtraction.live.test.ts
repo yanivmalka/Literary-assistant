@@ -36,7 +36,7 @@ function modelError(model: GeminiModelConfig, message: string, details?: unknown
   return new Error(`[live model:${model.id}] ${message}${suffix}`)
 }
 
-describe('Entity Extraction live model matrix (Gemini, no Supabase)', () => {
+describe.skipIf(!geminiApiKey)('Entity Extraction live model matrix (Gemini, no Supabase)', () => {
   for (const model of modelConfigs) {
     it(`[live:${model.id}] extracts and validates the fixed fixture`, async () => {
       if (!geminiApiKey) {

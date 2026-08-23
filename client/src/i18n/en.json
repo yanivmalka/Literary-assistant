@@ -705,7 +705,18 @@
     },
     "theme": {
       "switchToDark": "Switch to dark mode",
-      "switchToLight": "Switch to light mode"
+      "switchToLight": "Switch to light mode",
+      "appearanceTitle": "Theme transition",
+      "appearanceDescription": "Choose how the interface changes between day and night mode.",
+      "transitionEnabled": "Enable gradual transition",
+      "transitionEnabledDescription": "Animate the interface colors when switching themes.",
+      "transitionMode": "Transition mode",
+      "immediate": "Immediate",
+      "gradual": "Gradual",
+      "duration": "Transition speed",
+      "durationDescription": "Choose how long the gradual transition takes.",
+      "seconds": "{{value}} seconds",
+      "reducedMotionHint": "Gradual transitions are disabled when your system prefers reduced motion."
     },
     "documents": {
       "extractKnowledge": "Extract",

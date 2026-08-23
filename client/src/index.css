@@ -63,6 +63,16 @@
   [dir="rtl"] body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   }
+
+  /* Animate theme colors without affecting layout, transforms, or opacity. */
+  html.theme-transition,
+  html.theme-transition *,
+  html.theme-transition *::before,
+  html.theme-transition *::after {
+    transition-property: background-color, border-color, color, fill, stroke, box-shadow;
+    transition-duration: var(--theme-transition-duration, 0ms);
+    transition-timing-function: ease-in-out;
+  }
 }
 
 @layer utilities {

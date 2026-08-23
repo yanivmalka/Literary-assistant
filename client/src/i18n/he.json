@@ -705,7 +705,18 @@
     },
     "theme": {
       "switchToDark": "עבור למצב לילה",
-      "switchToLight": "עבור למצב יום"
+      "switchToLight": "עבור למצב יום",
+      "appearanceTitle": "מעבר בין ערכות",
+      "appearanceDescription": "בחר כיצד הממשק ישתנה בין מצב יום למצב לילה.",
+      "transitionEnabled": "הפעל מעבר הדרגתי",
+      "transitionEnabledDescription": "הנפש את צבעי הממשק בעת החלפת הערכה.",
+      "transitionMode": "סוג המעבר",
+      "immediate": "מיידי",
+      "gradual": "הדרגתי",
+      "duration": "קצב המעבר",
+      "durationDescription": "בחר כמה זמן יימשך המעבר ההדרגתי.",
+      "seconds": "{{value}} שניות",
+      "reducedMotionHint": "מעברים הדרגתיים מושבתים כאשר הגדרות המערכת מעדיפות הפחתת תנועה."
     },
     "documents": {
       "extractKnowledge": "חלץ",
