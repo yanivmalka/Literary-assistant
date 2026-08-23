@@ -826,6 +826,10 @@
         "contained_in": "Contained in"
       }
     },
+    "character": {
+      "addFieldTitle": "Add Character Field",
+      "addFieldHint": "Choose a field from the catalog. It will be added to future extraction instructions and shown here even when it has no value yet."
+    },
     "location": {
       "newTitle": "New Location",
       "editTitle": "Edit Location",

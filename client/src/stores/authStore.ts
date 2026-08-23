@@ -1,9 +1,25 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import i18n from '@/i18n'
 import type { Profile } from '@/lib/types'
 import type { User, Session } from '@supabase/supabase-js'
 
-interface AuthState {
+type AuthError = { code?: string; message?: string } | null
+
+function translateAuthError(error: AuthError, fallbackKey: string) {
+  const code = error?.code?.toLowerCase()
+  const message = error?.message?.toLowerCase() || ''
+
+  if (code === 'email_not_confirmed' || message.includes('email not confirmed')) {
+    return i18n.t('auth.emailNotConfirmed')
+  }
+  if (code === 'invalid_credentials' || code === 'invalid_grant') {
+    return i18n.t('auth.invalidCredentials')
+  }
+  return i18n.t(fallbackKey)
+}
+
+
   user: User | null
   session: Session | null
   profile: Profile | null
@@ -71,7 +87,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const normalizedEmail = email.trim()
       if (!normalizedEmail || !password) {
         set({ loading: false })
-        return { error: 'Email and password are required.' }
+        return { error: i18n.t('auth.emailRequired') }
       }
 
       const { error } = await supabase.auth.signUp({
@@ -82,11 +98,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
       })
       set({ loading: false })
-      return { error: error?.message ?? null }
+      return { error: error ? translateAuthError(error, 'auth.signUpFailed') : null }
     } catch (err) {
       set({ loading: false })
-      const message = err instanceof Error ? err.message : 'Sign up failed'
-      return { error: message }
+      console.error('Sign up failed:', err)
+      return { error: i18n.t('auth.signUpFailed') }
     }
   },
 
@@ -96,7 +112,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const normalizedEmail = email.trim()
       if (!normalizedEmail || !password) {
         set({ loading: false })
-        return { error: 'Email and password are required.' }
+        return { error: i18n.t('auth.emailRequired') }
       }
 
       const { error } = await supabase.auth.signInWithPassword({
@@ -106,18 +122,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) {
         set({ loading: false })
-        const errorCode = error.code?.toLowerCase()
-        const errorMessage = error.message.toLowerCase()
-
-        if (errorCode === 'email_not_confirmed' || errorMessage.includes('email not confirmed')) {
-          return { error: 'Please check your email to confirm your account before logging in.' }
-        }
-
-        if (errorCode === 'invalid_credentials' || errorCode === 'invalid_grant') {
-          return { error: 'Invalid email or password.' }
-        }
-
-        return { error: error.message }
+        const translatedError = translateAuthError(error, 'auth.signInFailed')
+        return { error: translatedError }
       }
 
       // Wait for the auth session to be established and listener to fire
@@ -139,8 +145,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return { error: null }
     } catch (err) {
       set({ loading: false })
-      const message = err instanceof Error ? err.message : 'Sign in failed'
-      return { error: message }
+      console.error('Sign in failed:', err)
+      return { error: i18n.t('auth.signInFailed') }
     }
   },
 
@@ -150,7 +156,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       provider: 'google',
       options: { redirectTo: redirectUrl },
     })
-    return { error: error?.message ?? null }
+    return { error: error ? translateAuthError(error, 'auth.signInFailed') : null }
   },
 
   signOut: async () => {
@@ -177,10 +183,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         token,
         type: 'signup',
       })
-      return { error: error?.message ?? null }
+      return { error: error ? translateAuthError(error, 'auth.emailConfirmationFailed') : null }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Email confirmation failed'
-      return { error: message }
+      console.error('Email confirmation failed:', err)
+      return { error: i18n.t('auth.emailConfirmationFailed') }
     }
   },
 
@@ -193,20 +199,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           redirectTo: redirectUrl,
         },
       })
-      return { error: error?.message ?? null }
+      return { error: error ? translateAuthError(error, 'ui.common.unexpectedError') : null }
     } catch (err) {
-      const message = err instanceof Error ? err.message : `Failed to link ${provider}`
-      return { error: message }
+      console.error(`Failed to link ${provider}:`, err)
+      return { error: i18n.t('ui.common.unexpectedError') }
     }
   },
 
   updateUserPassword: async (password) => {
     try {
       const { error } = await supabase.auth.updateUser({ password })
-      return { error: error?.message ?? null }
+      return { error: error ? translateAuthError(error, 'auth.passwordUpdateFailed') : null }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update password'
-      return { error: message }
+      console.error('Failed to update password:', err)
+      return { error: i18n.t('auth.passwordUpdateFailed') }
     }
   },
 
@@ -214,12 +220,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser()
       if (userError || !user) {
-        return { identities: null, error: userError?.message ?? 'User not found' }
+        return { identities: null, error: i18n.t('auth.userNotFound') }
       }
       return { identities: user.identities ?? [], error: null }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch identities'
-      return { identities: null, error: message }
+      console.error('Failed to fetch identities:', err)
+      return { identities: null, error: i18n.t('auth.identitiesFetchFailed') }
     }
   },
 }))

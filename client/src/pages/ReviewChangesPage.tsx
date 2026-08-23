@@ -75,7 +75,7 @@ export default function ReviewChangesPage() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
             <div>
-              <h3 className="font-semibold text-amber-900 mb-2">Potential Conflicts</h3>
+              <h3 className="font-semibold text-amber-900 mb-2">{t('review.potentialConflicts')}</h3>
               <ul className="space-y-1 text-sm text-amber-800">
                 {conflicts.map((conflict, i) => (
                   <li key={i}>• {conflict.description}</li>
@@ -100,19 +100,19 @@ export default function ReviewChangesPage() {
               {/* Change type badge */}
               <div className="text-xs font-semibold mb-2">
                 {change.type === 'new_entity' && (
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">New Entity</span>
+                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">{t('review.newEntity')}</span>
                 )}
                 {change.type === 'field_change' && (
-                  <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded">Field Change</span>
+                  <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded">{t('review.fieldChange')}</span>
                 )}
                 {change.type === 'new_relationship' && (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded">New Relationship</span>
+                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded">{t('review.newRelationship')}</span>
                 )}
                 {change.type === 'remove_relationship' && (
-                  <span className="px-2 py-1 bg-red-100 text-red-800 rounded">Remove Relationship</span>
+                  <span className="px-2 py-1 bg-red-100 text-red-800 rounded">{t('review.removeRelationship')}</span>
                 )}
                 {change.type === 'new_event' && (
-                  <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded">New Event</span>
+                  <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded">{t('review.newEvent')}</span>
                 )}
               </div>
 
@@ -122,7 +122,7 @@ export default function ReviewChangesPage() {
                   <div>
                     <h4 className="font-semibold">{change.entity_name}</h4>
                     <p className="text-sm text-muted-foreground">
-                      New {change.entity_type} entity
+                      {t('review.newEntityDescription', { type: change.entity_type })}
                     </p>
                   </div>
                 )}
@@ -133,7 +133,7 @@ export default function ReviewChangesPage() {
                       {change.entity_name} → {change.relationship_type} → {change.target_entity_name}
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      {change.type === 'remove_relationship' ? 'Remove relationship' : 'New relationship'}
+                      {t(change.type === 'remove_relationship' ? 'review.removeRelationshipDescription' : 'review.newRelationshipDescription')}
                     </p>
                   </div>
                 )}
@@ -141,7 +141,7 @@ export default function ReviewChangesPage() {
                 {change.type === 'new_event' && (
                   <div>
                     <h4 className="font-semibold">{change.event_name}</h4>
-                    <p className="text-sm text-muted-foreground">New event</p>
+                    <p className="text-sm text-muted-foreground">{t('review.newEventDescription')}</p>
                   </div>
                 )}
 

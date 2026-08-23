@@ -363,9 +363,9 @@ export default function CharacterEditModal({
           {isDynamicProfile && (
             <section className="border border-dashed rounded-lg p-4 space-y-3">
               <div>
-                <h3 className="font-semibold">הוספת שדה דמות</h3>
+                <h3 className="font-semibold">{t('ui.character.addFieldTitle')}</h3>
                 <p className="text-xs text-muted-foreground">
-                  בחר שדה מהקטלוג. הוא יתווסף להוראות החילוץ העתידיות, ויוצג כאן גם אם עדיין אין לו ערך.
+                  {t('ui.character.addFieldHint')}
                 </p>
               </div>
               <div className="flex gap-2">
