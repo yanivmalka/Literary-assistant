@@ -18,7 +18,21 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 ## 3. Run Migrations
 
-Run every file in `supabase/migrations/` in numeric order in the Supabase SQL Editor (or with the Supabase CLI). Do not deploy the Edge Functions until the migrations have completed. In particular, the current extraction flow requires migrations 115-121, including `120_reconcile_extraction_metadata.sql` and `121_set_current_model_profile_default.sql`, which repair environments where the function was deployed before the extraction metadata schema.
+Use **one** migration mechanism per environment:
+
+- **Supabase CLI:** run the normal migration command (`supabase db push`) and let the CLI track applied migrations.
+- **SQL Editor:** run only migration files that are not already applied, in numeric order.
+
+Do not run the complete `supabase/migrations/` directory repeatedly, and do not manually insert rows into the migration history table. If a migration reports a duplicate key in `schema_migrations`, stop and inspect the migration history before retrying; rerunning the file can create schema drift or duplicate data.
+
+The runtime reconciliation migration is `128_reconcile_runtime_schema.sql`. Apply it **once** after migrations `001`–`127` are already present. It:
+
+- removes only the stale `knowledge_entities_version_name_unique` constraint/index;
+- recreates `get_quill_wallet()` with qualified `user_id` references;
+- limits that RPC's execution privilege to authenticated users;
+- does not delete application rows.
+
+Do not edit an already-applied migration to repair a deployed database. Add a new numbered migration instead.
 
 Afterward, verify the columns required by the extraction function:
 

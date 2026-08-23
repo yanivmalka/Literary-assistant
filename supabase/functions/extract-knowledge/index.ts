@@ -54,6 +54,11 @@ const corsHeaders = {
 };
 
 const BATCH_SIZE = 3;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
 
 // ============================================
 // Types
@@ -745,7 +750,7 @@ async function findExistingMainEntity(
   versionId: string,
   entity: NormalizedEntity,
 ): Promise<ExtractionEntityCandidate | null> {
-  const entitySelect = "id, canonical_name, entity_type, entity_types, structured_fields, attributes, source, description, layer, branch_id";
+  const entitySelect = "id, canonical_name, entity_type, entity_types, structured_fields, attributes, source, description, layer, branch_id, created_at";
   const { data, error } = await supabase
     .from("knowledge_entities")
     .select(entitySelect)
@@ -958,14 +963,32 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let body: ExtractRequest;
   try {
-    const body = (await req.json()) as ExtractRequest;
+    body = (await req.json()) as ExtractRequest;
+  } catch {
+    return errorResponse("Request body must be valid JSON.", 400);
+  }
+
+  try {
 
     // ==============================
     // Validation: Required base fields
     // ==============================
     if (!body.version_id || !body.project_id || !body.document_id || !body.user_id) {
       return errorResponse("Missing required fields: version_id, project_id, document_id, user_id.", 400);
+    }
+
+    if (![body.version_id, body.project_id, body.document_id, body.user_id].every(isUuid)) {
+      return errorResponse("version_id, project_id, document_id, and user_id must be valid UUIDs.", 400);
+    }
+
+    if (body.target_branch_id !== undefined && body.target_branch_id !== null && !isUuid(body.target_branch_id)) {
+      return errorResponse("target_branch_id must be a valid UUID.", 400);
+    }
+
+    if (body.extraction_run_id !== undefined && !isUuid(body.extraction_run_id)) {
+      return errorResponse("extraction_run_id must be a valid UUID.", 400);
     }
 
     const modelProfile = body.model_profile ?? DEFAULT_MODEL_PROFILE;
@@ -1334,7 +1357,7 @@ Deno.serve(async (req) => {
         extraction_run_id: extractionRunId,
         model: modelUsed,
         model_profile: modelProfile,
-        raw_response: extraction,
+        raw_response: storageSafeExtraction,
         input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
         output_tokens: (usage as Record<string, unknown>).candidatesTokenCount ?? null,
         thinking_tokens: (usage as Record<string, unknown>).thoughtsTokenCount ?? null,
@@ -1437,7 +1460,7 @@ Deno.serve(async (req) => {
         const { error: mainUpdateError } = await supabase
           .from("knowledge_entities")
           .update({
-            canonical_name: merged.canonical_name,
+            canonical_name: existing.source === "user" ? existing.canonical_name : merged.canonical_name,
             entity_types: merged.entity_types,
             description: existing.source === "user" ? existing.description : merged.description,
             attributes: existing.source === "user" ? existing.attributes : merged.attributes,
@@ -1587,16 +1610,39 @@ Deno.serve(async (req) => {
           .select("id")
           .single();
 
+        let insertedNewEntity = false;
         if (insertError || !inserted) {
-          const message = `Failed to insert ${targetLayer} entity '${entity.canonical_name}': ${insertError?.message || "no row returned"}`;
-          console.error(message);
-          persistenceErrors.push(message);
-          continue;
+          // Keep the flow safe even if migration 128 has not reached the
+          // database yet or two extraction requests race each other.
+          if (targetLayer === "main" && insertError?.code === "23505") {
+            const racedEntity = await findExistingMainEntity(
+              supabase,
+              body.project_id,
+              body.user_id,
+              body.version_id,
+              entity,
+            );
+            if (racedEntity) {
+              entityId = racedEntity.id;
+            } else {
+              const message = `Failed to resolve Main entity after duplicate insert '${entity.canonical_name}': ${insertError.message}`;
+              console.error(message);
+              persistenceErrors.push(message);
+              continue;
+            }
+          } else {
+            const message = `Failed to insert ${targetLayer} entity '${entity.canonical_name}': ${insertError?.message || "no row returned"}`;
+            console.error(message);
+            persistenceErrors.push(message);
+            continue;
+          }
+        } else {
+          entityId = inserted.id;
+          insertedNewEntity = true;
         }
-        entityId = inserted.id;
 
         // If Branch mode: also create knowledge_branch_entities mapping
-        if (targetLayer === "branch") {
+        if (insertedNewEntity && targetLayer === "branch") {
           const { error: branchMappingError } = await supabase
             .from("knowledge_branch_entities")
             .upsert(

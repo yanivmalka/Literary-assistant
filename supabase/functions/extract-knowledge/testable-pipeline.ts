@@ -49,7 +49,7 @@ export function cloneJsonValue<T>(value: T): T | null {
   }
 }
 
- type NormalizedExtractionBucket =
+type NormalizedExtractionBucket =
   | 'characters'
   | 'locations'
   | 'objects'
