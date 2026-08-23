@@ -18,6 +18,7 @@ import {
   getPopulatedCharacterFields,
   isDynamicCharacterProfile,
   loadCharacterFieldSchema,
+  normalizeCharacterGroupKey,
   type CharacterFieldDefinition,
 } from '@/lib/characterSchema'
 import CharacterEditModal from '@/components/knowledge/CharacterEditModal'
@@ -75,18 +76,21 @@ export default function CharacterProfilePage() {
       if (!entity) return []
       if (!isDynamicProfile) return getFieldGroupsForType(entityType)
       const groups = new Map<string, string[]>()
+      const populatedKeys = new Set(
+        getPopulatedCharacterFields(entity, modelProfile, dynamicFields).map(field => field.key.trim()),
+      )
       groups.set('זהות', ['name', 'first_name'])
       for (const field of visibleDynamicDefinitions) {
-        // Identity fields are rendered in one explicit group, including the
-        // catalog's longer identity group key.
-        if (field.field_key === 'first_name') continue
-        const groupKey = field.group_key === 'זהות ופרטים אישיים' ? 'זהות' : field.group_key
+        const fieldKey = field.field_key.trim()
+        // first_name is already rendered in the explicit identity group above.
+        if (fieldKey === 'first_name') continue
+        const groupKey = normalizeCharacterGroupKey(field.group_key)
         const group = groups.get(groupKey) || []
-        if (!group.includes(field.field_key)) group.push(field.field_key)
+        if (!group.includes(fieldKey)) group.push(fieldKey)
         groups.set(groupKey, group)
       }
       return [...groups.entries()]
-        .filter(([, fields]) => fields.length > 0)
+        .filter(([, fields]) => fields.some(field => field === 'name' || field === 'first_name' || populatedKeys.has(field)))
         .map(([key, fields]) => ({ key, labelKey: '', fields }))
     },
     [entity, entityType, isDynamicProfile, visibleDynamicDefinitions]

@@ -14,6 +14,7 @@ import {
   getCatalogCharacterField,
   isDynamicCharacterProfile,
   isPopulatedCharacterField,
+  normalizeCharacterGroupKey,
   loadCharacterFieldSchema,
   type CharacterFieldDefinition,
 } from '@/lib/characterSchema'
@@ -134,11 +135,12 @@ export default function CharacterEditModal({
       },
     ])
     for (const field of visibleDynamicFields) {
+      const fieldKey = field.field_key.trim()
       // first_name is already rendered in the explicit identity group above.
-      if (field.field_key === 'first_name') continue
-      const groupKey = field.group_key === 'זהות ופרטים אישיים' ? 'זהות' : field.group_key
+      if (fieldKey === 'first_name') continue
+      const groupKey = normalizeCharacterGroupKey(field.group_key)
       const group = groups.get(groupKey) || []
-      group.push(field)
+      group.push({ ...field, field_key: fieldKey })
       groups.set(groupKey, group)
     }
     return [...groups.entries()]

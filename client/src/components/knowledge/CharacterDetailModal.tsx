@@ -10,6 +10,7 @@ import {
   isDynamicCharacterProfile,
   isPopulatedCharacterField,
   loadCharacterFieldProvenance,
+  normalizeCharacterGroupKey,
   type CharacterFieldDefinition,
   type CharacterFieldProvenance,
 } from '@/lib/characterSchema'
@@ -104,11 +105,9 @@ export default function CharacterDetailModal({
   const populatedFields = getPopulatedCharacterFields(character, modelProfile, definitions)
   const dynamicGroups = new Map<string, typeof populatedFields>()
   for (const field of populatedFields) {
-    const groupKey = field.definition.group_key === 'זהות ופרטים אישיים'
-      ? 'זהות'
-      : field.definition.group_key
+    const groupKey = normalizeCharacterGroupKey(field.definition.group_key)
     const group = dynamicGroups.get(groupKey) || []
-    group.push(field)
+    group.push({ ...field, key: field.key.trim() })
     dynamicGroups.set(groupKey, group)
   }
   const legacyFields = [

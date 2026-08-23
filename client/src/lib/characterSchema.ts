@@ -98,6 +98,17 @@ export const CHARACTER_FIELD_CATALOG: readonly CharacterFieldDefinition[] = [
   characterField('religion_and_beliefs', 'דת ואמונה', 'long_text', 'זהות ופרטים אישיים', 108),
 ]
 
+export function normalizeCharacterGroupKey(groupKey: string): string {
+  const normalized = groupKey.trim().replace(/\s+/g, ' ')
+  const identityKeys = new Set([
+    'זהות',
+    'זהות ופרטים אישיים',
+    'identity',
+    'identity and personal details',
+  ])
+  return identityKeys.has(normalized.toLocaleLowerCase()) ? 'זהות' : normalized
+}
+
 export function isDynamicCharacterProfile(profile: ExtractionModelProfile | string): profile is CharacterDynamicProfile {
   return (DYNAMIC_CHARACTER_PROFILES as readonly string[]).includes(profile)
 }
