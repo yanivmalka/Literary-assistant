@@ -25,7 +25,7 @@ export default function SignUpPage() {
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+      setError(t('auth.passwordMinLength'))
       return
     }
 
@@ -52,10 +52,9 @@ export default function SignUpPage() {
         </div>
         <div className="w-full max-w-md text-center">
           <Map className="h-12 w-12 text-primary mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-4">Check your email</h2>
+          <h2 className="text-xl font-semibold mb-4">{t('ui.auth.confirmationTitle')}</h2>
           <p className="text-muted-foreground mb-6">
-            We sent a confirmation link to <strong>{email}</strong>. 
-            Click the link to activate your account.
+            {t('ui.auth.confirmationBody')}
           </p>
           <button
             onClick={() => navigate('/login')}
