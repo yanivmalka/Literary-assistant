@@ -29,11 +29,15 @@ export interface QAMessage {
 interface QAState {
   messages: QAMessage[]
   conversationId: string | null
+  selectedSourceVersionIds: string[]
+  includeAdjacent: boolean
   loading: boolean
   error: string | null
 
   ask: (projectId: string, question: string) => Promise<void>
   loadConversation: (projectId: string) => Promise<void>
+  setSelectedSourceVersionIds: (versionIds: string[]) => void
+  setIncludeAdjacent: (includeAdjacent: boolean) => void
   clearHistory: () => void
 }
 
@@ -67,6 +71,8 @@ interface EdgeFunctionResponse {
 export const useQAStore = create<QAState>((set, get) => ({
   messages: [],
   conversationId: null,
+  selectedSourceVersionIds: [],
+  includeAdjacent: true,
   loading: false,
   error: null,
 
@@ -121,6 +127,12 @@ export const useQAStore = create<QAState>((set, get) => ({
           top_k: 5,
           conversation_id: get().conversationId,
           client_request_id: questionMsg.id,
+          source_version_ids: get().selectedSourceVersionIds.length > 0
+            ? get().selectedSourceVersionIds
+            : undefined,
+          include_adjacent: get().selectedSourceVersionIds.length > 0
+            ? get().includeAdjacent
+            : undefined,
         }),
       })
 
@@ -268,6 +280,12 @@ export const useQAStore = create<QAState>((set, get) => ({
       set({ conversationId: null, messages: [], loading: false })
     }
   },
+
+  setSelectedSourceVersionIds: (versionIds) => {
+    set({ selectedSourceVersionIds: [...new Set(versionIds)] })
+  },
+
+  setIncludeAdjacent: (includeAdjacent) => set({ includeAdjacent }),
 
   clearHistory: () => set({ messages: [], conversationId: null, error: null }),
 }))

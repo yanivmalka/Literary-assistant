@@ -370,7 +370,52 @@
     "noAnswer": "לא ניתן היה ליצור תשובה. קטעים רלוונטיים מוצגים למטה.",
     "authRequired": "יש להתחבר כדי לשאול שאלות.",
     "partialResults": "ייתכן שחלק מהתוצאות אינן מלאות.",
-    "entities": "ישויות שהוזכרו"
+    "entities": "ישויות שהוזכרו",
+    "sourcePicker": {
+      "title": "מקורות לשאלה",
+      "description": "בחר גרסאות מסמך כדי להגביל את החיפוש. ללא בחירה, החיפוש יתבצע בכל המקורות.",
+      "allSources": "כל המקורות",
+      "scoped": "מוגבל",
+      "empty": "אין עדיין גרסאות מסמך שעברו עיבוד.",
+      "version": "גרסה {{version}}",
+      "includeAdjacent": "כלול קטעים סמוכים"
+    }
+  },
+  "artifacts": {
+    "title": "תוצרי חילוץ",
+    "subtitle": "סקור תוצרי מומחים ואת הראיות שלהם בלי לשנות את שכבת הידע.",
+    "openReview": "סקור תוצרי חילוץ",
+    "backToDocuments": "חזרה למסמכים",
+    "empty": "לא נמצאו תוצרי מומחים במקביל.",
+    "emptyDescription": "תוצרים יופיעו כאן לאחר הרצת parallel-experts שהופעלה במפורש.",
+    "loadError": "לא ניתן לטעון את תוצרי החילוץ",
+    "readOnlyNotice": "מסך קריאה בלבד. שום פעולה כאן לא מאשרת, מקדמת או כותבת שינויים ל-Main או ל-Branch.",
+    "roles": {
+      "characters": "מומחה דמויות",
+      "locations": "מומחה מקומות",
+      "events": "מומחה אירועים"
+    },
+    "status": {
+      "pending": "ממתין",
+      "running": "פועל",
+      "succeeded": "הצליח",
+      "failed": "נכשל"
+    },
+    "window": "חלון",
+    "run": "הרצה",
+    "model": "מודל",
+    "notAvailable": "לא זמין",
+    "chunks": "מיקומי קטעים",
+    "chunk": "קטע",
+    "attempt": "ניסיון",
+    "tokens": "טוקנים",
+    "latency": "זמן תגובה",
+    "entities": "ישויות",
+    "events": "אירועים",
+    "relationships": "קשרים",
+    "evidence": "ראיות",
+    "noEvidence": "לא נמצאה ראיית קטע עבור תוצר זה.",
+    "parsedOutput": "פלט מומחה מפוענח"
   },
   "contradictions": {
     "title": "סתירות",

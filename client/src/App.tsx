@@ -18,6 +18,7 @@ import CharacterProfilePage from './pages/CharacterProfilePage'
 import TimelinePage from './pages/TimelinePage'
 import KnowledgeHubPage from './pages/KnowledgeHubPage'
 import QAPage from './pages/QAPage'
+import ArtifactReviewPage from './pages/ArtifactReviewPage'
 import ContradictionsPage from './pages/ContradictionsPage'
 import BranchPage from './pages/BranchPage'
 import DevTestPage from './pages/DevTestPage'
@@ -60,6 +61,7 @@ function App() {
         <Route path="projects/:projectId/timeline" element={<TimelinePage />} />
         <Route path="projects/:projectId/review" element={<ReviewChangesPage />} />
         <Route path="projects/:projectId/qa" element={<QAPage />} />
+        <Route path="projects/:projectId/artifacts" element={<ArtifactReviewPage />} />
         <Route path="projects/:projectId/contradictions" element={<ContradictionsPage />} />
         <Route path="projects/:projectId/branches" element={<BranchPage />} />
         <Route path="trash" element={<TrashPage />} />

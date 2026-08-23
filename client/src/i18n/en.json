@@ -370,7 +370,52 @@
     "noAnswer": "No answer could be generated. Relevant passages are shown below.",
     "authRequired": "Please log in to ask questions.",
     "partialResults": "Some results may be incomplete.",
-    "entities": "Entities mentioned"
+    "entities": "Entities mentioned",
+    "sourcePicker": {
+      "title": "Sources for this question",
+      "description": "Choose document versions to limit retrieval. Leaving all unchecked searches all sources.",
+      "allSources": "All sources",
+      "scoped": "Scoped",
+      "empty": "No processed document versions are available yet.",
+      "version": "v{{version}}",
+      "includeAdjacent": "Include nearby passages"
+    }
+  },
+  "artifacts": {
+    "title": "Extraction Artifacts",
+    "subtitle": "Review specialist outputs and their evidence without changing the Knowledge Layer.",
+    "openReview": "Review extraction artifacts",
+    "backToDocuments": "Back to documents",
+    "empty": "No parallel expert artifacts found.",
+    "emptyDescription": "Artifacts appear here after an explicitly enabled parallel-experts extraction run.",
+    "loadError": "Could not load extraction artifacts",
+    "readOnlyNotice": "Read-only review. Nothing on this screen accepts, promotes, or writes changes to Main or Branch.",
+    "roles": {
+      "characters": "Characters specialist",
+      "locations": "Locations specialist",
+      "events": "Events specialist"
+    },
+    "status": {
+      "pending": "Pending",
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "failed": "Failed"
+    },
+    "window": "Window",
+    "run": "Run",
+    "model": "Model",
+    "notAvailable": "not available",
+    "chunks": "Chunk positions",
+    "chunk": "Chunk",
+    "attempt": "Attempt",
+    "tokens": "Tokens",
+    "latency": "Latency",
+    "entities": "Entities",
+    "events": "Events",
+    "relationships": "Relationships",
+    "evidence": "Evidence",
+    "noEvidence": "No chunk evidence was available for this artifact.",
+    "parsedOutput": "Parsed specialist output"
   },
   "contradictions": {
     "title": "Contradictions",

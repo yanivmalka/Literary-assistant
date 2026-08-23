@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { MessageSquare } from 'lucide-react'
 import QAPanel from '@/components/qa/QAPanel'
+import SourcePicker from '@/components/qa/SourcePicker'
 import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
 
 export default function QAPage() {
@@ -20,6 +21,9 @@ export default function QAPage() {
           {t('qa.title')}
         </h2>
         <p className="text-sm text-muted-foreground mt-1">{t('qa.subtitle')}</p>
+      </div>
+      <div className="mb-3">
+        <SourcePicker projectId={projectId} />
       </div>
       <div className="border rounded-lg overflow-hidden">
         <QAPanel projectId={projectId} />

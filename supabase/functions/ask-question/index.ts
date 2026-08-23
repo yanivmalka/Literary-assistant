@@ -430,6 +430,8 @@ async function enhancedHybridSearch(
     chapterNumber: chunk.chapter_number,
     chapterTitle: chunk.chapter_title,
     page: chunk.page,
+    position: chunk.position,
+    versionId: chunk.version_id,
     score: chunk.score,
     documentName: chunk.document_name,
   }));
@@ -443,6 +445,14 @@ async function hybridSearch(
   branchId?: string | null,
   scope?: RetrievalScope,
 ): Promise<QASource[]> {
+  if (scope) {
+    const hasExplicitSourceScope = scopeStrings(scope.sourceVersionIds).length > 0
+      || scopeIntegers(scope.chapterNumbers).length > 0
+      || scopeStrings(scope.chunkIds).length > 0;
+    if (hasExplicitSourceScope) {
+      return enhancedHybridSearch(supabase, projectId, question, topK, scope);
+    }
+  }
   if (Deno.env.get("QA_RETRIEVAL_MODE") === "enhanced") {
     return enhancedHybridSearch(supabase, projectId, question, topK, scope);
   }

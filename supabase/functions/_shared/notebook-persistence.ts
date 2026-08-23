@@ -124,6 +124,8 @@ async function ensureNotebookSources(
   if (versionsError) throw versionsError;
 
   const documentIds = [...new Set((versions ?? []).map((version: { document_id: string }) => version.document_id))];
+  if (documentIds.length === 0) return new Map();
+
   const { data: documents, error: documentsError } = await supabase
     .from("documents")
     .select("id, name")

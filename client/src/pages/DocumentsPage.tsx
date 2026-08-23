@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
-import { FileText } from 'lucide-react'
+import { useParams, Link } from 'react-router-dom'
+import { FileText, ClipboardList } from 'lucide-react'
 import { useDocumentStore } from '@/stores/documentStore'
 import DocumentUploader from '@/components/documents/DocumentUploader'
 import DocumentList from '@/components/documents/DocumentList'
@@ -61,6 +61,13 @@ export default function DocumentsPage() {
         <p className="text-sm text-muted-foreground mt-1">
           {t('documents.subtitle')}
         </p>
+        <Link
+          to={`/projects/${projectId}/artifacts`}
+          className="mt-3 inline-flex items-center gap-1.5 rounded border px-3 py-2 text-sm hover:bg-muted"
+        >
+          <ClipboardList className="h-4 w-4" />
+          {t('artifacts.openReview')}
+        </Link>
       </div>
 
       {/* Upload section */}
