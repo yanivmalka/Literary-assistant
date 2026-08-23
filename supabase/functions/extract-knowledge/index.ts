@@ -50,6 +50,9 @@ import {
   validateExtractionMode,
   validateExtractionPayload,
   validateExtractionStrategy,
+  isParallelExpertsRolloutEnabled,
+  validateExtractionStrategyRollout,
+  PARALLEL_EXPERTS_ROLLOUT_ENV,
   type ExtractionStrategy,
 } from "./testable-pipeline.ts";
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
@@ -1073,6 +1076,11 @@ Deno.serve(async (req) => {
       return errorResponse(`Invalid extraction strategy: ${strategyValidation.error}`, 400);
     }
     const extractionStrategy: ExtractionStrategy = strategyValidation.strategy;
+    const rolloutValidation = validateExtractionStrategyRollout(
+      extractionStrategy,
+      isParallelExpertsRolloutEnabled(Deno.env.get(PARALLEL_EXPERTS_ROLLOUT_ENV)),
+    );
+    if (!rolloutValidation.ok) return errorResponse(rolloutValidation.error, 403);
 
     // ==============================
     // Validation: Main vs Branch extraction mode

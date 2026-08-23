@@ -5,6 +5,10 @@ import {
   createTokenBudgetState,
   validateExpertExtractionResult,
 } from "../supabase/functions/_shared/parallel-experts.ts";
+import {
+  isParallelExpertsRolloutEnabled,
+  validateExtractionStrategyRollout,
+} from "../supabase/functions/extract-knowledge/testable-pipeline.ts";
 import { assert, assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 
 function validResult() {
@@ -86,4 +90,15 @@ Deno.test("token budget falls back to component counts when total is invalid", (
 
   assert(result.ok);
   if (result.ok) assertEquals(result.state.consumed, 60);
+});
+
+Deno.test("parallel-experts rollout is fail-closed and exact-true only", () => {
+  assertEquals(isParallelExpertsRolloutEnabled(undefined), false);
+  assertEquals(isParallelExpertsRolloutEnabled("TRUE"), false);
+  assertEquals(isParallelExpertsRolloutEnabled("true"), true);
+  assertEquals(validateExtractionStrategyRollout("legacy-sequential", false), { ok: true });
+  const disabled = validateExtractionStrategyRollout("parallel-experts", false);
+  assert(!disabled.ok);
+  if (!disabled.ok) assert(disabled.error.includes("EXTRACTION_PARALLEL_EXPERTS_ENABLED=true"));
+  assertEquals(validateExtractionStrategyRollout("parallel-experts", true), { ok: true });
 });

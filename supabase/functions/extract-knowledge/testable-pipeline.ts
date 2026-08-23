@@ -45,6 +45,26 @@ export function validateExtractionStrategy(value: unknown): ExtractionStrategyVa
   };
 }
 
+export const PARALLEL_EXPERTS_ROLLOUT_ENV = 'EXTRACTION_PARALLEL_EXPERTS_ENABLED';
+
+/** Server-side rollout is fail-closed: only the exact string "true" enables it. */
+export function isParallelExpertsRolloutEnabled(value: unknown): boolean {
+  return value === 'true';
+}
+
+export function validateExtractionStrategyRollout(
+  strategy: ExtractionStrategy,
+  rolloutEnabled: boolean,
+): { ok: true } | { ok: false; error: string } {
+  if (strategy === 'parallel-experts' && !rolloutEnabled) {
+    return {
+      ok: false,
+      error: 'parallel-experts is disabled. Enable EXTRACTION_PARALLEL_EXPERTS_ENABLED=true for an explicit rollout.',
+    };
+  }
+  return { ok: true };
+}
+
 /** Mirrors the handler's JSON cleanup and fallback object extraction without I/O. */
 export function parseExtractionJson<T>(responseText: string): T | null {
   try {
