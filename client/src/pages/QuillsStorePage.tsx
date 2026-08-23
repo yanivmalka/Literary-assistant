@@ -9,6 +9,8 @@ const PACKAGES = [20, 50, 100] as const
 export default function QuillsStorePage() {
   const { t } = useTranslation()
   const { wallet, loading, granting, error, loadWallet, grantQuills } = useQuillStore()
+  const tokenRemainder = wallet?.token_remainder ?? 0
+  const tokensUntilNextQuill = Math.max(0, 5000 - tokenRemainder)
 
   useEffect(() => {
     if (!wallet) loadWallet()
@@ -40,6 +42,10 @@ export default function QuillsStorePage() {
             {loading ? '…' : wallet?.quills_balance ?? '—'}
           </p>
           <p className="text-sm font-medium">{t('quills.namePlural')}</p>
+          <div className="mt-3 border-t border-primary/20 pt-3 text-xs text-muted-foreground">
+            <p>{t('quills.tokensUsedTowardNext', { tokens: tokenRemainder.toLocaleString() })}</p>
+            <p>{t('quills.tokensUntilNext', { tokens: tokensUntilNextQuill.toLocaleString() })}</p>
+          </div>
         </div>
       </div>
 

@@ -9,12 +9,25 @@ export interface QuillWallet {
   token_remainder: number
 }
 
+export interface QuillBalancePayload {
+  quills_balance: number
+  token_remainder: number
+}
+
+export interface QuillUsagePayload {
+  total_tokens: number
+  charged_quills: number
+  quills_balance: number
+  token_remainder: number
+}
+
 interface QuillState {
   wallet: QuillWallet | null
   loading: boolean
   granting: boolean
   error: string | null
   loadWallet: () => Promise<void>
+  applyServerWallet: (payload: QuillBalancePayload) => void
   grantQuills: (amount: 20 | 50 | 100) => Promise<boolean>
   clear: () => void
 }
@@ -36,6 +49,17 @@ export const useQuillStore = create<QuillState>((set) => ({
       console.error('[Quills] Failed to load wallet:', error)
       set({ loading: false, error: 'quills.loadError' })
     }
+  },
+
+  applyServerWallet: (payload) => {
+    if (!Number.isFinite(payload.quills_balance) || !Number.isFinite(payload.token_remainder)) return
+    set((state) => ({
+      wallet: state.wallet
+        ? { ...state.wallet, ...payload }
+        : { user_id: '', ...payload },
+      loading: false,
+      error: null,
+    }))
   },
 
   grantQuills: async (amount) => {

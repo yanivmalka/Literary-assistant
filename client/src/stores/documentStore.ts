@@ -432,7 +432,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           break
         }
 
-        await useQuillStore.getState().loadWallet()
+        if (data.quills) {
+          useQuillStore.getState().applyServerWallet(data.quills)
+        } else {
+          await useQuillStore.getState().loadWallet()
+        }
 
         const nextOffset = Number(data.next_offset ?? offset + BATCH_SIZE)
         // The server historically marks a full final batch as done=false because

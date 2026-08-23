@@ -111,7 +111,9 @@
     "loadError": "Could not load your Quill balance right now. Please try again.",
     "retry": "Try again",
     "purchaseError": "Could not add Quills. Please try again.",
-    "insufficient": "You do not have enough Quills. Add more Quills to continue."
+    "insufficient": "You do not have enough Quills. Add more Quills to continue.",
+    "tokensUsedTowardNext": "{{tokens}} tokens accumulated toward the next Quill",
+    "tokensUntilNext": "{{tokens}} tokens until another Quill is consumed"
   },
   "maps": {
     "create": "New Map",

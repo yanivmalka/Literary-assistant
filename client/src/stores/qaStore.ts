@@ -32,6 +32,11 @@ interface QAState {
   clearHistory: () => void
 }
 
+interface QuillResponse {
+  quills_balance: number
+  token_remainder: number
+}
+
 interface EdgeFunctionResponse {
   success: boolean
   error?: string
@@ -40,8 +45,13 @@ interface EdgeFunctionResponse {
     sources: QASource[]
     entitiesReferenced: string[]
     noSufficientContext: boolean
-    modelUsed?: string
-    latencyMs?: number
+    quills?: QuillResponse
+    usage?: {
+      input_tokens: number | null
+      output_tokens: number | null
+      total_tokens: number
+      charged_quills: number
+    }
   }
 }
 
@@ -117,7 +127,11 @@ export const useQAStore = create<QAState>((set, get) => ({
       }
 
       const result = data.result
-      await useQuillStore.getState().loadWallet()
+      if (result.quills) {
+        useQuillStore.getState().applyServerWallet(result.quills)
+      } else {
+        await useQuillStore.getState().loadWallet()
+      }
 
       // No context available
       if (result.noSufficientContext && !result.answer) {

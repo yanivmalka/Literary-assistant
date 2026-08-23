@@ -418,6 +418,9 @@ Deno.serve(async (req) => {
       );
     }
 
+    // --- Step 6: Parse LLM response and meter usage ---
+    const geminiData = geminiResult.data as Record<string, unknown>;
+
     let quillCharge;
     try {
       quillCharge = await consumeGeminiUsage(
@@ -437,8 +440,15 @@ Deno.serve(async (req) => {
       return errorResponse("Failed to update Quill balance", 500, chargeMessage);
     }
 
-    // --- Step 6: Parse LLM response ---
-    const geminiData = geminiResult.data as Record<string, unknown>;
+    const usage = (geminiData.usageMetadata as Record<string, unknown> | undefined) ?? {};
+    const usagePayload = {
+      input_tokens: usage.promptTokenCount ?? null,
+      output_tokens: usage.candidatesTokenCount ?? null,
+      total_tokens: quillCharge.totalTokens,
+      charged_quills: quillCharge.chargedQuills,
+    };
+
+    // --- Step 7: Parse LLM response ---
     const candidates = (geminiData.candidates as Array<Record<string, unknown>>) || [];
     const firstCandidate = candidates[0];
     const content = firstCandidate?.content as Record<string, unknown> | undefined;
@@ -468,6 +478,11 @@ Deno.serve(async (req) => {
           noSufficientContext,
           modelUsed: geminiResult.modelUsed,
           latencyMs,
+          usage: usagePayload,
+          quills: {
+            quills_balance: quillCharge.balance,
+            token_remainder: quillCharge.remainder,
+          },
         } as QAResult,
       }),
       {
