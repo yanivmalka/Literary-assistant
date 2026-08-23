@@ -315,3 +315,22 @@ The four-scenario controlled extraction verification above is a baseline and doe
 - `supabase/sql/verification/VERIFY_CHARACTER_LOCATION_FIELDS.sql`
 
 This additional gate covers all 20 active `CharacterFields` and all 9 active `LocationFields`, including raw Gemini output, normalized `knowledge_entities.structured_fields`, `knowledge_entity_values`, Main routing, provenance, and separate UI coverage. It also explicitly distinguishes extraction-contract gaps from normalization, persistence, value-sync, routing, and UI failures.
+
+
+---
+
+## Extraction Profile Routing
+
+The site now exposes three independent extraction profiles:
+
+| Display name | Canonical profile ID | Initial purpose |
+|---|---|---|
+| Sub-base model | `sub-base` | Existing active extraction behavior |
+| Sub-base model 2 | `sub-base-2` | Existing development behavior, isolated for separate iteration |
+| Sub-base model - Locations | `sub-base-locations` | Clone of Sub-base model 2, reserved for location-specific rules |
+
+All three profiles use the same Gemini fallback chain initially. Their Branch data and prompt instructions are profile-scoped so later development can proceed independently.
+
+Routing is project-wide rather than profile-specific: the first extraction run for a project with an empty Main layer uses `bootstrap` and writes to Main, regardless of the selected profile. Once Main contains entities, every later run uses the active Branch for the selected profile. Continuation batches keep the run's original profile, mode, and target Branch.
+
+Migration `supabase/migrations/133_sub_base_extraction_profiles.sql` renames persisted `current`/`development` values and expands the database constraints to include `sub-base-locations`.

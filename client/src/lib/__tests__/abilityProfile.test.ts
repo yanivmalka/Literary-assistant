@@ -3,10 +3,11 @@ import { shouldUseAbilityFallback } from '../abilityProfile'
 
 describe('ability fallback profile isolation', () => {
   it('keeps compatibility fallback disabled for the active profile', () => {
-    expect(shouldUseAbilityFallback('current')).toBe(false)
+    expect(shouldUseAbilityFallback('sub-base')).toBe(false)
   })
 
-  it('enables compatibility fallback only for development', () => {
-    expect(shouldUseAbilityFallback('development')).toBe(true)
+  it('enables compatibility fallback for the cloned profiles', () => {
+    expect(shouldUseAbilityFallback('sub-base-2')).toBe(true)
+    expect(shouldUseAbilityFallback('sub-base-locations')).toBe(true)
   })
 })

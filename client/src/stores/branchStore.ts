@@ -1,7 +1,10 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import i18n from '@/i18n'
-import type { ExtractionModelProfile } from '@/lib/extractionModels'
+import {
+  DEFAULT_EXTRACTION_MODEL_PROFILE,
+  type ExtractionModelProfile,
+} from '@/lib/extractionModels'
 import {
   getEffectiveBranchView,
   applyFieldOverride,
@@ -119,9 +122,9 @@ interface BranchState {
   error: string | null
 
   // Actions
-  fetchBranches: (projectId: string) => Promise<void>
+  fetchBranches: (projectId: string, profile?: ExtractionModelProfile) => Promise<void>
   fetchCurrentBranch: (projectId: string, profile?: ExtractionModelProfile) => Promise<Branch | null>
-  createBranch: (projectId: string, name?: string) => Promise<Branch | null>
+  createBranch: (projectId: string, name?: string, profile?: ExtractionModelProfile) => Promise<Branch | null>
   fetchBranchEntities: (branchId: string) => Promise<void>
   fetchMainEntities: (projectId: string) => Promise<void>
   getEffectiveBranchView: (entityId: string, branchId: string) => Promise<EffectiveEntity | null>
@@ -151,7 +154,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
   // ==============================
   // Fetch all branches for a project
   // ==============================
-  fetchBranches: async (projectId: string) => {
+  fetchBranches: async (projectId: string, profile = DEFAULT_EXTRACTION_MODEL_PROFILE) => {
     try {
       const { data, error } = await supabase
         .from('knowledge_branches')
@@ -166,7 +169,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
       }
 
       const branches = (data || []) as Branch[]
-      const current = branches.find(b => b.profile === 'current' && b.is_current && b.status === 'active') || null
+      const current = branches.find(b => b.profile === profile && b.is_current && b.status === 'active') || null
       set({ branches, currentBranch: current })
     } catch (err) {
       console.error('Failed to fetch branches:', err)
@@ -176,7 +179,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
   // ==============================
   // Fetch the current active branch
   // ==============================
-  fetchCurrentBranch: async (projectId: string, profile = 'current') => {
+  fetchCurrentBranch: async (projectId: string, profile = DEFAULT_EXTRACTION_MODEL_PROFILE) => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return null
@@ -213,7 +216,11 @@ export const useBranchStore = create<BranchState>((set, get) => ({
   // - An existing entity is modified in the branch, or
   // - A new entity is created in the branch, or
   // - An operation explicitly creates an overlay.
-  createBranch: async (projectId: string, name?: string) => {
+  createBranch: async (
+    projectId: string,
+    name?: string,
+    profile = DEFAULT_EXTRACTION_MODEL_PROFILE,
+  ) => {
     set({ loading: true, error: null })
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -230,6 +237,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
           project_id: projectId,
           user_id: user.id,
           name: branchName,
+          profile,
           status: 'active',
           is_current: true,
         })
@@ -246,7 +254,7 @@ export const useBranchStore = create<BranchState>((set, get) => ({
       // Overlays will be created only when needed (on modification or extraction).
 
       // Refresh state
-      await get().fetchBranches(projectId)
+      await get().fetchBranches(projectId, profile)
 
       set({ loading: false })
       return branch as Branch

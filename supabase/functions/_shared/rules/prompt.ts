@@ -231,13 +231,13 @@ ${chunksText}`;
 
 
 
-export type ExtractionPromptProfile = "current" | "development";
+export type ExtractionPromptProfile = "sub-base" | "sub-base-2" | "sub-base-locations";
 
 /**
  * Profile-aware prompt entry point.
- * The shared extraction contract remains identical initially, while the
- * development profile has an isolated instruction section that can evolve
- * without changing current. Promotion should transfer reviewed results, not
+ * The shared extraction contract remains identical initially, while each
+ * non-base profile has an isolated instruction section that can evolve
+ * without changing sub-base. Promotion should transfer reviewed results, not
  * prompt behavior or raw model output automatically.
  */
 export function buildExtractionPromptForProfile(
@@ -246,13 +246,15 @@ export function buildExtractionPromptForProfile(
 ): string {
   const basePrompt = buildExtractionPrompt(chunks);
 
-  if (profile === "current") {
+  if (profile === "sub-base") {
     return basePrompt;
   }
 
+  const profileLabel = profile === "sub-base-locations" ? "locations" : "sub-base-2"
+
   return `${basePrompt}
 
-=== DEVELOPMENT PROFILE INSTRUCTIONS ===
-This is the development extraction profile. Keep the same JSON schema and evidence requirements as the active profile, but this section is intentionally isolated so development-specific extraction instructions can evolve without changing the active profile.
+=== ${profileLabel.toUpperCase()} PROFILE INSTRUCTIONS ===
+This is the ${profileLabel} extraction profile. Keep the same JSON schema and evidence requirements as the sub-base profile, but this section is intentionally isolated so this profile's extraction instructions can evolve without changing the other profiles.
 `;
 }

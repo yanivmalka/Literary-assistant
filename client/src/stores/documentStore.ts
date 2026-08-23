@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import { useEntityStore } from '@/stores/entityStore'
-import { buildExtractionRequest, hasMainEntities, getOrCreateActiveBranch } from '@/lib/extractionBranching'
+import { buildExtractionRequest, getExtractionMode, hasMainEntities, getOrCreateActiveBranch } from '@/lib/extractionBranching'
 import { DEFAULT_EXTRACTION_MODEL_PROFILE, type ExtractionModelProfile } from '@/lib/extractionModels'
 import { useQuillStore } from '@/stores/quillStore'
 
@@ -310,13 +310,14 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       // or all go to the same branch.
       const mainExists = await hasMainEntities(projectId)
 
-      if (!mainExists && modelProfile === 'current') {
-        // Current profile may initialize Main on the first extraction.
-        extractionMode = 'bootstrap'
-        console.log('[Knowledge] Extraction mode: BOOTSTRAP - initializing Main layer with complete extraction')
+      extractionMode = getExtractionMode(mainExists)
+      if (extractionMode === 'bootstrap') {
+        // The first successful extraction for a project initializes Main,
+        // regardless of which isolated profile the user selected.
+        console.log(`[Knowledge] Extraction mode: BOOTSTRAP (${modelProfile}) - initializing Main layer with complete extraction`)
       } else {
-        // Development is always isolated in its profile-specific Branch.
-        extractionMode = 'branch'
+        // Every extraction after Main initialization is isolated in the
+        // selected profile-specific Branch.
         console.log(`[Knowledge] Extraction mode: BRANCH (${modelProfile})`)
         activeBranch = await getOrCreateActiveBranch(projectId, modelProfile)
       }

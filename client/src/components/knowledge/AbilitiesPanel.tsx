@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Shield, Sparkles } from 'lucide-react'
 import { shouldUseAbilityFallback } from '@/lib/abilityProfile'
+import { shouldUseProfileBranch } from '@/lib/extractionModels'
 import type { Entity } from '@/stores/entityStore'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import { supabase } from '@/lib/supabase'
@@ -185,7 +186,7 @@ export default function AbilitiesPanel({
         .select('target_entity_id, relationship_type')
         .eq('source_entity_id', character.id)
         .eq('relationship_type', 'has_ability')
-      const { data: relationships, error: relError } = modelProfile === 'development' && branchId
+      const { data: relationships, error: relError } = shouldUseProfileBranch(modelProfile) && branchId
         ? await relationshipQuery.eq('branch_id', branchId)
         : await relationshipQuery
 

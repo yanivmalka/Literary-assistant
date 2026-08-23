@@ -75,7 +75,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
   mainEntitiesCache: null,
   branchEntitiesCache: null,
 
-  fetchEntities: async (projectId, filters, profile = 'current') => {
+  fetchEntities: async (projectId, filters, profile = 'sub-base') => {
     set({ loading: true })
     try {
       const { data: { user } } = await supabase.auth.getUser()

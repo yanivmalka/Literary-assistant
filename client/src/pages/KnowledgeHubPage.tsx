@@ -112,7 +112,9 @@ export default function KnowledgeHubPage() {
             {activeTab === 'characters' && (
               <CharactersHub projectId={projectId} entities={entities} modelProfile={modelProfile} />
             )}
-            {activeTab === 'locations' && <LocationsHub projectId={projectId} entities={entities} />}
+            {activeTab === 'locations' && (
+              <LocationsHub projectId={projectId} entities={entities} modelProfile={modelProfile} />
+            )}
             {activeTab === 'timeline' && <TimelineHub projectId={projectId} />}
           </>
         )}

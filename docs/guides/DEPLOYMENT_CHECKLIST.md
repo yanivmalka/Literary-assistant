@@ -10,7 +10,7 @@ Offline validation does not establish production readiness. Complete the control
 ## Pre-Deployment Verification
 
 ### Database Migrations
-Apply the migrations required by the active extraction handler in numeric order. The active handler uses the provenance, model-profile, run-lineage, branch-profile, branch-persistence, and graph/timeline schema changes from migrations 112 and 115-123. Migrations 113-114 define optional bootstrap-staging and resolution-suggestion infrastructure; those modules are not invoked by the current handler and must not be described as active extraction behavior.
+Apply the migrations required by the active extraction handler in numeric order. The active handler uses the provenance, model-profile, run-lineage, branch-profile, branch-persistence, and graph/timeline schema changes from migrations 112 and 115-123, followed by migration 133 for the canonical sub-base profiles. Migrations 113-114 define optional bootstrap-staging and resolution-suggestion infrastructure; those modules are not invoked by the current handler and must not be described as active extraction behavior.
 
 - [ ] Migration 112 deployed (`add_mentions_provenance.sql`)
   - [ ] `mentions.chunk_id` added with FK to `document_chunks.id`
@@ -33,8 +33,8 @@ Apply the migrations required by the active extraction handler in numeric order.
   - [ ] `raw_extractions.extraction_run_id` exists
   - [ ] `idx_raw_extractions_extraction_run` exists
 
-- [ ] Migration 117 deployed (`rename_extraction_model_profiles.sql`)
-  - [ ] `raw_extractions.model_profile` accepts `current` and `development`
+- [ ] Migration 117 deployed (`rename_extraction_model_profiles.sql`) — historical profile normalization
+  - [ ] Final canonical profile values are applied by migration 133: `sub-base`, `sub-base-2`, and `sub-base-locations`
 
 - [ ] Migration 118 deployed (`profile_scoped_branches.sql`)
   - [ ] `knowledge_branches.profile` exists
@@ -54,14 +54,19 @@ Apply the migrations required by the active extraction handler in numeric order.
     ```
     Expected: both columns are returned.
 
-- [ ] Migration 121 deployed (`set_current_model_profile_default.sql`)
-  - [ ] New raw extraction rows default to `model_profile = 'current'`
+- [ ] Migration 121 deployed (`set_current_model_profile_default.sql`) — historical default alignment
+  - [ ] Final new raw extraction rows default to `model_profile = 'sub-base'` after migration 133
 
 - [ ] Migration 122 deployed (`reconcile_branch_entity_persistence.sql`)
   - [ ] Branch entity rows and `knowledge_branch_entities.entity_id` satisfy the current Branch persistence contract
 
 - [ ] Migration 123 deployed (`extraction_graph_provenance.sql`)
   - [ ] Relationship/event metadata and event mention provenance columns exist
+
+- [ ] Migration 133 deployed (`sub_base_extraction_profiles.sql`)
+  - [ ] Historical `current`/`development` values are normalized to `sub-base`/`sub-base-2`
+  - [ ] `sub-base-locations` is accepted for raw extractions, Branches, and promotions
+  - [ ] New raw extraction rows default to `model_profile = 'sub-base'`
 
 - [ ] `supabase/functions/_shared/extraction-state.ts` reviewed as supporting code only
   - [ ] Do not claim active handler integration unless an E2E test proves it
@@ -128,7 +133,7 @@ Apply the migrations required by the active extraction handler in numeric order.
     "next_offset": 100,
     "telemetry": {
       "model": "string",
-      "model_profile": "current|development",
+      "model_profile": "sub-base|sub-base-2|sub-base-locations",
       "latency_ms": 0,
       "chunks_sent": 1
     },

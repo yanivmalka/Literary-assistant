@@ -10,7 +10,7 @@ export interface GeminiModelConfig {
   priority: number;
 }
 
-export type GeminiModelProfile = "current" | "development";
+export type GeminiModelProfile = "sub-base" | "sub-base-2" | "sub-base-locations";
 
 /**
  * Ordered list of Gemini models used by the active extraction behavior.
@@ -24,25 +24,30 @@ export const GEMINI_MODELS: GeminiModelConfig[] = [
 
 /**
  * Model profiles are intentionally separate so they can evolve independently.
- * The development profile currently mirrors the active profile exactly; change
- * only this profile when developing a new extraction model or fallback chain.
+ * The sub-base-2 profile currently mirrors the sub-base profile exactly;
+ * change only that profile when developing its extraction model or fallback chain.
  */
 export const GEMINI_MODEL_PROFILES: Record<GeminiModelProfile, GeminiModelConfig[]> = {
-  current: GEMINI_MODELS,
-  development: [
+  "sub-base": GEMINI_MODELS,
+  "sub-base-2": [
+    { id: "gemini-3.5-flash", priority: 1 },
+    { id: "gemini-3.5-flash-lite", priority: 2 },
+    { id: "gemini-2.5-flash", priority: 3 },
+  ],
+  "sub-base-locations": [
     { id: "gemini-3.5-flash", priority: 1 },
     { id: "gemini-3.5-flash-lite", priority: 2 },
     { id: "gemini-2.5-flash", priority: 3 },
   ],
 };
 
-export const DEFAULT_MODEL_PROFILE: GeminiModelProfile = "current";
+export const DEFAULT_MODEL_PROFILE: GeminiModelProfile = "sub-base";
 
 /** Default model to use (highest priority) */
 export const DEFAULT_MODEL = GEMINI_MODELS[0].id;
 
 export function isGeminiModelProfile(value: unknown): value is GeminiModelProfile {
-  return value === "current" || value === "development";
+  return value === "sub-base" || value === "sub-base-2" || value === "sub-base-locations";
 }
 
 /** Base URL for Gemini API */

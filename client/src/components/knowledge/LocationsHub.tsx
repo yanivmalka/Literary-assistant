@@ -4,23 +4,28 @@ import { GitBranch, Plus } from 'lucide-react'
 import { useBranchStore } from '@/stores/branchStore'
 import { useEntityStore } from '@/stores/entityStore'
 import type { Entity } from '@/stores/entityStore'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
+import { shouldUseProfileBranch } from '@/lib/extractionModels'
 import LocationTile from './LocationTile'
 import LocationEditModal from './LocationEditModal'
 
 interface LocationsHubProps {
   projectId: string
   entities: Entity[]
+  modelProfile: ExtractionModelProfile
 }
 
 type VersionType = 'main' | 'branch'
 
-export default function LocationsHub({ projectId }: LocationsHubProps) {
+export default function LocationsHub({ projectId, modelProfile }: LocationsHubProps) {
   const { t } = useTranslation()
 
   const { currentBranch } = useBranchStore()
   const { fetchEntities: fetchEntitiesStore, getMainOnlyEntities, getEffectiveBranchEntities } = useEntityStore()
 
-  const [selectedVersion, setSelectedVersion] = useState<VersionType>('main')
+  const [selectedVersion, setSelectedVersion] = useState<VersionType>(
+    shouldUseProfileBranch(modelProfile) ? 'branch' : 'main',
+  )
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState<Entity | null>(null)
 
@@ -140,7 +145,7 @@ export default function LocationsHub({ projectId }: LocationsHubProps) {
         onClose={handleCloseEditModal}
         onLocationUpdated={() => {
           handleCloseEditModal()
-          fetchEntitiesStore(projectId)
+          fetchEntitiesStore(projectId, undefined, modelProfile)
         }}
       />
     </div>

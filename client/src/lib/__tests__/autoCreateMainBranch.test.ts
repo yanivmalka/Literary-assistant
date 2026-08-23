@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { getExtractionMode } from '../extractionBranching'
 
 /**
  * Auto-create Main/Branch Tests (Extraction Bootstrap)
@@ -15,6 +16,15 @@ describe('Auto-create Main/Branch for Extraction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
+
+  it.each(['sub-base', 'sub-base-2', 'sub-base-locations'] as const)(
+    'routes the first extraction for %s to Main and later extractions to Branch',
+    (profile) => {
+      expect(getExtractionMode(false)).toBe('bootstrap')
+      expect(getExtractionMode(true)).toBe('branch')
+      expect(profile).toBeTruthy()
+    },
+  )
 
   describe('STATE 1: No Main exists', () => {
     it('should detect that Main does not exist', () => {

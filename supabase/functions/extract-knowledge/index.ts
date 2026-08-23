@@ -1005,10 +1005,6 @@ Deno.serve(async (req) => {
     const modeValidation = validateExtractionMode(body);
     if (!modeValidation.ok) return errorResponse(`Invalid extraction mode: ${modeValidation.error}`, 400);
 
-    if (modelProfile === 'development' && modeValidation.mode !== 'branch') {
-      return errorResponse("Development extraction must use a dedicated Branch.", 400);
-    }
-
     // For backward compatibility, fall back to legacy behavior if extraction_mode not provided
     const useMainForExtraction = modeValidation.mode === 'bootstrap';
     const hasBranchId = !!body.target_branch_id;

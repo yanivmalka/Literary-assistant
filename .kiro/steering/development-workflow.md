@@ -21,9 +21,9 @@ npm run install:all
 
 # Run Supabase migrations (in Supabase SQL Editor, in numeric order)
 # Apply every file under supabase/migrations/ before deploying Edge Functions.
-# The current extraction flow specifically requires migrations 115-121,
-# including 120_reconcile_extraction_metadata.sql and
-# 121_set_current_model_profile_default.sql.
+# The current extraction flow specifically requires migrations 115-123 and
+# 133_sub_base_extraction_profiles.sql, including the metadata recovery,
+# branch persistence, and canonical profile migration steps.
 ```
 
 ### Development

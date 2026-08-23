@@ -135,6 +135,13 @@ export function buildRawExtractionRecord(
   }
 }
 
+export function getExtractionMode(mainExists: boolean): 'bootstrap' | 'branch' {
+  return mainExists ? 'branch' : 'bootstrap'
+}
+
+/**
+ * Build an extraction request for a selected target layer.
+ */
 export function buildExtractionRequest(
   versionId: string,
   projectId: string,
@@ -170,7 +177,7 @@ export function buildExtractionRequest(
  */
 export async function getActiveBranch(
   projectId: string,
-  profile: ExtractionModelProfile = 'current',
+  profile: ExtractionModelProfile = 'sub-base',
 ) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
@@ -756,7 +763,7 @@ export async function hasMainEntities(projectId: string): Promise<boolean> {
  */
 export async function getOrCreateActiveBranch(
   projectId: string,
-  profile: ExtractionModelProfile = 'current',
+  profile: ExtractionModelProfile = 'sub-base',
 ): Promise<{ id: string }> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -784,7 +791,11 @@ export async function getOrCreateActiveBranch(
   // No active branch exists. Try to create one.
   // If race condition: another client creates it first, we'll get "duplicate" error
   // In that case, re-fetch to get the newly created branch
-  const profileLabel = profile === 'development' ? 'Development' : 'Current'
+  const profileLabel = profile === 'sub-base'
+    ? 'Sub-base'
+    : profile === 'sub-base-2'
+      ? 'Sub-base 2'
+      : 'Sub-base Locations'
   const branchName = `${profileLabel} Branch ${new Date().toLocaleDateString(navigator.language === 'he' ? 'he-IL' : 'en-US')}`
 
   const { data: created, error: createError } = await supabase

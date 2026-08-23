@@ -5,6 +5,7 @@ import { useBranchStore } from '@/stores/branchStore'
 import { useEntityStore } from '@/stores/entityStore'
 import type { Entity } from '@/stores/entityStore'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
+import { shouldUseProfileBranch } from '@/lib/extractionModels'
 import CharacterTile from './CharacterTile'
 import CharacterDetailModal from './CharacterDetailModal'
 import CharacterEditModal from './CharacterEditModal'
@@ -24,7 +25,7 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
   const { createEntity, fetchEntities: fetchEntitiesStore, getMainOnlyEntities, getEffectiveBranchEntities } = useEntityStore()
 
   const [selectedVersion, setSelectedVersion] = useState<VersionType>(
-    modelProfile === 'development' ? 'branch' : 'main',
+    shouldUseProfileBranch(modelProfile) ? 'branch' : 'main',
   )
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -33,7 +34,7 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
   const createInProgressRef = useRef(false)
 
   useEffect(() => {
-    setSelectedVersion(modelProfile === 'development' ? 'branch' : 'main')
+    setSelectedVersion(shouldUseProfileBranch(modelProfile) ? 'branch' : 'main')
   }, [modelProfile])
 
   // Get characters for selected version (Main or Branch)

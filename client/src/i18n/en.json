@@ -508,8 +508,9 @@
       "extractKnowledgeTitle": "Extract knowledge from this document",
       "modelProfile": "Extraction model",
       "modelProfiles": {
-        "current": "Active model",
-        "development": "Development model (same for now)"
+        "sub-base": "Sub-base model",
+        "sub-base-2": "Sub-base model 2",
+        "sub-base-locations": "Sub-base model - Locations"
       },
       "uploadNotAuthenticated": "Please log in before uploading a document",
       "uploadFailed": "The document upload failed. Please try again.",

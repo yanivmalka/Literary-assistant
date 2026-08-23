@@ -508,8 +508,9 @@
       "extractKnowledgeTitle": "חלץ ידע מהמסמך",
       "modelProfile": "מודל חילוץ",
       "modelProfiles": {
-        "current": "המודל הפעיל",
-        "development": "מודל בפיתוח (זהה כרגע)"
+        "sub-base": "מודל תת-בסיס",
+        "sub-base-2": "מודל תת-בסיס 2",
+        "sub-base-locations": "מודל תת-בסיס - מקומות"
       },
       "uploadNotAuthenticated": "יש להתחבר לפני העלאת מסמך",
       "uploadFailed": "העלאת המסמך נכשלה. נסה שוב.",

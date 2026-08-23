@@ -30,7 +30,7 @@ afterEach(() => {
 
 describe('Entity Extraction model matrix contract (offline)', () => {
   it('contains every configured model in every extraction profile', () => {
-    expect(Object.keys(GEMINI_MODEL_PROFILES)).toEqual(['current', 'development'])
+    expect(Object.keys(GEMINI_MODEL_PROFILES)).toEqual(['sub-base', 'sub-base-2', 'sub-base-locations'])
     expect(modelConfigs.map((model) => model.id)).toEqual([
       'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
