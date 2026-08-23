@@ -236,20 +236,7 @@ function buildPrompt(
   customPlaceFields: Array<{ place_type_key: string; field_key: string; label: string }> = [],
   dynamicCharacterFields: Array<{ field_key: string; label: string; group_key: string }> = [],
 ): string {
-  const basePrompt = buildExtractionPromptForProfile(chunks, profile, dynamicCharacterFields);
-  if (profile !== "sub-base-locations") return basePrompt;
-
-  if (customPlaceFields.length === 0) return basePrompt;
-
-  const fieldInstructions = customPlaceFields
-    .map(field => `- ${field.place_type_key}: ${field.field_key} (${field.label})`)
-    .join("\n");
-  return `${basePrompt}
-
-=== PROJECT-SPECIFIC LOCATION FIELDS ===
-For a location, use attributes.location_fields for the following user-defined fields when the text explicitly supports them. Keep the exact field_key; do not invent a value. If the field does not apply or has no evidence, omit it.
-${fieldInstructions}
-`;
+  return buildExtractionPromptForProfile(chunks, profile, dynamicCharacterFields, customPlaceFields);
 }
 
 // ============================================

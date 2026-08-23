@@ -20,6 +20,7 @@ import {
   isGeminiModelProfile,
   type GeminiModelConfig,
 } from "./gemini-config.ts";
+import { buildSubBaseLocationsInstructions } from "./rules/prompt.ts";
 
 function configuredGeminiModel(id: string): GeminiModelConfig {
   const model = GEMINI_MODELS.find((candidate) => candidate.id === id);

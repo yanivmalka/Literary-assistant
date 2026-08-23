@@ -269,6 +269,42 @@ export interface DynamicCharacterFieldPromptDefinition {
   group_key: string;
 }
 
+export interface ProjectPlaceFieldPromptDefinition {
+  place_type_key: string;
+  field_key: string;
+  label: string;
+}
+
+/**
+ * Builds the profile-specific rules that must also be supplied to specialist
+ * prompts. Keeping these rules here prevents parallel extraction from drifting
+ * away from the sequential extraction contract.
+ */
+export function buildSubBaseLocationsInstructions(
+  customPlaceFields: ProjectPlaceFieldPromptDefinition[] = [],
+  dynamicCharacterFields: DynamicCharacterFieldPromptDefinition[] = [],
+): string {
+  const sections = [LOCATIONS_PROFILE_INSTRUCTIONS];
+
+  if (dynamicCharacterFields.length > 0) {
+    sections.push(
+      `${DYNAMIC_CHARACTER_FIELD_INSTRUCTIONS}${dynamicCharacterFields
+        .map(field => `- ${field.field_key} (${field.label}; group: ${field.group_key})`)
+        .join("\\n")}`,
+    );
+  }
+
+  if (customPlaceFields.length > 0) {
+    sections.push(`=== PROJECT-SPECIFIC LOCATION FIELDS ===
+For a location, use attributes.location_fields for the following user-defined fields when the text explicitly supports them. Keep the exact field_key; do not invent a value. If the field does not apply or has no evidence, omit it.
+${customPlaceFields
+  .map(field => `- ${field.place_type_key}: ${field.field_key} (${field.label})`)
+  .join("\\n")}`);
+  }
+
+  return sections.join("\\n");
+}
+
 /**
  * Builds the prompt for the selected extraction profile.
  * sub-base-2 remains the existing development profile; the locations profile
@@ -278,6 +314,7 @@ export function buildExtractionPromptForProfile(
   chunks: { position: number; content: string }[],
   profile: ExtractionPromptProfile,
   dynamicCharacterFields: DynamicCharacterFieldPromptDefinition[] = [],
+  customPlaceFields: ProjectPlaceFieldPromptDefinition[] = [],
 ): string {
   const basePrompt = buildExtractionPrompt(chunks);
 
@@ -290,10 +327,5 @@ export function buildExtractionPromptForProfile(
     return subBase2Prompt;
   }
 
-  const characterFields = dynamicCharacterFields.length > 0
-    ? `${DYNAMIC_CHARACTER_FIELD_INSTRUCTIONS}${dynamicCharacterFields
-      .map(field => `- ${field.field_key} (${field.label}; group: ${field.group_key})`)
-      .join("\n")}`
-    : "";
-  return `${subBase2Prompt}\n${LOCATIONS_PROFILE_INSTRUCTIONS}\n${characterFields}`;
+  return `${subBase2Prompt}\n${buildSubBaseLocationsInstructions(customPlaceFields, dynamicCharacterFields)}`;
 }
