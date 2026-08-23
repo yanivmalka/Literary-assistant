@@ -72,7 +72,14 @@ export default function DocumentList({ projectId }: DocumentListProps) {
   }
 
   const handleExtractKnowledge = async (doc: Document) => {
-    if (!doc.latest_version || extractionInProgress || pausedExtractions[doc.id]) return
+    if (!doc.latest_version || extractionInProgress) return
+
+    const paused = pausedExtractions[doc.id]
+    if (paused) {
+      await resumeExtraction(doc.id)
+      return
+    }
+
     console.log('[Knowledge] Manual extraction triggered for', doc.name)
     setStoredExtractionModelProfile(selectedModelProfile)
     await triggerEntityExtraction(
