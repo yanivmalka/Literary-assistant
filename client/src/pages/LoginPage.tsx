@@ -95,7 +95,7 @@ export default function LoginPage() {
 
           <div className="my-4 flex items-center gap-3">
             <div className="flex-1 border-t" />
-            <span className="text-sm text-muted-foreground">or</span>
+            <span className="text-sm text-muted-foreground">{t('ui.common.or')}</span>
             <div className="flex-1 border-t" />
           </div>
 

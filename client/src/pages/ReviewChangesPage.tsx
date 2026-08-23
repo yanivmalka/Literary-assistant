@@ -150,12 +150,12 @@ export default function ReviewChangesPage() {
                     <h4 className="font-semibold">{change.entity_name}</h4>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                       <div>
-                        <p className="font-medium text-muted-foreground">Main</p>
-                        <p className="text-foreground">{change.main_value || '(empty)'}</p>
+                        <p className="font-medium text-muted-foreground">{t('review.main')}</p>
+                        <p className="text-foreground">{change.main_value || t('review.empty')}</p>
                       </div>
                       <div>
-                        <p className="font-medium text-muted-foreground">Branch</p>
-                        <p className="text-foreground">{change.branch_value || '(empty)'}</p>
+                        <p className="font-medium text-muted-foreground">{t('review.branch')}</p>
+                        <p className="text-foreground">{change.branch_value || t('review.empty')}</p>
                       </div>
                     </div>
                   </div>
@@ -170,7 +170,7 @@ export default function ReviewChangesPage() {
                   className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm"
                 >
                   <CheckCircle className="h-4 w-4" />
-                  Approve
+                  {t('review.approve')}
                 </button>
                 <button
                   onClick={() => handleReject(change)}
@@ -178,7 +178,7 @@ export default function ReviewChangesPage() {
                   className="flex items-center gap-1 px-3 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50 text-sm"
                 >
                   <XCircle className="h-4 w-4" />
-                  Reject
+                  {t('review.reject')}
                 </button>
               </div>
             </div>
