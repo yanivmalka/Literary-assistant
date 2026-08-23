@@ -106,6 +106,9 @@ interface ExtractedEntity {
   tattoos?: string | null;
   narrative_role?: string | null;
   location_type?: string | null;
+  place_type?: string | null;
+  location_fields?: Record<string, unknown> | null;
+  container_places?: Array<{ name: string; type?: string }> | string[] | null;
   parent_location?: string | null;
   continent?: string | null;
   country?: string | null;
@@ -185,8 +188,20 @@ function normalizeRelationshipType(value: string | null | undefined): string | n
 function buildPrompt(
   chunks: { position: number; content: string }[],
   profile: GeminiModelProfile,
+  customPlaceFields: Array<{ place_type_key: string; field_key: string; label: string }> = [],
 ): string {
-  return buildExtractionPromptForProfile(chunks, profile);
+  const basePrompt = buildExtractionPromptForProfile(chunks, profile);
+  if (customPlaceFields.length === 0) return basePrompt;
+
+  const fieldInstructions = customPlaceFields
+    .map(field => `- ${field.place_type_key}: ${field.field_key} (${field.label})`)
+    .join("\\n");
+  return `${basePrompt}
+
+=== PROJECT-SPECIFIC LOCATION FIELDS ===
+For a location, use attributes.location_fields for the following user-defined fields when the text explicitly supports them. Keep the exact field_key; do not invent a value. If the field does not apply or has no evidence, omit it.
+${fieldInstructions}
+`;
 }
 
 // ============================================
@@ -237,16 +252,18 @@ function buildStructuredFields(type: string, entity: ExtractedEntity): Record<st
     fields.narrative_role = entity.narrative_role || null;
     fields.narrative_impact = null;
   } else if (type === "location") {
-    fields.location_type = entity.location_type || null;
-    fields.parent_location = entity.parent_location || null;
-    fields.continent = entity.continent || null;
-    fields.country = entity.country || null;
-    fields.region = entity.region || null;
-    fields.city = entity.city || null;
+    const entityAttributes = entity.attributes || {};
+    const locationFields = entity.location_fields || (entityAttributes.location_fields as Record<string, unknown> | undefined) || {};
+    const placeType = entity.place_type || entity.location_type || (entityAttributes.place_type as string | undefined) || "other";
+    fields.place_type = placeType;
+    fields.location_type = placeType;
+    fields.description = entity.description || entity.significance || null;
+    for (const [key, value] of Object.entries(locationFields)) {
+      if (key && value !== undefined) fields[key] = value;
+    }
+    if (entity.parent_location) fields.parent_location = entity.parent_location;
     fields.narrative_impact = null;
     fields.narrative_importance = entity.narrative_importance || null;
-    fields.related_events = null;
-    fields.related_characters = entity.related_characters || null;
   } else if (type === "object") {
     fields.object_type = entity.object_type || null;
     fields.appearance = entity.appearance || null;
@@ -1208,7 +1225,21 @@ Deno.serve(async (req) => {
     // ==============================
     // Step 2: Call Gemini (with multi-model fallback)
     // ==============================
-    const prompt = buildPrompt(chunkData, modelProfile);
+    const { data: projectPlaceFields, error: projectPlaceFieldsError } = await supabase
+      .from("knowledge_place_field_definitions")
+      .select("place_type_key, field_key, label")
+      .eq("project_id", body.project_id)
+      .eq("is_active", true)
+      .order("sort_order");
+    if (projectPlaceFieldsError) {
+      console.warn("[extract-knowledge] Could not load project place fields:", projectPlaceFieldsError.message);
+    }
+
+    const prompt = buildPrompt(
+      chunkData,
+      modelProfile,
+      (projectPlaceFields || []) as Array<{ place_type_key: string; field_key: string; label: string }>,
+    );
     const totalChars = chunkData.reduce((sum, c) => sum + c.content.length, 0);
 
     const geminiResult = await callGeminiWithFallback(
@@ -1822,8 +1853,35 @@ Deno.serve(async (req) => {
     // ==============================
     // Step 6: Save relationships in the target layer
     // ==============================
+    // Convert explicit location containment hints to graph edges. The graph is
+    // intentionally flat: no intermediate hierarchy levels are inferred.
+    const containmentRelationships: ExtractedRelationship[] = [];
+    for (const location of extraction.locations || []) {
+      const attributes = location.attributes || {};
+      const rawContainers = location.container_places || attributes.container_places;
+      const containers = Array.isArray(rawContainers) ? rawContainers : rawContainers ? [rawContainers] : [];
+      const legacyParent = location.parent_location ? [location.parent_location] : [];
+      for (const container of [...containers, ...legacyParent]) {
+        const containerName = typeof container === "string"
+          ? container.trim()
+          : container && typeof container === "object" && "name" in container
+            ? String((container as { name?: unknown }).name || "").trim()
+            : "";
+        if (!containerName || containerName === location.name.trim()) continue;
+        containmentRelationships.push({
+          character_a: location.name.trim(),
+          character_b: containerName,
+          relationship_type: "contained_in",
+          source_type: "location",
+          target_type: "location",
+          evidence: location.field_evidence?.container_places || [],
+          chunk_positions: location.chunk_positions || [],
+        });
+      }
+    }
+
     let relationshipsSaved = 0;
-    for (const rel of extraction.relationships || []) {
+    for (const rel of [...(extraction.relationships || []), ...containmentRelationships]) {
       const relationshipType = normalizeRelationshipType(rel.relationship_type);
       if (!relationshipType) continue;
 

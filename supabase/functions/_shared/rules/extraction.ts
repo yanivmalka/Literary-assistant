@@ -48,9 +48,7 @@ export const ENTITY_TYPE_DEFINITIONS: Record<string, EntityTypeConfig> = {
     extracted: true,
     manualCreation: true,
     fields: [
-      "name", "location_type", "parent_location", "description",
-      "continent", "country", "region", "city",
-      "narrative_impact", "narrative_importance", "related_events", "related_characters",
+      "name", "place_type", "description", "narrative_importance", "narrative_impact", "custom_fields",
     ],
   },
   object: {

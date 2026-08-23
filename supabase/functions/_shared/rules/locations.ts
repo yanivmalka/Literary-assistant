@@ -1,71 +1,28 @@
-// ============================================
-// Location Rules
-// ============================================
-// Defines what constitutes a valid location entity.
-// Only locations with distinct identity and narrative importance are extracted.
-// Now supports multiple languages (Hebrew, English, Arabic, French, etc.)
-// ============================================
-
 import { getMultilingualLocationBlockWords } from './language-rules.ts';
 
+export const PLACE_TYPE_CATALOG = {
+  cosmic: ['universe', 'parallel_universe', 'dimension', 'plane', 'galaxy', 'star_system', 'world', 'moon'],
+  geography: ['continent', 'subcontinent', 'island', 'archipelago', 'peninsula', 'sea', 'ocean', 'lake', 'river', 'mountain', 'mountain_range', 'desert', 'forest', 'natural_region'],
+  governance: ['country', 'province', 'kingdom', 'colony', 'empire', 'territory', 'principality', 'duchy', 'republic', 'city_state'],
+  settlement: ['city', 'capital', 'town', 'village', 'colony_settlement', 'settlement', 'farm', 'fief', 'trading_post', 'outpost'],
+  structure: ['neighborhood', 'district', 'street', 'square', 'market', 'harbor', 'complex', 'building', 'villa', 'fort', 'castle', 'palace', 'temple', 'place_of_worship', 'tower'],
+  dwelling: ['house', 'cabin', 'apartment', 'room', 'tent', 'basement', 'attic', 'courtyard', 'garden'],
+} as const;
+
+export const ALL_PLACE_TYPES = Object.values(PLACE_TYPE_CATALOG).flat();
+
 export const LOCATION_RULES = {
-  /**
-   * Core rule: Only locations with a DISTINCT IDENTITY are extracted.
-   * A distinct identity means the location has a unique name, recurring
-   * narrative presence, or specific importance to the plot.
-   */
   requiresDistinctIdentity: true,
-
-  /**
-   * Generic location nouns that should NOT become entities on their own.
-   * These are only valid if paired with a unique identifier
-   * (e.g., "חדר" = blocked, "חדרו של ליאו" = might be valid if narratively important).
-   * 
-   * Now supports multiple languages (Hebrew, English, etc.)
-   * Auto-combines blocking words from all supported languages.
-   * 
-   * TO ADD A BLOCKWORD: Update language-rules.ts, not this file.
-   * 
-   * Includes:
-   * - Hebrew: Indoor spaces (חדר, מטבח, דירה), Outdoor generic (אוהל, גינה), 
-   *   Nature generic (יער, נהר, הר), Structures (בית, בניין), Urban (עיר, כפר)
-   * - English: room, bedroom, kitchen, forest, city, house, street, etc.
-   */
   blockWords: getMultilingualLocationBlockWords(['he', 'en']) as Set<string>,
-  
-  /**
-   * Language codes supported for location blocking.
-   * To add a new language, update this array and add block words to language-rules.ts
-   */
   supportedLanguages: ['he', 'en', 'ar', 'fr', 'de', 'es', 'it', 'pt', 'ru', 'ja', 'zh'] as const,
-
-  /**
-   * Location types that the system recognizes.
-   */
-  validTypes: [
-    'continent', 'country', 'region', 'city', 'village',
-    'building', 'room', 'landmark', 'wilderness', 'other',
-  ] as const,
-
-  /**
-   * Consolidation rules for locations:
-   * - "העיר" referring to "טרונהיים" → canonical: "טרונהיים", alias: "העיר"
-   * - "יער" + "יער אירויין" = same → canonical: "יער אירויין", alias: "היער"
-   * - "המישור הארצי" and "מישור הארצי" = same → pick the most natural form
-   */
+  validTypes: [...ALL_PLACE_TYPES, 'other'] as const,
+  categories: PLACE_TYPE_CATALOG,
   consolidation: {
     preferSpecificName: true,
     treatHeHayediaAsIdentical: true,
     treatNikudAsIdentical: true,
   },
-
-  /**
-   * All structured fields for a location.
-   */
   fields: [
-    'name', 'location_type', 'parent_location', 'description',
-    'continent', 'country', 'region', 'city',
-    'narrative_impact', 'narrative_importance', 'related_events', 'related_characters',
+    'name', 'place_type', 'description', 'narrative_importance', 'narrative_impact', 'custom_fields',
   ] as const,
 } as const;
-

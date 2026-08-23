@@ -34,6 +34,9 @@ export interface ExtractedEntity {
   tattoos?: string | null;
   narrative_role?: string | null;
   location_type?: string | null;
+  place_type?: string | null;
+  location_fields?: Record<string, unknown> | null;
+  container_places?: Array<{ name: string; type?: string }> | string[] | null;
   parent_location?: string | null;
   continent?: string | null;
   country?: string | null;
@@ -142,16 +145,20 @@ export function buildStructuredFields(type: string, entity: ExtractedEntity): Re
     fields.narrative_role = entity.narrative_role || null;
     fields.narrative_impact = null;
   } else if (type === "location") {
-    fields.location_type = entity.location_type || null;
-    fields.parent_location = entity.parent_location || null;
-    fields.continent = entity.continent || null;
-    fields.country = entity.country || null;
-    fields.region = entity.region || null;
-    fields.city = entity.city || null;
-    fields.narrative_impact = null;
+    const entityAttributes = entity.attributes || {};
+    const locationFields = entity.location_fields || (entityAttributes.location_fields as Record<string, unknown> | undefined) || {};
+    const placeType = entity.place_type || entity.location_type || (entityAttributes.place_type as string | undefined) || "other";
+    fields.place_type = placeType;
+    fields.location_type = placeType;
+    fields.description = entity.description || entity.significance || null;
+    for (const [key, value] of Object.entries(locationFields)) {
+      if (key && value !== undefined) fields[key] = value;
+    }
+    // Keep legacy parent_location as a compatibility hint; containment is
+    // persisted from explicit relationships, never inferred from this field.
+    if (entity.parent_location) fields.parent_location = entity.parent_location;
     fields.narrative_importance = entity.narrative_importance || null;
-    fields.related_events = null;
-    fields.related_characters = entity.related_characters || null;
+    fields.narrative_impact = null;
   } else if (type === "object") {
     fields.object_type = entity.object_type || null;
     fields.appearance = entity.appearance || null;
