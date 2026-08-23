@@ -6,6 +6,10 @@ import {
 
 export type ExtractionMode = 'bootstrap' | 'branch';
 
+export type ExtractionStrategy = 'legacy-sequential' | 'parallel-experts';
+
+export const DEFAULT_EXTRACTION_STRATEGY: ExtractionStrategy = 'legacy-sequential';
+
 export interface ExtractionModeRequest {
   extraction_mode?: ExtractionMode;
   target_branch_id?: string | null;
@@ -20,6 +24,26 @@ export type ExtractionValidationResult = {
   ok: false;
   error: string;
 };
+
+export type ExtractionStrategyValidationResult = {
+  ok: true;
+  strategy: ExtractionStrategy;
+} | {
+  ok: false;
+  error: string;
+};
+
+export function validateExtractionStrategy(value: unknown): ExtractionStrategyValidationResult {
+  const strategy = value ?? DEFAULT_EXTRACTION_STRATEGY;
+  if (strategy === 'legacy-sequential' || strategy === 'parallel-experts') {
+    return { ok: true, strategy };
+  }
+
+  return {
+    ok: false,
+    error: "extraction_strategy must be 'legacy-sequential' or 'parallel-experts'.",
+  };
+}
 
 /** Mirrors the handler's JSON cleanup and fallback object extraction without I/O. */
 export function parseExtractionJson<T>(responseText: string): T | null {

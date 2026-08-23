@@ -254,12 +254,14 @@ export default function EntityModal({
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {/* Aliases */}
           <div className="border rounded-lg p-4">
-            <label htmlFor="aliases-input" className="block text-sm font-medium text-muted-foreground mb-1">
+                <label htmlFor="aliases-input" className="block text-sm font-medium text-muted-foreground mb-1">
               {t('entityFields.aliases')}
             </label>
             <input
               id="aliases-input"
+              name="aliases"
               type="text"
+              autoComplete="off"
               value={aliasesText}
               onChange={e => setAliasesText(e.target.value)}
               placeholder={t('entityFields.aliasesPlaceholder')}
@@ -384,6 +386,8 @@ function FieldInput({ field, value, onChange, isTextarea, t }: FieldInputProps) 
       {isTextarea ? (
         <textarea
           id={`field-${field}`}
+          name={field}
+          autoComplete="off"
           value={value}
           onChange={e => onChange(field, e.target.value)}
           placeholder={placeholder}
@@ -393,7 +397,9 @@ function FieldInput({ field, value, onChange, isTextarea, t }: FieldInputProps) 
       ) : (
         <input
           id={`field-${field}`}
+          name={field}
           type="text"
+          autoComplete="off"
           value={value}
           onChange={e => onChange(field, e.target.value)}
           placeholder={placeholder}

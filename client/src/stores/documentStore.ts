@@ -307,6 +307,14 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       _extractionCancelFlag: false,
     })
 
+    const stopIfCancelled = () => {
+      if (!get()._extractionCancelFlag) return false
+
+      set({ extractionInProgress: false })
+      console.log('[Knowledge] Extraction cancelled by user')
+      return true
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       // Do not leave the UI stuck in the in-progress state if the session expired.
@@ -343,6 +351,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       extractionRunId = crypto.randomUUID()
       console.log('[Knowledge] Extraction run:', extractionRunId, 'mode:', extractionMode)
     } catch (error) {
+      if (stopIfCancelled()) return
+
       console.error('[DIAGNOSTIC] triggerEntityExtraction() - Extraction setup failed - error:', error)
       console.error('[Knowledge] Extraction setup failed:', error)
       set({
@@ -352,6 +362,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       })
       return
     }
+
+    if (stopIfCancelled()) return
 
     const BATCH_SIZE = 2
     let offset = 0
@@ -368,6 +380,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       .from('document_chunks')
       .select('id', { count: 'exact', head: true })
       .eq('version_id', versionId)
+
+    if (stopIfCancelled()) return
 
     if (countError) {
       console.error('[DIAGNOSTIC] triggerEntityExtraction() - document_chunks count error - operation: GET /rest/v1/document_chunks - table: document_chunks - versionId:', versionId, 'error_code:', countError.code, 'error_message:', countError.message)
@@ -403,15 +417,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     const extractionWarnings: ExtractionWarning[] = []
 
     while (!done) {
-      // Check cancel flag
-      if (get()._extractionCancelFlag) {
-        set({
-          extractionInProgress: false,
-          extractionCancelled: true,
-        })
-        console.log('[Knowledge] Extraction cancelled by user')
-        return
-      }
+      if (stopIfCancelled()) return
 
       try {
         const requestBody = {
@@ -460,6 +466,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             error = retry.error
           }
         }
+
+        if (stopIfCancelled()) return
 
         if (error) {
           console.error('[DIAGNOSTIC] triggerEntityExtraction() - Edge Function error - operation: POST /functions/v1/extract-knowledge - error_code:', error.code, 'error_message:', error.message)
@@ -532,6 +540,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           await useQuillStore.getState().loadWallet()
         }
 
+        if (stopIfCancelled()) return
+
         const nextOffset = Number(data.next_offset ?? offset + BATCH_SIZE)
         // The server historically marks a full final batch as done=false because
         // it cannot distinguish it from a non-final full batch. Use the exact
@@ -573,6 +583,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           await new Promise(resolve => setTimeout(resolve, 15000))
         }
       } catch (err) {
+        if (stopIfCancelled()) return
+
         console.error('[DIAGNOSTIC] triggerEntityExtraction() - Catch error during extraction - error:', err)
         console.error('[Knowledge] Extraction failed:', err)
         set({
@@ -582,6 +594,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         break
       }
     }
+
+    if (stopIfCancelled()) return
 
     // A completed run is empty only when no persisted knowledge item was
     // reported. Older Edge Function revisions do not have persisted_items_saved,
@@ -611,7 +625,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   },
 
   cancelExtraction: () => {
-    set({ _extractionCancelFlag: true })
+    set({
+      _extractionCancelFlag: true,
+      extractionCancelled: true,
+      extractionDone: false,
+      extractionError: null,
+    })
   },
 
   dismissExtractionStatus: () => {

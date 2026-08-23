@@ -146,7 +146,7 @@ export default function MapWizardPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">{t('ui.maps.mapName')}</label>
+              <label htmlFor="map-name" className="block text-sm font-medium mb-1">{t('ui.maps.mapName')}</label>
               <input
                 id="map-name"
                 name="map-name"
@@ -159,7 +159,7 @@ export default function MapWizardPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">{t('ui.maps.description')}</label>
+              <label htmlFor="map-description" className="block text-sm font-medium mb-1">{t('ui.maps.description')}</label>
               <textarea
                 id="map-description"
                 name="description"

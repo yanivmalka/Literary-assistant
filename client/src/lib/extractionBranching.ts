@@ -11,7 +11,10 @@
 
 import { supabase } from '@/lib/supabase'
 import { LEGACY_BOOTSTRAP_CANONICAL_NAME } from '@/lib/mainLayer'
-import type { ExtractionModelProfile } from '@/lib/extractionModels'
+import {
+  DEFAULT_EXTRACTION_STRATEGY,
+  type ExtractionModelProfile,
+} from '@/lib/extractionModels'
 
 export interface BranchEntityData {
   canonical_name: string
@@ -164,6 +167,7 @@ export function buildExtractionRequest(
     user_id: userId,
     target_branch_id: branchId || null,  // null = use Main (bootstrap)
     use_main: branchId === null,         // explicit flag for Edge Function
+    extraction_strategy: DEFAULT_EXTRACTION_STRATEGY,
     offset,
     limit,
   }

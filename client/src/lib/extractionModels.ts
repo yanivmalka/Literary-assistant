@@ -1,5 +1,8 @@
 export type ExtractionModelProfile = 'sub-base' | 'sub-base-2' | 'sub-base-locations'
 
+export type ExtractionStrategy = 'legacy-sequential' | 'parallel-experts'
+
+export const DEFAULT_EXTRACTION_STRATEGY: ExtractionStrategy = 'legacy-sequential'
 export const DEFAULT_EXTRACTION_MODEL_PROFILE: ExtractionModelProfile = 'sub-base'
 
 export const EXTRACTION_MODEL_PROFILES: readonly ExtractionModelProfile[] = [

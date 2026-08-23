@@ -148,6 +148,7 @@ export default function EditorToolbar() {
                   id="stroke-width"
                   name="stroke-width"
                   type="range"
+                  autoComplete="off"
                   min="1"
                   max="12"
                   step="0.5"

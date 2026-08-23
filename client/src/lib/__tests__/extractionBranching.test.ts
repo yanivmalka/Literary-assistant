@@ -25,6 +25,7 @@ describe('AI extraction branch routing', () => {
       user_id: 'u1',
       target_branch_id: 'branch-1',
       use_main: false,
+      extraction_strategy: 'legacy-sequential',
       offset: 0,
       limit: 2,
     })
@@ -38,6 +39,7 @@ describe('AI extraction branch routing', () => {
       user_id: 'u1',
       target_branch_id: null,
       use_main: true,
+      extraction_strategy: 'legacy-sequential',
       offset: 0,
       limit: 2,
     })

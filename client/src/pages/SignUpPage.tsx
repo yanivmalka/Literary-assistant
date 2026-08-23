@@ -88,6 +88,7 @@ export default function SignUpPage() {
               </label>
               <input
                 id="email"
+                name="email"
                 type="email"
                 autoComplete="email"
                 value={email}
@@ -103,6 +104,7 @@ export default function SignUpPage() {
               </label>
               <input
                 id="password"
+                name="password"
                 type="password"
                 autoComplete="new-password"
                 value={password}
@@ -119,6 +121,7 @@ export default function SignUpPage() {
               </label>
               <input
                 id="confirmPassword"
+                name="confirmPassword"
                 type="password"
                 autoComplete="new-password"
                 value={confirmPassword}

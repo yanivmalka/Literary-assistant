@@ -70,7 +70,7 @@ export default function DevTestPage() {
 
       {/* Prompt input */}
       <div className="mb-4">
-        <label className="block text-sm font-medium mb-2">Prompt</label>
+        <label htmlFor="dev-test-prompt" className="block text-sm font-medium mb-2">Prompt</label>
         <textarea
           id="dev-test-prompt"
           name="prompt"
@@ -170,7 +170,7 @@ export default function DevTestPage() {
 
           {/* Response text */}
           <div>
-            <label className="block text-sm font-medium mb-2">Gemini Response</label>
+            <span className="block text-sm font-medium mb-2">Gemini Response</span>
             <div className="p-4 bg-muted rounded-lg text-sm whitespace-pre-wrap leading-relaxed">
               {result.response}
             </div>

@@ -248,9 +248,9 @@ export default function CharacterProfilePage() {
                   // Read-only mode
                   return (
                     <div key={field}>
-                      <label className="text-sm font-medium text-muted-foreground">
+                      <span className="text-sm font-medium text-muted-foreground">
                         {fieldLabel}
-                      </label>
+                      </span>
                       <div className="mt-1 p-2 rounded bg-muted/50 min-h-[2.5rem] flex items-center">
                         <p className={value ? '' : 'text-muted-foreground italic'}>
                           {value || t('ui.common.unknown')}
@@ -268,6 +268,8 @@ export default function CharacterProfilePage() {
                       {isTextarea ? (
                         <textarea
                           id={field}
+                          name={field}
+                          autoComplete="off"
                           value={value}
                           onChange={e => handleFieldChange(field as string, e.target.value)}
                           className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground resize-none"
@@ -276,7 +278,9 @@ export default function CharacterProfilePage() {
                       ) : (
                         <input
                           id={field}
+                          name={field}
                           type="text"
+                          autoComplete="off"
                           value={value}
                           onChange={e => handleFieldChange(field as string, e.target.value)}
                           className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground"

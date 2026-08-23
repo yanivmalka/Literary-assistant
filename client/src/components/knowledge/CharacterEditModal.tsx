@@ -321,6 +321,8 @@ export default function CharacterEditModal({
                         {isTextarea ? (
                           <textarea
                             id={fieldKey}
+                            name={fieldKey}
+                            autoComplete="off"
                             value={value}
                             onChange={e => handleFieldChange(fieldKey, e.target.value)}
                             className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground resize-none"
@@ -329,7 +331,9 @@ export default function CharacterEditModal({
                         ) : (
                           <input
                             id={fieldKey}
+                            name={fieldKey}
                             type="text"
+                            autoComplete="off"
                             value={value}
                             onChange={e => handleFieldChange(fieldKey, e.target.value)}
                             className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground"
@@ -352,8 +356,11 @@ export default function CharacterEditModal({
                 </p>
               </div>
               <div className="flex gap-2">
+                <label htmlFor="character-field-to-add" className="sr-only">בחר שדה להוספה</label>
                 <select
-                  value={fieldToAdd}
+                  id="character-field-to-add"
+                  name="character-field-to-add"
+                  autoComplete="off"
                   onChange={event => setFieldToAdd(event.target.value)}
                   disabled={dynamicSchemaLoading || availableDynamicFields.length === 0}
                   className="flex-1 px-3 py-2 border rounded-md bg-background"

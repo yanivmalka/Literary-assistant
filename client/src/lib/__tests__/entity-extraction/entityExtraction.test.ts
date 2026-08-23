@@ -7,6 +7,7 @@ import {
   parseExtractionJson,
   normalizeExtractionPayload,
   validateExtractionMode,
+  validateExtractionStrategy,
 } from '../../../../../supabase/functions/extract-knowledge/testable-pipeline.ts'
 import {
   applyEntityOverrides,
@@ -182,6 +183,16 @@ describe('Entity Extraction automatic checks (in-memory fixtures)', () => {
       ok: true,
       mode: 'bootstrap',
       branchId: null,
+    })
+  })
+
+  it('[validation] defaults missing extraction strategy to legacy-sequential and rejects unknown strategies', () => {
+    expect(validateExtractionStrategy(undefined)).toEqual({ ok: true, strategy: 'legacy-sequential' })
+    expect(validateExtractionStrategy('legacy-sequential')).toEqual({ ok: true, strategy: 'legacy-sequential' })
+    expect(validateExtractionStrategy('parallel-experts')).toEqual({ ok: true, strategy: 'parallel-experts' })
+    expect(validateExtractionStrategy('unknown')).toEqual({
+      ok: false,
+      error: "extraction_strategy must be 'legacy-sequential' or 'parallel-experts'.",
     })
   })
 

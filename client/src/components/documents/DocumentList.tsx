@@ -119,6 +119,8 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                   </label>
                   <select
                     id={`extraction-model-${doc.id}`}
+                    name={`extraction-model-${doc.id}`}
+                    autoComplete="off"
                     value={selectedModelProfile}
                     onChange={event => {
                       const profile = event.target.value as ExtractionModelProfile

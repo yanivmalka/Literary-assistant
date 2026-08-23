@@ -217,10 +217,10 @@ export default function BranchPage() {
                 // Edit mode
                 <div className="space-y-3">
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">{t('branch.fields.name')}</label>
+                    <label htmlFor={`edit-canonical-name-${entity.id}`} className="text-xs font-medium text-muted-foreground">{t('branch.fields.name')}</label>
                     <input
-                      id="edit-canonical-name"
-                      name="canonical-name"
+                      id={`edit-canonical-name-${entity.id}`}
+                      name={`canonical-name-${entity.id}`}
                       type="text"
                       value={editForm.canonical_name}
                       onChange={e => setEditForm(prev => ({ ...prev, canonical_name: e.target.value }))}
@@ -229,10 +229,10 @@ export default function BranchPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground">{t('branch.fields.description')}</label>
+                    <label htmlFor={`edit-description-${entity.id}`} className="text-xs font-medium text-muted-foreground">{t('branch.fields.description')}</label>
                     <textarea
-                      id="edit-description"
-                      name="description"
+                      id={`edit-description-${entity.id}`}
+                      name={`description-${entity.id}`}
                       value={editForm.description}
                       onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
                       className="w-full mt-1 px-3 py-1.5 border rounded-md text-sm"
@@ -242,7 +242,7 @@ export default function BranchPage() {
                   </div>
                   {Object.entries(editForm.attributes).map(([key, val]) => (
                     <div key={key}>
-                      <label className="text-xs font-medium text-muted-foreground">{key}</label>
+                      <label htmlFor={`edit-attr-${key}`} className="text-xs font-medium text-muted-foreground">{key}</label>
                       <input
                         id={`edit-attr-${key}`}
                         name={`attribute-${key}`}

@@ -140,6 +140,7 @@ export default function RelationshipPanel({
             <select
               id="relationship-type"
               name="relationship-type"
+              autoComplete="off"
               value={selectedType}
               onChange={e => setSelectedType(e.target.value as typeof RELATIONSHIP_TYPES[number])}
               className="w-full px-3 py-2 border rounded-md text-sm"
@@ -154,6 +155,7 @@ export default function RelationshipPanel({
             <select
               id="relationship-target"
               name="relationship-target"
+              autoComplete="off"
               value={selectedTarget}
               onChange={e => setSelectedTarget(e.target.value)}
               className="w-full px-3 py-2 border rounded-md text-sm"

@@ -160,18 +160,18 @@ export default function MarkerPalette() {
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium mb-1">{t('editor.markers.markerName')}</label>
+                <label htmlFor="marker-name" className="block text-xs font-medium mb-1">{t('editor.markers.markerName')}</label>
                 <input id="marker-name" name="marker-name" type="text" value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full px-2 py-1.5 text-sm border rounded bg-background" autoFocus autoComplete="off" />
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1">{t('editor.markers.markerColor')}</label>
+                <label htmlFor="marker-color" className="block text-xs font-medium mb-1">{t('editor.markers.markerColor')}</label>
                 <div className="flex items-center gap-2">
-                  <input id="marker-color" name="marker-color" type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)} className="h-8 w-8 rounded border cursor-pointer" />
+                  <input id="marker-color" name="marker-color" type="color" autoComplete="off" value={newColor} onChange={(e) => setNewColor(e.target.value)} className="h-8 w-8 rounded border cursor-pointer" />
                   <span className="text-xs text-muted-foreground">{newColor}</span>
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium mb-1">{t('editor.markers.markerShape')}</label>
+                <span className="block text-xs font-medium mb-1">{t('editor.markers.markerShape')}</span>
                 <div className="grid grid-cols-6 gap-1">
                   {SHAPES.map((shapeOpt) => (
                     <button key={shapeOpt} onClick={() => setNewShape(shapeOpt)} className={`p-2 border rounded flex items-center justify-center ${newShape === shapeOpt ? 'border-primary bg-primary/10' : 'hover:bg-accent'}`}>

@@ -42,7 +42,16 @@ import {
   type EntityResolutionRecord,
 } from "../_shared/entity-resolution.ts";
 import { normalizeEntities as normalizeEntitiesForExtraction } from "./normalization.ts";
-import { parseExtractionJson, cloneJsonValue, normalizeExtractionPayload, validateExtractionMode, validateExtractionPayload } from "./testable-pipeline.ts";
+import {
+  DEFAULT_EXTRACTION_STRATEGY,
+  parseExtractionJson,
+  cloneJsonValue,
+  normalizeExtractionPayload,
+  validateExtractionMode,
+  validateExtractionPayload,
+  validateExtractionStrategy,
+  type ExtractionStrategy,
+} from "./testable-pipeline.ts";
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
 import { buildAbilityLinks, mergeAbilityLinkEntries } from "../_shared/ability-links.ts";
 import type { AbilityLinkEntity } from "../_shared/ability-links.ts";
@@ -79,6 +88,8 @@ interface ExtractRequest {
   extraction_run_id?: string;
   /** Server-side allowlisted model profile, fixed for every batch in a run. */
   model_profile?: GeminiModelProfile;
+  /** Run-level extraction strategy, fixed for every batch in a run. */
+  extraction_strategy?: unknown;
   /** Allow only sub-base-locations to continue after a classified Gemini batch failure. */
   skip_per_batch?: boolean;
 }
@@ -1014,6 +1025,8 @@ async function loadPersistedAbilityLinkEntries(
 // ============================================
 
 Deno.serve(async (req) => {
+  const requestStartedAt = Date.now();
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -1053,6 +1066,12 @@ Deno.serve(async (req) => {
     if (body.skip_per_batch === true && modelProfile !== "sub-base-locations") {
       return errorResponse("skip_per_batch is supported only for sub-base-locations.", 400);
     }
+
+    const strategyValidation = validateExtractionStrategy(body.extraction_strategy);
+    if (!strategyValidation.ok) {
+      return errorResponse(`Invalid extraction strategy: ${strategyValidation.error}`, 400);
+    }
+    const extractionStrategy: ExtractionStrategy = strategyValidation.strategy;
 
     // ==============================
     // Validation: Main vs Branch extraction mode
@@ -1185,7 +1204,7 @@ Deno.serve(async (req) => {
     if (extractionRunId) {
       const { data: priorRun, error: priorRunError } = await supabase
         .from("raw_extractions")
-        .select("document_id, version_id, branch_id, model_profile")
+        .select("document_id, version_id, branch_id, model_profile, extraction_strategy")
         .eq("project_id", body.project_id)
         .eq("user_id", authenticatedUser.id)
         .eq("extraction_run_id", extractionRunId)
@@ -1200,7 +1219,8 @@ Deno.serve(async (req) => {
         priorRun.document_id !== body.document_id ||
         priorRun.version_id !== body.version_id ||
         priorRun.branch_id !== targetBranchId ||
-        priorRun.model_profile !== modelProfile
+        priorRun.model_profile !== modelProfile ||
+        (priorRun.extraction_strategy ?? DEFAULT_EXTRACTION_STRATEGY) !== extractionStrategy
       )) {
         return errorResponse(
           "Extraction run rejected: profile, Branch, document, or version does not match the existing run.",
@@ -1219,7 +1239,7 @@ Deno.serve(async (req) => {
       return errorResponse("INSUFFICIENT_QUILLS", 402);
     }
 
-    console.log(`[extract-knowledge] Version: 2.5.0 | Layer: ${targetLayer} | Model profile: ${modelProfile} | Auth: OK`);
+    console.log(`[extract-knowledge] Version: 2.5.0 | Layer: ${targetLayer} | Model profile: ${modelProfile} | Strategy: ${extractionStrategy} | Auth: OK`);
 
     const offset = body.offset ?? 0;
     const limit = body.limit ?? BATCH_SIZE;
@@ -1227,6 +1247,7 @@ Deno.serve(async (req) => {
     // ==============================
     // Step 1: Fetch chunks from DB
     // ==============================
+    const chunkFetchStartedAt = Date.now();
     const { data: chunks, error: chunksError } = await supabase
       .from("document_chunks")
       .select("id, content, position, page")
@@ -1262,10 +1283,12 @@ Deno.serve(async (req) => {
       position: c.position,
       content: c.content,
     }));
+    const chunkFetchLatencyMs = Date.now() - chunkFetchStartedAt;
 
     // ==============================
     // Step 2: Call Gemini (with multi-model fallback)
     // ==============================
+    const promptBuildStartedAt = Date.now();
     let projectPlaceFields: Array<{ place_type_key: string; field_key: string; label: string }> = [];
     let projectCharacterFields: Array<{ field_key: string; label: string; group_key: string }> = [];
     if (modelProfile === "sub-base-locations") {
@@ -1294,6 +1317,7 @@ Deno.serve(async (req) => {
     }
 
     const prompt = buildPrompt(chunkData, modelProfile, projectPlaceFields, projectCharacterFields);
+    const promptBuildLatencyMs = Date.now() - promptBuildStartedAt;
     const totalChars = chunkData.reduce((sum, c) => sum + c.content.length, 0);
 
     const geminiResult = await callGeminiWithFallback(
@@ -1427,6 +1451,7 @@ Deno.serve(async (req) => {
         extraction_run_id: extractionRunId,
         model: modelUsed,
         model_profile: modelProfile,
+        extraction_strategy: extractionStrategy,
         raw_response: storageSafeExtraction,
         input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
         output_tokens: (usage as Record<string, unknown>).candidatesTokenCount ?? null,
@@ -1435,6 +1460,10 @@ Deno.serve(async (req) => {
         cached_tokens: (usage as Record<string, unknown>).cachedContentTokenCount ?? null,
         latency_ms: latencyMs,
         chunks_count: chunks.length,
+        total_chars: totalChars,
+        extracted_item_count: extractedItemCount,
+        chunk_fetch_latency_ms: chunkFetchLatencyMs,
+        prompt_build_latency_ms: promptBuildLatencyMs,
       })
       .select("id")
       .single();
@@ -1444,6 +1473,7 @@ Deno.serve(async (req) => {
     }
 
     const rawExtractionId = rawExtraction.id;
+    const persistenceStartedAt = Date.now();
 
     // ==============================
     // Step 5: Normalize & upsert entities (incremental merge)
@@ -2136,6 +2166,21 @@ Deno.serve(async (req) => {
       return errorResponse(message, 422, details);
     }
 
+    const persistenceLatencyMs = Date.now() - persistenceStartedAt;
+    const pipelineLatencyMs = Date.now() - requestStartedAt;
+    const { error: telemetryUpdateError } = await supabase
+      .from("raw_extractions")
+      .update({
+        persistence_latency_ms: persistenceLatencyMs,
+        pipeline_latency_ms: pipelineLatencyMs,
+        persisted_item_count: persistedItemCount,
+      })
+      .eq("id", rawExtractionId);
+
+    if (telemetryUpdateError) {
+      return errorResponse(`Failed to save extraction telemetry: ${telemetryUpdateError.message}`, 500);
+    }
+
     try {
       quillCharge = await consumeGeminiUsage(
         supabase,
@@ -2147,6 +2192,7 @@ Deno.serve(async (req) => {
           document_id: body.document_id,
           version_id: body.version_id,
           extraction_run_id: extractionRunId,
+          extraction_strategy: extractionStrategy,
           offset,
           model: modelUsed,
         },
@@ -2174,13 +2220,22 @@ Deno.serve(async (req) => {
         telemetry: {
           model: modelUsed,
           model_profile: modelProfile,
+          extraction_strategy: extractionStrategy,
           input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
           output_tokens: (usage as Record<string, unknown>).candidatesTokenCount ?? null,
+          thinking_tokens: (usage as Record<string, unknown>).thoughtsTokenCount ?? null,
           total_tokens: quillCharge.totalTokens,
-          charged_quills: quillCharge.chargedQuills,
+          cached_tokens: (usage as Record<string, unknown>).cachedContentTokenCount ?? null,
           latency_ms: latencyMs,
           chunks_sent: chunks.length,
           total_chars: totalChars,
+          extracted_item_count: extractedItemCount,
+          persisted_item_count: persistedItemCount,
+          chunk_fetch_latency_ms: chunkFetchLatencyMs,
+          prompt_build_latency_ms: promptBuildLatencyMs,
+          persistence_latency_ms: persistenceLatencyMs,
+          pipeline_latency_ms: pipelineLatencyMs,
+          total_latency_ms: Date.now() - requestStartedAt,
         },
         quills: {
           quills_balance: quillCharge.balance,

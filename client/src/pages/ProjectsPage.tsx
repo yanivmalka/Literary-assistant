@@ -128,7 +128,7 @@ export default function ProjectsPage() {
             <h3 className="text-lg font-semibold mb-4">{t('projects.create')}</h3>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label htmlFor="project-name" className="block text-sm font-medium mb-1">
                   {t('projects.title')}
                 </label>
                 <input
@@ -145,7 +145,7 @@ export default function ProjectsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">
+                <label htmlFor="project-description" className="block text-sm font-medium mb-1">
                   {t('projects.description')}
                 </label>
                 <textarea
