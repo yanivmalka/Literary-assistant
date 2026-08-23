@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Check, X } from 'lucide-react'
 
 interface Relationship {
