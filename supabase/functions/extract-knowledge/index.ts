@@ -46,6 +46,7 @@ import { parseExtractionJson, cloneJsonValue, normalizeExtractionPayload, valida
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
 import { buildAbilityLinks, mergeAbilityLinkEntries } from "../_shared/ability-links.ts";
 import type { AbilityLinkEntity } from "../_shared/ability-links.ts";
+import { buildSkippedBatchResponse, getExtractionSkipReason } from "./skip-policy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -76,8 +77,8 @@ interface ExtractRequest {
   // CRITICAL FIX: Extraction-level context instead of per-batch decisions
   extraction_mode?: 'bootstrap' | 'branch';
   extraction_run_id?: string;
-  /** Server-side allowlisted model profile, fixed for every batch in a run. */
-  model_profile?: GeminiModelProfile;
+  /** Allow only sub-base-locations to continue after a classified Gemini batch failure. */
+  skip_per_batch?: boolean;
 }
 
 interface ExtractedEntity {
@@ -1047,6 +1048,9 @@ Deno.serve(async (req) => {
     if (!isGeminiModelProfile(modelProfile)) {
       return errorResponse("Invalid model_profile. Choose a supported extraction model.", 400);
     }
+    if (body.skip_per_batch === true && modelProfile !== "sub-base-locations") {
+      return errorResponse("skip_per_batch is supported only for sub-base-locations.", 400);
+    }
 
     // ==============================
     // Validation: Main vs Branch extraction mode
@@ -1307,6 +1311,21 @@ Deno.serve(async (req) => {
     );
 
     if (!geminiResult.success) {
+      const skipReason = getExtractionSkipReason(
+        modelProfile,
+        body.skip_per_batch === true,
+        geminiResult,
+      );
+      if (skipReason) {
+        console.warn(
+          `[extract-knowledge] Skipping ${chunks.length} chunk(s) at offset ${offset}: ${skipReason}`,
+        );
+        return new Response(
+          JSON.stringify(buildSkippedBatchResponse(skipReason, chunks, offset, limit)),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
       console.error("[extract-knowledge] Gemini fallback chain exhausted:", JSON.stringify(geminiResult.fallbackChain));
       return errorResponse(geminiResult.error, geminiResult.status, geminiResult.details);
     }

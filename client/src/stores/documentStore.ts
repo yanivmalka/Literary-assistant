@@ -33,12 +33,21 @@ export interface Document {
   latest_version: DocumentVersion | null
 }
 
+export type ExtractionSkipReason = 'safety_block' | 'transient_failure'
+
+export interface ExtractionWarning {
+  reason: ExtractionSkipReason
+  chunks: number[]
+}
+
 export interface ExtractionProgress {
   currentBatch: number
   totalChunks: number
   processedChunks: number
   entitiesSaved: number
   eventsSaved: number
+  skippedBatches: number
+  skippedChunks: number
 }
 
 interface DocumentState {
@@ -53,6 +62,7 @@ interface DocumentState {
   extractionDone: boolean
   extractionCancelled: boolean
   extractionError: string | null
+  extractionWarnings: ExtractionWarning[]
   extractionProgress: ExtractionProgress | null
   extractionDocumentId: string | null
   _extractionCancelFlag: boolean
@@ -79,6 +89,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   extractionDone: false,
   extractionCancelled: false,
   extractionError: null,
+  extractionWarnings: [],
   extractionProgress: null,
   extractionDocumentId: null,
   _extractionCancelFlag: false,
@@ -290,6 +301,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       extractionDone: false,
       extractionCancelled: false,
       extractionError: null,
+      extractionWarnings: [],
       extractionDocumentId: documentId,
       extractionProgress: null,
       _extractionCancelFlag: false,
@@ -370,10 +382,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         processedChunks: 0,
         entitiesSaved: 0,
         eventsSaved: 0,
-      },
-    })
+        skippedBatches: 0,
+        skippedChunks: 0,
 
-    if (total === 0) {
       console.error('[DIAGNOSTIC] triggerEntityExtraction() - No document chunks available for extraction - versionId:', versionId)
       set({
         extractionInProgress: false,
@@ -385,6 +396,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     let totalEntities = 0
     let totalEvents = 0
     let totalPersisted = 0
+    let totalSkippedBatches = 0
+    let totalSkippedChunks = 0
+    const extractionWarnings: ExtractionWarning[] = []
 
     while (!done) {
       // Check cancel flag
@@ -413,6 +427,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           extraction_run_id: extractionRunId,
           // Keep the selected profile constant across every batch in this run.
           model_profile: requestModelProfile,
+          // Only locations may continue after a classified Gemini batch failure.
+          skip_per_batch: modelProfile === 'sub-base-locations',
         }
 
         let { data, error } = await supabase.functions.invoke('extract-knowledge', {
@@ -451,6 +467,50 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             extractionError: 'ui.documents.extractionError',
           })
           break
+        }
+
+        if (data?.skipped === true) {
+          const nextOffset = Number(data.next_offset)
+          const skippedChunks = Array.isArray(data.skipped_chunks)
+            ? data.skipped_chunks.filter((position: unknown): position is number => typeof position === 'number')
+            : []
+          const skipReason = data.skip_reason === 'safety_block' || data.skip_reason === 'transient_failure'
+            ? data.skip_reason as ExtractionSkipReason
+            : null
+
+          if (!skipReason || !Number.isFinite(nextOffset) || nextOffset <= offset || nextOffset > total) {
+            console.error('[DIAGNOSTIC] triggerEntityExtraction() - Invalid skipped batch response:', data)
+            set({
+              extractionInProgress: false,
+              extractionError: 'ui.documents.extractionError',
+            })
+            break
+          }
+
+          totalSkippedBatches++
+          totalSkippedChunks += skippedChunks.length
+          extractionWarnings.push({ reason: skipReason, chunks: skippedChunks })
+          const skippedDone = Boolean(data.done) || nextOffset >= total
+          offset = nextOffset
+          done = skippedDone
+
+          set({
+            extractionProgress: {
+              currentBatch: Math.ceil(offset / BATCH_SIZE),
+              totalChunks: total,
+              processedChunks: Math.min(offset, total),
+              entitiesSaved: totalEntities,
+              eventsSaved: totalEvents,
+              skippedBatches: totalSkippedBatches,
+              skippedChunks: totalSkippedChunks,
+            },
+          })
+
+          console.warn('[Knowledge] Batch skipped:', skipReason, skippedChunks)
+          if (!done) {
+            await new Promise(resolve => setTimeout(resolve, 15000))
+          }
+          continue
         }
 
         if (!data || !data.success) {
@@ -499,6 +559,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             processedChunks,
             entitiesSaved: totalEntities,
             eventsSaved: totalEvents,
+            skippedBatches: totalSkippedBatches,
+            skippedChunks: totalSkippedChunks,
           },
         })
 
