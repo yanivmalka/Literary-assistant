@@ -241,6 +241,8 @@
     "subtitle": "Characters, locations, and other elements found in your documents",
     "subtitleByType": "{{type}} found in your documents",
     "empty": "No entities found yet. Upload a document to get started.",
+    "emptyCharacters": "No characters yet. Add a character manually or extract characters from an uploaded document.",
+    "emptyLocations": "No locations yet. Add a location manually or extract locations from an uploaded document.",
     "emptyStates": {
       "object": {
         "title": "No objects are associated with this character yet.",

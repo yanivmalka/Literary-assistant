@@ -166,7 +166,7 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
 
         {characters.length === 0 ? (
           <div className="border-2 border-dashed rounded-lg p-12 text-center">
-            <p className="text-muted-foreground">{t('entities.empty')}</p>
+            <p className="text-muted-foreground">{t('entities.emptyCharacters')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

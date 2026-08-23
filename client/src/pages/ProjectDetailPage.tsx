@@ -148,7 +148,7 @@ export default function ProjectDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Link
           to={`/projects/${projectId}/knowledge?tab=characters`}
-          className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
+          className="border rounded-lg p-5 transition-shadow hover:shadow-md cursor-pointer"
         >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
             <Users className="h-5 w-5 text-blue-500" />
@@ -162,7 +162,7 @@ export default function ProjectDetailPage() {
 
         <Link
           to={`/projects/${projectId}/knowledge?tab=locations`}
-          className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
+          className="border rounded-lg p-5 transition-shadow hover:shadow-md cursor-pointer"
         >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
             <MapPin className="h-5 w-5 text-green-500" />
@@ -176,7 +176,7 @@ export default function ProjectDetailPage() {
 
         <Link
           to={`/projects/${projectId}/knowledge?tab=timeline`}
-          className={`border rounded-lg p-5 transition-shadow ${hasReadyDocument ? 'hover:shadow-md cursor-pointer' : 'opacity-60 pointer-events-none'}`}
+          className="border rounded-lg p-5 transition-shadow hover:shadow-md cursor-pointer"
         >
           <h3 className="font-semibold flex items-center gap-2 mb-2">
             <Calendar className="h-5 w-5 text-indigo-500" />

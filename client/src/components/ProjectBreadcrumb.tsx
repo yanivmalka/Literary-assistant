@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronRight, FolderOpen, FileText, MessageSquare, AlertTriangle, GitBranch, Users } from 'lucide-react'
+import { ChevronRight, FolderOpen, FileText, MessageSquare, AlertTriangle, GitBranch, Users, Calendar } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 
 interface ProjectBreadcrumbProps {
@@ -12,6 +12,7 @@ interface ProjectBreadcrumbProps {
 const NAV_ITEMS = [
   { key: 'documents', path: 'documents', icon: FileText, label: 'documents.title' },
   { key: 'entities', path: 'entities', icon: Users, label: 'entities.title' },
+  { key: 'timeline', path: 'timeline', icon: Calendar, label: 'timeline.title' },
   { key: 'qa', path: 'qa', icon: MessageSquare, label: 'qa.title' },
   { key: 'contradictions', path: 'contradictions', icon: AlertTriangle, label: 'contradictions.title' },
   { key: 'branches', path: 'branches', icon: GitBranch, label: 'branch.title' },
