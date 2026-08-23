@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
-import { Plus, FolderOpen, MoreVertical, Trash2 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Feather, Plus, FolderOpen, MoreVertical, Trash2 } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 
 export default function ProjectsPage() {
@@ -46,6 +46,24 @@ export default function ProjectsPage() {
           {t('projects.create')}
         </button>
       </div>
+
+      <Link
+        to="/quills"
+        className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/5 p-5 hover:border-primary/40 hover:bg-primary/10 transition-colors"
+      >
+        <div className="flex items-center gap-4">
+          <div className="rounded-lg bg-primary/10 p-3 text-primary">
+            <Feather className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="font-semibold">{t('quills.storeTitle')}</h3>
+            <p className="text-sm text-muted-foreground">{t('quills.projectsCardDescription')}</p>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
+          {t('quills.openStore')}
+        </span>
+      </Link>
 
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">{t('common.loading')}</div>

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
+import { useQuillStore } from '@/stores/quillStore'
 import i18n from '@/i18n'
 
 export interface QASource {
@@ -109,10 +110,14 @@ export const useQAStore = create<QAState>((set, get) => ({
       const data = await response.json() as EdgeFunctionResponse
 
       if (!data.success || !data.result) {
-        throw new Error(data.error || 'Edge Function returned invalid response')
+        const errorMessage = data.error === 'INSUFFICIENT_QUILLS'
+          ? i18n.t('quills.insufficient')
+          : (data.error || 'Edge Function returned invalid response')
+        throw new Error(errorMessage)
       }
 
       const result = data.result
+      await useQuillStore.getState().loadWallet()
 
       // No context available
       if (result.noSufficientContext && !result.answer) {

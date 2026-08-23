@@ -22,6 +22,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callGeminiWithFallback } from "../_shared/gemini-client.ts";
+import { assertQuillsAvailable, consumeGeminiUsage } from "../_shared/quills.ts";
 import {
   DEFAULT_MODEL,
   DEFAULT_MODEL_PROFILE,
@@ -1110,6 +1111,11 @@ Deno.serve(async (req) => {
       return errorResponse("GEMINI_API_KEY not configured", 500);
     }
 
+    const quota = await assertQuillsAvailable(supabase, authenticatedUser.id);
+    if (!quota.available) {
+      return errorResponse("INSUFFICIENT_QUILLS", 402);
+    }
+
     console.log(`[extract-knowledge] Version: 2.5.0 | Layer: ${targetLayer} | Model profile: ${modelProfile} | Auth: OK`);
 
     const offset = body.offset ?? 0;
@@ -1205,9 +1211,6 @@ Deno.serve(async (req) => {
       console.log(`[extract-knowledge] Used fallback model: ${modelUsed} (primary: ${DEFAULT_MODEL})`);
     }
 
-    // ==============================
-    // Step 3: Parse and validate JSON
-    // ==============================
     const parsedExtraction = parseExtractionJson<unknown>(responseText);
     const extraction = normalizeExtractionPayload<GeminiExtraction>(parsedExtraction);
     if (!extraction) {
@@ -1255,6 +1258,31 @@ Deno.serve(async (req) => {
       );
     }
 
+    let quillCharge;
+    try {
+      quillCharge = await consumeGeminiUsage(
+        supabase,
+        authenticatedUser.id,
+        usage,
+        "extract-knowledge",
+        {
+          project_id: body.project_id,
+          document_id: body.document_id,
+          version_id: body.version_id,
+          extraction_run_id: extractionRunId,
+          offset,
+          model: modelUsed,
+        },
+        `extract:${extractionRunId ?? `${body.version_id}:${offset}`}`,
+      );
+    } catch (chargeError) {
+      const chargeMessage = chargeError instanceof Error ? chargeError.message : "Quill consumption failed";
+      if (chargeMessage.includes("INSUFFICIENT_QUILLS")) {
+        return errorResponse("INSUFFICIENT_QUILLS", 402);
+      }
+      console.error("[extract-knowledge] Quill consumption failed:", chargeMessage);
+      return errorResponse("Failed to update Quill balance", 500, chargeMessage);
+    }
 
     // ==============================
     // Step 4: Save raw extraction
@@ -1913,6 +1941,8 @@ Deno.serve(async (req) => {
           values_synced: valuesSynced,
           value_evidence_synced: valueEvidenceSynced,
           raw_extraction_id: rawExtractionId,
+          quills_charged: quillCharge.chargedQuills,
+          quills_balance: quillCharge.balance,
           branch_id: targetBranchId || null,
           layer: targetLayer,
           normalized_entity_count: normalizedEntities.length,

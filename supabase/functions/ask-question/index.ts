@@ -10,6 +10,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callGeminiWithFallback } from "../_shared/gemini-client.ts";
+import { assertQuillsAvailable, consumeGeminiUsage } from "../_shared/quills.ts";
 import { DEFAULT_MODEL } from "../_shared/gemini-config.ts";
 
 const corsHeaders = {
@@ -358,6 +359,11 @@ Deno.serve(async (req) => {
       );
     }
 
+    const quota = await assertQuillsAvailable(supabase, user.id);
+    if (!quota.available) {
+      return errorResponse("INSUFFICIENT_QUILLS", 402);
+    }
+
     // --- Step 4: Build context string with source references ---
     const contextParts = sources.map((s, i) => {
       const ref = s.chapterTitle
@@ -410,6 +416,25 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    let quillCharge;
+    try {
+      quillCharge = await consumeGeminiUsage(
+        supabase,
+        user.id,
+        (geminiData.usageMetadata as Record<string, unknown> | undefined) ?? {},
+        "ask-question",
+        { project_id: projectId, model: geminiResult.modelUsed },
+        `qa:${user.id}:${projectId}:${crypto.randomUUID()}`,
+      );
+    } catch (chargeError) {
+      const chargeMessage = chargeError instanceof Error ? chargeError.message : "Quill consumption failed";
+      if (chargeMessage.includes("INSUFFICIENT_QUILLS")) {
+        return errorResponse("INSUFFICIENT_QUILLS", 402);
+      }
+      console.error("[ask-question] Quill consumption failed:", chargeMessage);
+      return errorResponse("Failed to update Quill balance", 500, chargeMessage);
     }
 
     // --- Step 6: Parse LLM response ---

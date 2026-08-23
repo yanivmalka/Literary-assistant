@@ -92,6 +92,26 @@
     "name": "Project Name",
     "description": "Description"
   },
+  "quills": {
+    "namePlural": "Quills",
+    "storeTitle": "Quill Store",
+    "storeDescription": "Use Quills for Gemini-powered features. Every 5,000 Gemini tokens use 1 Quill.",
+    "currentBalance": "Current balance",
+    "choosePackage": "Choose a package",
+    "demoNotice": "Payments are not connected yet. Adding Quills is free during this demo.",
+    "noPayment": "No payment required",
+    "packageIncludes": "Up to {{tokens}} Gemini tokens",
+    "addPackage": "Add {{amount}} Quills",
+    "adding": "Adding...",
+    "openStore": "Open Quill Store",
+    "backToProjects": "Back to projects",
+    "projectsCardDescription": "Add Quills for AI features. Free demo packages are available.",
+    "warning10": "You have 10 Quills or fewer remaining. Consider adding more.",
+    "warning5": "You have 5 Quills or fewer remaining. Consider adding more soon.",
+    "loadError": "Could not load your Quill balance. Please run the Quills migration and try again.",
+    "purchaseError": "Could not add Quills. Please try again.",
+    "insufficient": "You do not have enough Quills. Add more Quills to continue."
+  },
   "maps": {
     "create": "New Map",
     "wizard": {

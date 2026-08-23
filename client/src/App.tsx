@@ -24,6 +24,7 @@ import DevTestPage from './pages/DevTestPage'
 import DebugAuthPage from './pages/DebugAuthPage'
 import ReviewChangesPage from './pages/ReviewChangesPage'
 import AccountSettingsPage from './pages/AccountSettingsPage'
+import QuillsStorePage from './pages/QuillsStorePage'
 
 function App() {
   const { i18n } = useTranslation()
@@ -48,6 +49,7 @@ function App() {
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<HomePage />} />
         <Route path="projects" element={<ProjectsPage />} />
+        <Route path="quills" element={<QuillsStorePage />} />
         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="projects/:projectId/maps/new" element={<MapWizardPage />} />
         <Route path="projects/:projectId/maps/:mapId" element={<MapEditorPage />} />

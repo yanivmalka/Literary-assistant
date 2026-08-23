@@ -1,13 +1,51 @@
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link, useNavigate } from 'react-router-dom'
-import { Map, LogOut, Trash2, FolderOpen, Settings } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Feather, Map, LogOut, Trash2, FolderOpen, Settings } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { useQuillStore } from '@/stores/quillStore'
+import { toast } from './Toast'
 import LanguageSwitcher from './LanguageSwitcher'
 
 export default function Header() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, profile, signOut } = useAuthStore()
+  const { wallet, loadWallet, clear } = useQuillStore()
+  const previousBalance = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (user) {
+      loadWallet()
+    } else {
+      clear()
+    }
+  }, [clear, loadWallet, user])
+
+  useEffect(() => {
+    if (!user || !wallet) return
+
+    const currentBalance = wallet.quills_balance
+    const storageKey = `quills:last-seen:${user.id}`
+    const storedBalance = Number(window.localStorage.getItem(storageKey))
+    const previous = previousBalance.current ?? (Number.isFinite(storedBalance) ? storedBalance : null)
+
+    if (previous !== null) {
+      if (previous > 10 && currentBalance <= 10) {
+        toast('info', t('quills.warning10'))
+      }
+      if (previous > 5 && currentBalance <= 5) {
+        toast('info', t('quills.warning5'))
+      }
+      if (previous > 3 && currentBalance <= 3 && location.pathname !== '/quills') {
+        navigate('/quills')
+      }
+    }
+
+    previousBalance.current = currentBalance
+    window.localStorage.setItem(storageKey, String(currentBalance))
+  }, [location.pathname, navigate, t, user, wallet])
 
   const handleSignOut = async () => {
     await signOut()
@@ -37,6 +75,14 @@ export default function Header() {
             >
               <Trash2 className="h-4 w-4" />
               {t('projects.trash')}
+            </Link>
+            <Link
+              to="/quills"
+              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+              aria-label={t('quills.openStore')}
+            >
+              <Feather className="h-4 w-4" />
+              <span>{wallet?.quills_balance ?? '—'} {t('quills.namePlural')}</span>
             </Link>
           </nav>
         )}

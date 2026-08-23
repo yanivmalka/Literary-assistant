@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useEntityStore } from '@/stores/entityStore'
 import { buildExtractionRequest, hasMainEntities, getOrCreateActiveBranch } from '@/lib/extractionBranching'
 import { DEFAULT_EXTRACTION_MODEL_PROFILE, type ExtractionModelProfile } from '@/lib/extractionModels'
+import { useQuillStore } from '@/stores/quillStore'
 
 export interface DocumentVersion {
   id: string
@@ -430,6 +431,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           })
           break
         }
+
+        await useQuillStore.getState().loadWallet()
 
         const nextOffset = Number(data.next_offset ?? offset + BATCH_SIZE)
         // The server historically marks a full final batch as done=false because
