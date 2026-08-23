@@ -23,6 +23,8 @@ export const EXTRACTION_MODEL_PROFILES: readonly ExtractionModelProfile[] = [
 
 const EXTRACTION_MODEL_PROFILE_STORAGE_KEY = 'literary-assistant.extraction-model-profile'
 export const EXTRACTION_MODEL_PROFILE_CHANGED_EVENT = 'literary-assistant.extraction-model-profile-changed'
+const EXTRACTION_STRATEGY_STORAGE_KEY = 'literary-assistant.extraction-strategy'
+export const EXTRACTION_STRATEGY_CHANGED_EVENT = 'literary-assistant.extraction-strategy-changed'
 
 export function getStoredExtractionModelProfile(): ExtractionModelProfile {
   if (typeof window === 'undefined') return DEFAULT_EXTRACTION_MODEL_PROFILE
@@ -36,6 +38,18 @@ export function setStoredExtractionModelProfile(profile: ExtractionModelProfile)
   if (typeof window === 'undefined') return
   window.sessionStorage.setItem(EXTRACTION_MODEL_PROFILE_STORAGE_KEY, profile)
   window.dispatchEvent(new Event(EXTRACTION_MODEL_PROFILE_CHANGED_EVENT))
+}
+
+export function getStoredExtractionStrategy(): ExtractionStrategy {
+  if (typeof window === 'undefined') return DEFAULT_EXTRACTION_STRATEGY
+  const stored = window.sessionStorage.getItem(EXTRACTION_STRATEGY_STORAGE_KEY)
+  return isExtractionStrategy(stored) ? stored : DEFAULT_EXTRACTION_STRATEGY
+}
+
+export function setStoredExtractionStrategy(strategy: ExtractionStrategy): void {
+  if (typeof window === 'undefined') return
+  window.sessionStorage.setItem(EXTRACTION_STRATEGY_STORAGE_KEY, strategy)
+  window.dispatchEvent(new Event(EXTRACTION_STRATEGY_CHANGED_EVENT))
 }
 
 export type LegacyExtractionModelProfile = 'current' | 'development'

@@ -12,7 +12,7 @@
     "test:entities:models": "vitest run --reporter=verbose src/lib/__tests__/entity-extraction/modelExtraction.live.test.ts",
     "test:entities:all": "npm run test:entities:offline && npm run test:entities:models",
     "test:entities": "npm run test:entities:all",
-    "test:extraction-strategy": "vitest run --reporter=verbose src/lib/__tests__/extractionBranching.test.ts src/lib/__tests__/extractionTelemetry.test.ts"
+    "test:extraction-strategy": "vitest run --reporter=verbose src/lib/__tests__/extractionBranching.test.ts src/lib/__tests__/extractionModels.test.ts src/lib/__tests__/extractionTelemetry.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.0",
