@@ -39,7 +39,17 @@ export function parseExtractionJson<T>(responseText: string): T | null {
   }
 }
 
-type NormalizedExtractionBucket =
+export function cloneJsonValue<T>(value: T): T | null {
+  try {
+    const serialized = JSON.stringify(value)
+    if (serialized === undefined) return null
+    return JSON.parse(serialized) as T
+  } catch {
+    return null
+  }
+}
+
+ type NormalizedExtractionBucket =
   | 'characters'
   | 'locations'
   | 'objects'

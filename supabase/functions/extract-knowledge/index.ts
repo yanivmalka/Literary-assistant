@@ -42,7 +42,7 @@ import {
   type EntityResolutionRecord,
 } from "../_shared/entity-resolution.ts";
 import { normalizeEntities as normalizeEntitiesForExtraction } from "./normalization.ts";
-import { parseExtractionJson, normalizeExtractionPayload, validateExtractionMode, validateExtractionPayload } from "./testable-pipeline.ts";
+import { parseExtractionJson, cloneJsonValue, normalizeExtractionPayload, validateExtractionMode, validateExtractionPayload } from "./testable-pipeline.ts";
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
 import { buildAbilityLinks, mergeAbilityLinkEntries } from "../_shared/ability-links.ts";
 import type { AbilityLinkEntity } from "../_shared/ability-links.ts";
@@ -738,6 +738,32 @@ async function findExistingEntity(
   return resolveExtractionCandidate(entity, branchCandidates, mainCandidates);
 }
 
+async function findExistingMainEntity(
+  supabase: any,
+  projectId: string,
+  userId: string,
+  versionId: string,
+  entity: NormalizedEntity,
+): Promise<ExtractionEntityCandidate | null> {
+  const entitySelect = "id, canonical_name, entity_type, entity_types, structured_fields, attributes, source, description, layer, branch_id";
+  const { data, error } = await supabase
+    .from("knowledge_entities")
+    .select(entitySelect)
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .eq("version_id", versionId)
+    .eq("layer", "main")
+    .is("branch_id", null)
+    .eq("canonical_name", entity.canonical_name)
+    .order("created_at", { ascending: true })
+    .limit(1);
+
+  if (error) throw new Error(`Failed to find existing Main entity: ${error.message}`);
+
+  const existing = (data?.[0] || null) as ExtractionEntityCandidate | null;
+  return existing;
+}
+
 function mergeNonNullFields(
   existing: Record<string, unknown> | null | undefined,
   incoming: Record<string, unknown>,
@@ -1237,6 +1263,16 @@ Deno.serve(async (req) => {
       console.warn("[extract-knowledge] Extraction payload warnings:", extractionValidation.errors);
     }
 
+    // JSON.parse normally guarantees JSON-safe data, but normalize the value
+    // again before any JSONB write. This prevents a malformed/non-serializable
+    // value from reaching PostgreSQL and charging the user before failure.
+    const storageSafeExtraction = cloneJsonValue(extraction) as GeminiExtraction | null;
+    if (!storageSafeExtraction) {
+      const message = "Extraction payload could not be serialized as JSON.";
+      console.error(`[extract-knowledge] ${message} offset=${offset}`);
+      return errorResponse(message, 422);
+    }
+
     const extractedItemCount = [
       extraction.characters,
       extraction.locations,
@@ -1364,6 +1400,17 @@ Deno.serve(async (req) => {
           targetBranchId!,
           entity,
         );
+      } else {
+        // Main bootstrap batches can contain the same entity more than once,
+        // and a retried batch can repeat an earlier insert. Resolve the row
+        // within this document version before attempting another insert.
+        existing = await findExistingMainEntity(
+          supabase,
+          body.project_id,
+          body.user_id,
+          body.version_id,
+          entity,
+        );
       }
 
       if (targetLayer === "main" && (entity.entity_type === "ability" || entity.entity_type === "magic_ability")) {
@@ -1383,7 +1430,36 @@ Deno.serve(async (req) => {
 
       let entityId: string;
 
-      if (existing) {
+      if (existing && targetLayer === "main") {
+        // Main extraction is repeat-safe: merge observations into the row
+        // already created for this version instead of inserting a duplicate.
+        const merged = mergeExistingBranchEntity(existing, entity);
+        const { error: mainUpdateError } = await supabase
+          .from("knowledge_entities")
+          .update({
+            canonical_name: merged.canonical_name,
+            entity_types: merged.entity_types,
+            description: existing.source === "user" ? existing.description : merged.description,
+            attributes: existing.source === "user" ? existing.attributes : merged.attributes,
+            structured_fields: existing.source === "user" ? existing.structured_fields : merged.structured_fields,
+            raw_extraction_id: rawExtractionId,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existing.id)
+          .eq("project_id", body.project_id)
+          .eq("version_id", body.version_id)
+          .eq("layer", "main")
+          .is("branch_id", null);
+
+        if (mainUpdateError) {
+          const message = `Failed to update Main entity '${entity.canonical_name}': ${mainUpdateError.message}`;
+          console.error(message);
+          persistenceErrors.push(message);
+          continue;
+        }
+
+        entityId = existing.id;
+      } else if (existing) {
         if (existing.layer === "branch") {
           // Reuse the current Branch UUID and merge only non-null observations.
           // A missing field in a later extraction must not erase Branch data.

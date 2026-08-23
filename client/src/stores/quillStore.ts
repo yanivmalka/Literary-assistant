@@ -3,6 +3,14 @@ import { supabase } from '@/lib/supabase'
 
 export const QUILL_TOKEN_SIZE = 5000
 
+async function getAuthenticatedUser() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) return null
+
+  const { data: { user }, error } = await supabase.auth.getUser()
+  return error || !user ? null : user
+}
+
 export interface QuillWallet {
   user_id: string
   quills_balance: number
@@ -41,6 +49,12 @@ export const useQuillStore = create<QuillState>((set) => ({
   loadWallet: async () => {
     set({ loading: true, error: null })
     try {
+      const user = await getAuthenticatedUser()
+      if (!user) {
+        set({ wallet: null, loading: false, error: null })
+        return
+      }
+
       const { data, error } = await supabase.rpc('get_quill_wallet')
       if (error) throw error
       const wallet = Array.isArray(data) ? data[0] : data
@@ -65,6 +79,12 @@ export const useQuillStore = create<QuillState>((set) => ({
   grantQuills: async (amount) => {
     set({ granting: true, error: null })
     try {
+      const user = await getAuthenticatedUser()
+      if (!user) {
+        set({ granting: false, error: 'quills.purchaseError' })
+        return false
+      }
+
       const { data, error } = await supabase.rpc('grant_demo_quills', {
         p_amount: amount,
         p_package: String(amount),
@@ -76,7 +96,7 @@ export const useQuillStore = create<QuillState>((set) => ({
         granting: false,
         wallet: state.wallet
           ? { ...state.wallet, ...wallet }
-          : { user_id: '', ...wallet },
+          : { user_id: user.id, ...wallet },
       }))
       return true
     } catch (error) {
