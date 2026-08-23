@@ -35,6 +35,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
     documents,
     deleteDocument,
     triggerEntityExtraction,
+    resumeExtraction,
     extractionInProgress,
     extractionDocumentId,
     pausedExtractions,

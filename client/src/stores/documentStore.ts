@@ -533,6 +533,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         extractionInProgress: false,
         extractionPausing: false,
         extractionCancelled: false,
+        extractionDocumentId: null,
+        _extractionPauseFlag: false,
         pausedExtractions: {
           ...get().pausedExtractions,
           [documentId]: pausedRun,
