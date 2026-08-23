@@ -60,6 +60,15 @@ import { buildAbilityLinks, mergeAbilityLinkEntries } from "../_shared/ability-l
 import type { AbilityLinkEntity } from "../_shared/ability-links.ts";
 import { buildSkippedBatchResponse, getExtractionSkipReason } from "./skip-policy.ts";
 import { executeParallelExpertExtraction } from "../_shared/parallel-expert-merger.ts";
+import {
+  fingerprintShadowInput,
+  persistShadowComparison,
+  validateBaselineScope,
+  validateShadowExecutionGuard,
+  SHADOW_COMPARISON_PROFILE,
+  SHADOW_COMPARISON_STRATEGY,
+  type BaselineRawExtraction,
+} from "../_shared/shadow-comparison.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,6 +105,10 @@ interface ExtractRequest {
   extraction_strategy?: unknown;
   /** Allow only sub-base-locations to continue after a classified Gemini batch failure. */
   skip_per_batch?: boolean;
+  /** Evaluate C against one explicitly selected raw extraction without canonical writes. */
+  shadow_only?: boolean;
+  shadow_run_id?: string;
+  baseline_raw_extraction_id?: string;
 }
 
 interface ExtractedEntity {
@@ -1042,6 +1055,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const shadowOnly = body.shadow_only === true;
+    const requestedShadowRunId = body.shadow_run_id?.trim() || null;
+    const shadowRunId = shadowOnly
+      ? (requestedShadowRunId || `shadow:${crypto.randomUUID()}`)
+      : null;
 
     // ==============================
     // Validation: Required base fields
@@ -1058,8 +1076,17 @@ Deno.serve(async (req) => {
       return errorResponse("target_branch_id must be a valid UUID.", 400);
     }
 
-    if (body.extraction_run_id !== undefined && !isUuid(body.extraction_run_id)) {
+    if (body.extraction_run_id !== undefined && (!shadowOnly && !isUuid(body.extraction_run_id))) {
       return errorResponse("extraction_run_id must be a valid UUID.", 400);
+    }
+    if (shadowOnly && body.extraction_run_id !== undefined) {
+      return errorResponse("shadow_only must use shadow_run_id instead of extraction_run_id.", 400);
+    }
+    if (!shadowOnly && body.shadow_run_id !== undefined) {
+      return errorResponse("shadow_run_id is supported only with shadow_only=true.", 400);
+    }
+    if (shadowOnly && body.baseline_raw_extraction_id !== undefined && !isUuid(body.baseline_raw_extraction_id)) {
+      return errorResponse("baseline_raw_extraction_id must be a valid UUID.", 400);
     }
 
     const modelProfile = body.model_profile ?? DEFAULT_MODEL_PROFILE;
@@ -1081,6 +1108,19 @@ Deno.serve(async (req) => {
         400,
       );
     }
+    if (shadowOnly) {
+      const shadowGuard = validateShadowExecutionGuard({
+        shadow_only: true,
+        model_profile: modelProfile,
+        extraction_strategy: extractionStrategy,
+        baseline_raw_extraction_id: body.baseline_raw_extraction_id,
+        shadow_run_id: shadowRunId,
+      });
+      if (!shadowGuard.ok) return errorResponse(`Invalid shadow comparison request: ${shadowGuard.errors.join("; ")}`, 400);
+      if (modelProfile !== SHADOW_COMPARISON_PROFILE || extractionStrategy !== SHADOW_COMPARISON_STRATEGY) {
+        return errorResponse("Shadow comparison is restricted to the isolated Sub-base C parallel strategy.", 400);
+      }
+    }
     const rolloutValidation = validateExtractionStrategyRollout(
       extractionStrategy,
       isParallelExpertsRolloutEnabled(Deno.env.get(PARALLEL_EXPERTS_ROLLOUT_ENV)),
@@ -1091,13 +1131,15 @@ Deno.serve(async (req) => {
     // Validation: Main vs Branch extraction mode
     // CRITICAL FIX: Use extraction_mode (set per extraction run) instead of checking per batch
     // ==============================
-    const extractionMode = body.extraction_mode;
-    const extractionRunId = body.extraction_run_id?.trim() || null;
-    const modeValidation = validateExtractionMode(body);
+    const extractionMode = shadowOnly ? undefined : body.extraction_mode;
+    const extractionRunId = shadowOnly ? shadowRunId : body.extraction_run_id?.trim() || null;
+    const modeValidation = shadowOnly
+      ? { ok: true as const, mode: "branch" as const, branchId: null }
+      : validateExtractionMode(body);
     if (!modeValidation.ok) return errorResponse(`Invalid extraction mode: ${modeValidation.error}`, 400);
 
     // For backward compatibility, fall back to legacy behavior if extraction_mode not provided
-    const useMainForExtraction = modeValidation.mode === 'bootstrap';
+    const useMainForExtraction = !shadowOnly && modeValidation.mode === 'bootstrap';
     const hasBranchId = !!body.target_branch_id;
 
     // ==============================
@@ -1120,6 +1162,29 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    let baselineRawExtraction: BaselineRawExtraction | null = null;
+    if (shadowOnly) {
+      const { data: baseline, error: baselineError } = await supabase
+        .from("raw_extractions")
+        .select("id, project_id, document_id, version_id, user_id, branch_id, model, model_profile, extraction_strategy, raw_response")
+        .eq("id", body.baseline_raw_extraction_id)
+        .maybeSingle();
+      if (baselineError) {
+        return errorResponse(`Failed to load shadow baseline: ${baselineError.message}`, 500);
+      }
+      const baselineValidation = validateBaselineScope(baseline as Partial<BaselineRawExtraction> | null, {
+        project_id: body.project_id,
+        document_id: body.document_id,
+        version_id: body.version_id,
+        user_id: authenticatedUser.id,
+        baseline_raw_extraction_id: body.baseline_raw_extraction_id!,
+      });
+      if (!baselineValidation.ok) {
+        return errorResponse(`Invalid shadow baseline: ${baselineValidation.errors.join("; ")}`, 400);
+      }
+      baselineRawExtraction = baseline as BaselineRawExtraction;
+    }
+
     // ==============================
     // Authorization: Extraction mode validation
     // CRITICAL FIX: Use extraction_mode that was determined at RUN level
@@ -1128,13 +1193,18 @@ Deno.serve(async (req) => {
     let targetLayer: "main" | "branch" = "branch";
     let targetBranchId: string | null = null;
 
-    if (extractionMode === 'bootstrap' || useMainForExtraction) {
+    if (shadowOnly) {
+      // Shadow rows never participate in Main/Branch authorization or writes.
+      targetLayer = "branch";
+      targetBranchId = baselineRawExtraction?.branch_id ?? null;
+      console.log(`[extract-knowledge] Shadow run ${shadowRunId}: isolated comparison against ${baselineRawExtraction?.id}`);
+    } else if (extractionMode === 'bootstrap' || useMainForExtraction) {
       // Bootstrap mode: all batches from one extraction run write to Main.
       // A prior raw extraction is the durable marker that this run already
       // passed the empty-Main guard on its first batch.
       let isBootstrapContinuation = false;
 
-      if (extractionRunId) {
+      if (extractionRunId && !shadowOnly) {
         const { data: priorBatch, error: priorBatchError } = await supabase
           .from("raw_extractions")
           .select("id")
@@ -1215,7 +1285,7 @@ Deno.serve(async (req) => {
       console.log(`[extract-knowledge] Extraction run ${extractionRunId}: BRANCH mode - writing to branch ${activeBranch.id}`);
     }
 
-    if (extractionRunId) {
+    if (extractionRunId && !shadowOnly) {
       const { data: priorRun, error: priorRunError } = await supabase
         .from("raw_extractions")
         .select("document_id, version_id, branch_id, model_profile, extraction_strategy")
@@ -1248,12 +1318,14 @@ Deno.serve(async (req) => {
       return errorResponse("GEMINI_API_KEY not configured", 500);
     }
 
-    const quota = await assertQuillsAvailable(supabase, authenticatedUser.id);
-    if (!quota.available) {
-      return errorResponse("INSUFFICIENT_QUILLS", 402);
+    if (!shadowOnly) {
+      const quota = await assertQuillsAvailable(supabase, authenticatedUser.id);
+      if (!quota.available) {
+        return errorResponse("INSUFFICIENT_QUILLS", 402);
+      }
     }
 
-    console.log(`[extract-knowledge] Version: 2.5.0 | Layer: ${targetLayer} | Model profile: ${modelProfile} | Strategy: ${extractionStrategy} | Auth: OK`);
+    console.log(`[extract-knowledge] Version: 2.5.0 | Layer: ${shadowOnly ? "shadow" : targetLayer} | Model profile: ${modelProfile} | Strategy: ${extractionStrategy} | Auth: OK`);
 
     const offset = body.offset ?? 0;
     const limit = body.limit ?? BATCH_SIZE;
@@ -1298,6 +1370,9 @@ Deno.serve(async (req) => {
       content: c.content,
     }));
     const chunkFetchLatencyMs = Date.now() - chunkFetchStartedAt;
+    const shadowInputFingerprint = shadowOnly
+      ? await fingerprintShadowInput(chunkData)
+      : null;
 
     // ==============================
     // Step 2: Call Gemini (with multi-model fallback)
@@ -1509,6 +1584,84 @@ Deno.serve(async (req) => {
       console.error(`[extract-knowledge] ${message} offset=${offset}`);
       return errorResponse(message, 422);
     }
+    }
+
+    if (shadowOnly) {
+      if (!baselineRawExtraction || !storageSafeExtraction || !shadowInputFingerprint || !shadowRunId) {
+        return errorResponse("Shadow comparison could not establish its isolated inputs.", 500);
+      }
+      const shadowExtractedItemCount = [
+        extraction.characters,
+        extraction.locations,
+        extraction.objects,
+        extraction.abilities,
+        extraction.magic_abilities,
+        extraction.organizations,
+        extraction.events,
+        extraction.relationships,
+      ].reduce((total, items) => total + (items?.length || 0), 0);
+      try {
+        const comparison = await persistShadowComparison(supabase, {
+          scope: {
+            project_id: body.project_id,
+            document_id: body.document_id,
+            version_id: body.version_id,
+            user_id: authenticatedUser.id,
+          },
+          shadow_run_id: shadowRunId,
+          baseline: baselineRawExtraction,
+          candidate_payload: storageSafeExtraction,
+          offset,
+          limit,
+          chunk_positions: chunks.map((chunk: { position: number }) => chunk.position),
+          input_fingerprint: shadowInputFingerprint,
+          candidate_model_profile: modelProfile,
+          candidate_extraction_strategy: extractionStrategy,
+          candidate_model: modelUsed,
+          candidate_primary_model: expertModels[0]?.primary_model ?? null,
+          candidate_fallback_chain: expertModels,
+          input_tokens: Number((usage as Record<string, unknown>).promptTokenCount ?? 0),
+          output_tokens: Number((usage as Record<string, unknown>).candidatesTokenCount ?? 0),
+          thinking_tokens: Number((usage as Record<string, unknown>).thoughtsTokenCount ?? 0),
+          cached_tokens: Number((usage as Record<string, unknown>).cachedContentTokenCount ?? 0),
+          total_tokens: Number((usage as Record<string, unknown>).totalTokenCount ?? 0),
+          latency_ms: latencyMs,
+        });
+        return new Response(
+          JSON.stringify({
+            success: true,
+            shadow_only: true,
+            shadow_run_id: shadowRunId,
+            comparison_id: comparison.id,
+            baseline_raw_extraction_id: baselineRawExtraction.id,
+            input_alignment: comparison.input_alignment,
+            telemetry: {
+              model: modelUsed,
+              model_profile: modelProfile,
+              extraction_strategy: extractionStrategy,
+              expert_models: expertModels,
+              input_tokens: usage.promptTokenCount ?? null,
+              output_tokens: usage.candidatesTokenCount ?? null,
+              thinking_tokens: usage.thoughtsTokenCount ?? null,
+              total_tokens: usage.totalTokenCount ?? null,
+              cached_tokens: usage.cachedContentTokenCount ?? null,
+              latency_ms: latencyMs,
+              chunks_sent: chunks.length,
+              total_chars: totalChars,
+              extracted_item_count: shadowExtractedItemCount,
+              chunk_fetch_latency_ms: chunkFetchLatencyMs,
+              prompt_build_latency_ms: promptBuildLatencyMs,
+              total_latency_ms: Date.now() - requestStartedAt,
+            },
+            comparison_metrics: comparison["comparison_metrics"],
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      } catch (shadowError) {
+        const message = shadowError instanceof Error ? shadowError.message : "Shadow comparison persistence failed";
+        console.error("[extract-knowledge] Shadow comparison failed closed:", message);
+        return errorResponse(message, 500);
+      }
     }
 
     const extractedItemCount = [

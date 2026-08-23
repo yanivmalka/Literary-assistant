@@ -369,9 +369,9 @@ Model A מקבל את כל ה־chunks של ה־batch, אך instruction שלו מ
 - [x] לשמור fallback attempts מלאים.
 - [x] לחבר את חוזה הדמויות ל־merger.
 - [x] לוודא ש־relationships נשמרים כ־edges ולא כטקסט בלבד.
-- [ ] להשוות תוצאה חדשה מול התוצאה הקיימת ב־shadow mode.
+- [x] להשוות תוצאה חדשה מול התוצאה הקיימת ב־shadow mode.
 
-> Shadow comparison intentionally remains open: the current extraction endpoint has no isolated comparison sink, and enabling it requires a separate non-canonical result path before live C runs.
+> Shadow comparison ממומש כמסלול `shadow_only=true` מבודד בתוך `extract-knowledge`: הוא דורש את פרופיל `sub-base-c-characters`, אסטרטגיית `parallel-experts`, `shadow:<id>` נפרד ו־`baseline_raw_extraction_id` מפורש עם scope מלא. התוצאה נשמרת רק ב־`extraction_shadow_comparisons` עם fingerprint, payloads, metrics ו־fallback telemetry. המסלול חוזר לפני `raw_extractions`, כל כתיבת Knowledge Layer וחיוב Quills. מאחר ש־`raw_extractions` הישן אינו שומר batch offset/chunk positions, `input_alignment` נשמר כ־`unverified` ולא נבחר baseline לפי latest row.
 
 ### שלב 4 — Normalization ו־Knowledge Layer
 
