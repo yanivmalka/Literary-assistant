@@ -17,6 +17,7 @@ import {
   getCharacterAppearanceSummaries,
   getPopulatedCharacterFields,
   isDynamicCharacterProfile,
+  isPopulatedCharacterField,
   loadCharacterFieldSchema,
   normalizeCharacterGroupKey,
   type CharacterFieldDefinition,
@@ -305,6 +306,19 @@ export default function CharacterProfilePage() {
               .map(field => ({ fieldKey: field as string, summaryValue: null as string | null })),
             ...appearanceSummaries.map(summary => ({ fieldKey: summary.key, summaryValue: summary.value })),
           ]
+          const populatedValues = new Map(
+            getPopulatedCharacterFields(entity, modelProfile, dynamicFields)
+              .map(field => [field.key.trim(), field.value] as const),
+          )
+          const visibleFields = viewMode === 'profile' && isDynamicProfile
+            ? renderFields.filter(({ fieldKey, summaryValue }) => summaryValue !== null
+              ? summaryValue.trim().length > 0
+              : fieldKey === 'name'
+                ? entity.name.trim().length > 0
+                : isPopulatedCharacterField(populatedValues.get(fieldKey)))
+            : renderFields
+
+          if (visibleFields.length === 0) return null
 
           return (
             <div key={group.key} className="mb-8 last:mb-0">
