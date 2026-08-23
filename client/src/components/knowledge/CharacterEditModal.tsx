@@ -5,6 +5,16 @@ import { createPortal } from 'react-dom'
 import { useEntityStore } from '@/stores/entityStore'
 import { useBranchStore } from '@/stores/branchStore'
 import { getFieldGroupsForType, getFieldsForType, TEXTAREA_FIELDS } from '@/lib/entityTypes'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
+import {
+  CHARACTER_FIELD_CATALOG,
+  DYNAMIC_CHARACTER_PROFILE,
+  enableCharacterField,
+  getCatalogCharacterField,
+  isPopulatedCharacterField,
+  loadCharacterFieldSchema,
+  type CharacterFieldDefinition,
+} from '@/lib/characterSchema'
 import type { Entity } from '@/stores/entityStore'
 
 interface CharacterEditModalProps {
@@ -12,6 +22,7 @@ interface CharacterEditModalProps {
   character: Entity
   projectId: string
   selectedVersion: 'main' | 'branch'
+  modelProfile: ExtractionModelProfile
   onClose: () => void
   onCharacterUpdated?: () => void
 }
@@ -25,6 +36,7 @@ export default function CharacterEditModal({
   character,
   projectId,
   selectedVersion,
+  modelProfile,
   onClose,
   onCharacterUpdated,
 }: CharacterEditModalProps) {
@@ -38,20 +50,80 @@ export default function CharacterEditModal({
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [dynamicFields, setDynamicFields] = useState<CharacterFieldDefinition[]>([])
+  const [dynamicSchemaLoading, setDynamicSchemaLoading] = useState(false)
+  const [fieldToAdd, setFieldToAdd] = useState('')
+
+  const isDynamicProfile = modelProfile === DYNAMIC_CHARACTER_PROFILE
+  const structuredValues = useMemo(
+    () => (character.structured_fields || {}) as Record<string, unknown>,
+    [character.structured_fields],
+  )
 
   const entityType = character.entity_type as any
-  const fieldGroups = useMemo(
+  const staticFieldGroups = useMemo(
     () => getFieldGroupsForType(entityType),
     [entityType]
   )
-  const allFields = useMemo(
+  const staticFields = useMemo(
     () => getFieldsForType(entityType),
     [entityType]
+  )
+  const populatedDynamicKeys = useMemo(
+    () => Object.entries(structuredValues)
+      .filter(([key, value]) => key !== 'name' && isPopulatedCharacterField(value) && !!getCatalogCharacterField(key))
+      .map(([key]) => key),
+    [structuredValues]
+  )
+  const visibleDynamicFields = useMemo(() => {
+    if (!isDynamicProfile) return []
+    const selectedKeys = new Set(dynamicFields.map(field => field.field_key))
+    const visibleKeys = new Set([...populatedDynamicKeys, ...selectedKeys])
+    return CHARACTER_FIELD_CATALOG
+      .filter(field => visibleKeys.has(field.field_key))
+      .sort((a, b) => a.sort_order - b.sort_order)
+  }, [dynamicFields, isDynamicProfile, populatedDynamicKeys])
+  const dynamicGroups = useMemo(() => {
+    const groups = new Map<string, CharacterFieldDefinition[]>()
+    for (const field of visibleDynamicFields) {
+      const group = groups.get(field.group_key) || []
+      group.push(field)
+      groups.set(field.group_key, group)
+    }
+    return [...groups.entries()]
+  }, [visibleDynamicFields])
+  const fieldGroups = useMemo(
+    () => isDynamicProfile
+      ? dynamicGroups.map(([key, fields]) => ({ key, labelKey: '', label: key, fields }))
+      : staticFieldGroups,
+    [dynamicGroups, isDynamicProfile, staticFieldGroups],
+  )
+  const allFields = useMemo(
+    () => isDynamicProfile
+      ? ['name', ...visibleDynamicFields.map(field => field.field_key)]
+      : staticFields,
+    [isDynamicProfile, staticFields, visibleDynamicFields],
+  )
+  const availableDynamicFields = CHARACTER_FIELD_CATALOG.filter(
+    field => !dynamicFields.some(selected => selected.field_key === field.field_key),
   )
 
   useEffect(() => {
     setMountNode(document.body)
   }, [])
+
+  useEffect(() => {
+    if (!isOpen || !isDynamicProfile) {
+      setDynamicFields([])
+      setFieldToAdd('')
+      return
+    }
+    setDynamicSchemaLoading(true)
+    loadCharacterFieldSchema(projectId, modelProfile)
+      .then(setDynamicFields)
+      .catch(error => console.error('Failed to load character field schema:', error))
+      .finally(() => setDynamicSchemaLoading(false))
+  }, [isOpen, isDynamicProfile, modelProfile, projectId])
 
   // Initialize form data
   useEffect(() => {
@@ -65,7 +137,6 @@ export default function CharacterEditModal({
     setFormData(data)
     setOriginalFormData(data)
 
-    // Expand all groups by default
     const groups = new Set<string>()
     fieldGroups.forEach(group => groups.add(group.key))
     setExpandedGroups(groups)
@@ -96,7 +167,9 @@ export default function CharacterEditModal({
   const handleSave = async () => {
     setSaving(true)
     try {
-      const structuredFields: Record<string, unknown> = {}
+      const structuredFields: Record<string, unknown> = {
+        ...((character.structured_fields || {}) as Record<string, unknown>),
+      }
       for (const field of allFields) {
         const value = formData[field]
         structuredFields[field] = value && value.trim() ? value.trim() : null
@@ -117,7 +190,7 @@ export default function CharacterEditModal({
 
       if (success) {
         setOriginalFormData(formData)
-        await fetchEntities(projectId)
+        await fetchEntities(projectId, undefined, modelProfile)
         onCharacterUpdated?.()
         onClose()
       }
@@ -132,6 +205,24 @@ export default function CharacterEditModal({
     onClose()
   }
 
+  const handleAddField = async () => {
+    if (!isDynamicProfile || !fieldToAdd) return
+    const field = getCatalogCharacterField(fieldToAdd)
+    if (!field) return
+    try {
+      const enabled = await enableCharacterField(projectId, field)
+      setDynamicFields(current => [
+        ...current.filter(item => item.field_key !== enabled.field_key),
+        enabled,
+      ].sort((a, b) => a.sort_order - b.sort_order))
+      setFormData(current => ({ ...current, [enabled.field_key]: null }))
+      setFieldToAdd('')
+      setExpandedGroups(current => new Set([...current, enabled.group_key]))
+    } catch (error) {
+      console.error('Failed to enable character field:', error)
+    }
+  }
+
   const handleDelete = async () => {
     if (selectedVersion === 'branch' && !currentBranch) return
 
@@ -143,7 +234,7 @@ export default function CharacterEditModal({
       const success = await deleteEntity(character.id, branchContext)
 
       if (success) {
-        await fetchEntities(projectId)
+        await fetchEntities(projectId, undefined, modelProfile)
         onCharacterUpdated?.()
         onClose()
       }
@@ -195,48 +286,42 @@ export default function CharacterEditModal({
         <div className="p-6 space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto">
           {fieldGroups.map(group => (
             <div key={group.key} className="border rounded-lg">
-              {/* Group Header */}
               <button
                 onClick={() => toggleGroup(group.key)}
                 className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
               >
                 <h3 className="font-semibold text-muted-foreground">
-                  {t(group.labelKey)}
+                  {isDynamicProfile ? ('label' in group ? group.label : group.labelKey) : t(group.labelKey)}
                 </h3>
-                {expandedGroups.has(group.key) ? (
-                  <ChevronDown className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
+                {expandedGroups.has(group.key) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
-
-              {/* Group Fields */}
               {expandedGroups.has(group.key) && (
                 <div className="border-t p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                   {group.fields.map(field => {
-                    const value = formData[field as string] ?? ''
-                    const isTextarea = TEXTAREA_FIELDS.has(field as string)
-                    const fieldLabel = t(`entityFields.${field}`, { defaultValue: field })
-
+                    const fieldKey = typeof field === 'string' ? field : field.field_key
+                    const fieldDefinition = typeof field === 'string' ? getCatalogCharacterField(field) : field
+                    const value = formData[fieldKey] ?? ''
+                    const isTextarea = fieldDefinition?.field_type === 'long_text' || TEXTAREA_FIELDS.has(fieldKey)
+                    const fieldLabel = isDynamicProfile && fieldDefinition
+                      ? fieldDefinition.label
+                      : t(`entityFields.${fieldKey}`, { defaultValue: fieldKey })
                     return (
-                      <div key={field}>
-                        <label className="text-sm font-medium" htmlFor={field}>
-                          {fieldLabel}
-                        </label>
+                      <div key={fieldKey}>
+                        <label className="text-sm font-medium" htmlFor={fieldKey}>{fieldLabel}</label>
                         {isTextarea ? (
                           <textarea
-                            id={field}
+                            id={fieldKey}
                             value={value}
-                            onChange={e => handleFieldChange(field as string, e.target.value)}
+                            onChange={e => handleFieldChange(fieldKey, e.target.value)}
                             className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground resize-none"
                             rows={4}
                           />
                         ) : (
                           <input
-                            id={field}
+                            id={fieldKey}
                             type="text"
                             value={value}
-                            onChange={e => handleFieldChange(field as string, e.target.value)}
+                            onChange={e => handleFieldChange(fieldKey, e.target.value)}
                             className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground"
                           />
                         )}
@@ -247,6 +332,34 @@ export default function CharacterEditModal({
               )}
             </div>
           ))}
+
+          {isDynamicProfile && (
+            <section className="border border-dashed rounded-lg p-4 space-y-3">
+              <div>
+                <h3 className="font-semibold">הוספת שדה דמות</h3>
+                <p className="text-xs text-muted-foreground">
+                  בחר שדה מהקטלוג. הוא יתווסף להוראות החילוץ העתידיות, ויוצג כאן גם אם עדיין אין לו ערך.
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={fieldToAdd}
+                  onChange={event => setFieldToAdd(event.target.value)}
+                  disabled={dynamicSchemaLoading || availableDynamicFields.length === 0}
+                  className="flex-1 px-3 py-2 border rounded-md bg-background"
+                >
+                  <option value="">בחר שדה להוספה</option>
+                  {availableDynamicFields.map(field => (
+                    <option key={field.field_key} value={field.field_key}>{field.label}</option>
+                  ))}
+                </select>
+                <button onClick={handleAddField} disabled={!fieldToAdd || dynamicSchemaLoading} className="px-3 py-2 border rounded-md disabled:opacity-50">
+                  הוסף
+                </button>
+              </div>
+              {availableDynamicFields.length === 0 && <p className="text-xs text-muted-foreground">כל שדות הקטלוג כבר נבחרו.</p>}
+            </section>
+          )}
         </div>
 
         {/* Footer - Action Buttons */}

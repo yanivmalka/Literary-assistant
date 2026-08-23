@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import type { Entity } from '@/stores/entityStore'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
+import { CHARACTER_FIELD_CATALOG, DYNAMIC_CHARACTER_PROFILE, isPopulatedCharacterField } from '@/lib/characterSchema'
 import ObjectsPanel from './ObjectsPanel'
 import AbilitiesPanel from './AbilitiesPanel'
 
@@ -84,6 +85,13 @@ export default function CharacterDetailModal({
   const hairColor = getField(character, 'hair_color')
   const eyeColor = getField(character, 'eye_color')
   const description = getField(character, 'description')
+  const dynamicFields = Object.entries(character.structured_fields || {})
+    .map(([key, value]) => ({
+      key,
+      value,
+      definition: CHARACTER_FIELD_CATALOG.find(field => field.field_key === key),
+    }))
+    .filter(item => modelProfile === DYNAMIC_CHARACTER_PROFILE && item.definition && isPopulatedCharacterField(item.value))
 
   const handleClose = () => {
     setView('detail')
@@ -187,6 +195,27 @@ export default function CharacterDetailModal({
                   <p className="text-sm leading-relaxed text-muted-foreground bg-muted/50 p-3 rounded">
                     {description}
                   </p>
+                </div>
+              )}
+
+              {/* Dynamic extracted fields — only populated values are shown. */}
+              {modelProfile === DYNAMIC_CHARACTER_PROFILE && dynamicFields.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+                    שדות שחולצו
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {dynamicFields.map(({ key, value, definition }) => (
+                      <div key={key} className="p-3 bg-muted/50 rounded">
+                        <p className="text-xs text-muted-foreground font-medium mb-1">
+                          {definition?.label || key}
+                        </p>
+                        <p className="font-medium">
+                          {Array.isArray(value) ? value.join(', ') : String(value)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

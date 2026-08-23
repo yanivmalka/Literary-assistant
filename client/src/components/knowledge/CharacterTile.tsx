@@ -1,9 +1,12 @@
 import { useTranslation } from 'react-i18next'
 import { Edit3 } from 'lucide-react'
 import type { Entity } from '@/stores/entityStore'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
+import { CHARACTER_FIELD_CATALOG, DYNAMIC_CHARACTER_PROFILE, isPopulatedCharacterField } from '@/lib/characterSchema'
 
 interface CharacterTileProps {
   character: Entity
+  modelProfile: ExtractionModelProfile
   onClick: () => void
   onEditClick: (e: React.MouseEvent) => void
 }
@@ -16,13 +19,21 @@ function getField(entity: Entity, field: string): string | null {
   return null
 }
 
-export default function CharacterTile({ character, onClick, onEditClick }: CharacterTileProps) {
+export default function CharacterTile({ character, modelProfile, onClick, onEditClick }: CharacterTileProps) {
   const { t } = useTranslation()
 
   const age = getField(character, 'age')
   const height = getField(character, 'height')
   const eyeColor = getField(character, 'eye_color')
   const hairColor = getField(character, 'hair_color')
+  const dynamicFields = Object.entries(character.structured_fields || {})
+    .map(([key, value]) => ({
+      key,
+      value,
+      definition: CHARACTER_FIELD_CATALOG.find(field => field.field_key === key),
+    }))
+    .filter(item => modelProfile === DYNAMIC_CHARACTER_PROFILE && item.definition && isPopulatedCharacterField(item.value))
+    .slice(0, 4)
 
   return (
     <div
@@ -42,32 +53,45 @@ export default function CharacterTile({ character, onClick, onEditClick }: Chara
       <h3 className="font-semibold text-lg mb-3 pr-10">{character.name}</h3>
 
       {/* Character Attributes Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div>
-          <p className="text-xs text-muted-foreground font-medium">{t('entityFields.age')}</p>
-          <p className={age ? 'text-sm' : 'text-sm text-muted-foreground italic'}>
-            {age || t('ui.common.unknown')}
-          </p>
+      {modelProfile === DYNAMIC_CHARACTER_PROFILE ? (
+        dynamicFields.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            {dynamicFields.map(({ key, value, definition }) => (
+              <div key={key}>
+                <p className="text-xs text-muted-foreground font-medium">{definition?.label || key}</p>
+                <p className="text-sm">{Array.isArray(value) ? value.join(', ') : String(value)}</p>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">{t('entityFields.age')}</p>
+            <p className={age ? 'text-sm' : 'text-sm text-muted-foreground italic'}>
+              {age || t('ui.common.unknown')}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">{t('entityFields.height')}</p>
+            <p className={height ? 'text-sm' : 'text-sm text-muted-foreground italic'}>
+              {height || t('ui.common.unknown')}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">{t('entityFields.eye_color')}</p>
+            <p className={eyeColor ? 'text-sm' : 'text-sm text-muted-foreground italic'}>
+              {eyeColor || t('ui.common.unknown')}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground font-medium">{t('entityFields.hair_color')}</p>
+            <p className={hairColor ? 'text-sm' : 'text-sm text-muted-foreground italic'}>
+              {hairColor || t('ui.common.unknown')}
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground font-medium">{t('entityFields.height')}</p>
-          <p className={height ? 'text-sm' : 'text-sm text-muted-foreground italic'}>
-            {height || t('ui.common.unknown')}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground font-medium">{t('entityFields.eye_color')}</p>
-          <p className={eyeColor ? 'text-sm' : 'text-sm text-muted-foreground italic'}>
-            {eyeColor || t('ui.common.unknown')}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-muted-foreground font-medium">{t('entityFields.hair_color')}</p>
-          <p className={hairColor ? 'text-sm' : 'text-sm text-muted-foreground italic'}>
-            {hairColor || t('ui.common.unknown')}
-          </p>
-        </div>
-      </div>
+      )}
 
       {/* Description if available */}
       {getField(character, 'description') && (

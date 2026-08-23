@@ -108,6 +108,7 @@ interface ExtractedEntity {
   location_type?: string | null;
   place_type?: string | null;
   location_fields?: Record<string, unknown> | null;
+  character_fields?: Record<string, unknown> | null;
   container_places?: Array<{ name: string; type?: string }> | string[] | null;
   parent_location?: string | null;
   continent?: string | null;
@@ -189,9 +190,12 @@ function buildPrompt(
   chunks: { position: number; content: string }[],
   profile: GeminiModelProfile,
   customPlaceFields: Array<{ place_type_key: string; field_key: string; label: string }> = [],
+  dynamicCharacterFields: Array<{ field_key: string; label: string; group_key: string }> = [],
 ): string {
-  const basePrompt = buildExtractionPromptForProfile(chunks, profile);
-  if (profile !== "sub-base-locations" || customPlaceFields.length === 0) return basePrompt;
+  const basePrompt = buildExtractionPromptForProfile(chunks, profile, dynamicCharacterFields);
+  if (profile !== "sub-base-locations") return basePrompt;
+
+  if (customPlaceFields.length === 0) return basePrompt;
 
   const fieldInstructions = customPlaceFields
     .map(field => `- ${field.place_type_key}: ${field.field_key} (${field.label})`)
@@ -1229,6 +1233,7 @@ Deno.serve(async (req) => {
     // Step 2: Call Gemini (with multi-model fallback)
     // ==============================
     let projectPlaceFields: Array<{ place_type_key: string; field_key: string; label: string }> = [];
+    let projectCharacterFields: Array<{ field_key: string; label: string; group_key: string }> = [];
     if (modelProfile === "sub-base-locations") {
       const { data, error } = await supabase
         .from("knowledge_place_field_definitions")
@@ -1240,9 +1245,21 @@ Deno.serve(async (req) => {
         console.warn("[extract-knowledge] Could not load project place fields:", error.message);
       }
       projectPlaceFields = (data || []) as Array<{ place_type_key: string; field_key: string; label: string }>;
+
+      const { data: characterData, error: characterError } = await supabase
+        .from("knowledge_character_field_definitions")
+        .select("field_key, label, group_key")
+        .eq("project_id", body.project_id)
+        .eq("model_profile", "sub-base-locations")
+        .eq("is_active", true)
+        .order("sort_order");
+      if (characterError) {
+        console.warn("[extract-knowledge] Could not load project character fields:", characterError.message);
+      }
+      projectCharacterFields = (characterData || []) as Array<{ field_key: string; label: string; group_key: string }>;
     }
 
-    const prompt = buildPrompt(chunkData, modelProfile, projectPlaceFields);
+    const prompt = buildPrompt(chunkData, modelProfile, projectPlaceFields, projectCharacterFields);
     const totalChars = chunkData.reduce((sum, c) => sum + c.content.length, 0);
 
     const geminiResult = await callGeminiWithFallback(
@@ -1404,7 +1421,12 @@ Deno.serve(async (req) => {
     }
     // ================================================
 
-    const normalizedEntities = normalizeEntitiesForExtraction(extraction, chunkLookup, modelProfile);
+    const normalizedEntities = normalizeEntitiesForExtraction(
+      extraction,
+      chunkLookup,
+      modelProfile,
+      { activeCharacterFieldKeys: projectCharacterFields.map(field => field.field_key) },
+    );
     const entityIdEntries: Array<{ entity: NormalizedEntity; id: string }> = [];
     let entitiesSaved = 0;
     let mentionsSaved = 0;

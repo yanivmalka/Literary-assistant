@@ -36,6 +36,7 @@ export interface ExtractedEntity {
   location_type?: string | null;
   place_type?: string | null;
   location_fields?: Record<string, unknown> | null;
+  character_fields?: Record<string, unknown> | null;
   container_places?: Array<{ name: string; type?: string }> | string[] | null;
   parent_location?: string | null;
   continent?: string | null;
@@ -121,11 +122,24 @@ function normalizeStringList(value: unknown): string[] {
   return []
 }
 
+export interface DynamicCharacterFieldOptions {
+  profile?: ExtractionProfile;
+  activeCharacterFieldKeys?: readonly string[];
+}
+
+function hasExtractedValue(value: unknown): boolean {
+  if (value == null) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+
 /** Builds the structured fields used by persistence from one extracted entity. */
 export function buildStructuredFields(
   type: string,
   entity: ExtractedEntity,
   profile: ExtractionProfile = "sub-base",
+  options: DynamicCharacterFieldOptions = {},
 ): Record<string, unknown> {
   const fields: Record<string, unknown> = {};
   fields.name = entity.name ? stripNikud(entity.name) : null;
@@ -150,6 +164,19 @@ export function buildStructuredFields(
     fields.other_visual_features = null;
     fields.narrative_role = entity.narrative_role || null;
     fields.narrative_impact = null;
+
+    // Dynamic character fields are deliberately profile-scoped. They are
+    // omitted when absent instead of becoming empty null placeholders.
+    if (profile === "sub-base-locations") {
+      const entityAttributes = entity.attributes || {};
+      const dynamicFields = entity.character_fields
+        || (entityAttributes.character_fields as Record<string, unknown> | undefined)
+        || {};
+      const allowedKeys = new Set(options.activeCharacterFieldKeys || []);
+      for (const [key, value] of Object.entries(dynamicFields)) {
+        if (allowedKeys.has(key) && hasExtractedValue(value)) fields[key] = value;
+      }
+    }
   } else if (type === "location") {
     if (profile !== "sub-base-locations") {
       fields.location_type = entity.location_type || null;
@@ -245,6 +272,7 @@ export function normalizeEntities(
   extraction: GeminiExtraction,
   chunkLookup: Map<number, { id: string; page: number | null }>,
   profile: ExtractionProfile = "sub-base",
+  options: DynamicCharacterFieldOptions = {},
 ): NormalizedEntity[] {
   const entityMap = new Map<string, NormalizedEntity>();
 
@@ -254,7 +282,7 @@ export function normalizeEntities(
     const key = normalizeKey(cleanName);
     if (!key) return;
 
-    const incomingStructuredFields = buildStructuredFields(type, entity, profile);
+    const incomingStructuredFields = buildStructuredFields(type, entity, profile, options);
     const incomingContext: EntityResolutionRecord = {
       canonical_name: cleanName,
       entity_type: type,

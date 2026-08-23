@@ -175,6 +175,7 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
               <CharacterTile
                 key={character.id}
                 character={character}
+                modelProfile={modelProfile}
                 onClick={() => handleCharacterClick(character)}
                 onEditClick={(e) => handleEditClick(e, character)}
               />
@@ -202,10 +203,11 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
           character={selectedCharacter}
           projectId={projectId}
           selectedVersion={selectedVersion}
+          modelProfile={modelProfile}
           onClose={handleCloseEditModal}
           onCharacterUpdated={() => {
             handleCloseEditModal()
-            fetchEntitiesStore(projectId)
+            fetchEntitiesStore(projectId, undefined, modelProfile)
           }}
         />
       )}
