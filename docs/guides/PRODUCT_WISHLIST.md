@@ -196,6 +196,19 @@ Complete and verify the character model for the `sub-base` extraction profile be
 
 All character facts must use the shared Knowledge Layer and preserve source evidence, confidence, extraction lineage, review status, and Main/Branch scope. Profile-specific prompts and extraction rules may evolve independently, but they must write to the same canonical character contract.
 
+### **Dynamic Fields — `sub-base-locations` Only**
+
+The dynamic character-field behavior described below is restricted to the `sub-base-locations` extraction profile. It must not change extraction, normalization, persistence, or UI behavior for `sub-base` or `sub-base-2`.
+
+- Character fields are metadata-driven rather than a form containing every possible field with an empty value.
+- The product maintains a catalog of all approved character fields defined for this profile, including personal details, traits, appearance, beliefs, race, and future story-specific fields.
+- The user can add fields from that catalog to the project/profile configuration. The selected fields are then included in the Gemini extraction instructions with their exact stable keys.
+- Gemini extracts a selected field only when the source text explicitly supports it. Missing or unsupported fields are omitted from the extracted entity instead of being persisted as empty `null` fields.
+- The UI displays populated extracted fields and explicitly selected fields; it does not render the entire catalog as “unknown” values.
+- The UI must show the remaining catalog entries as available fields that the user can add. Adding a field must preserve its metadata and make it available to future extraction runs.
+- Dynamic field values must remain in `structured_fields`, `knowledge_entity_values`, and field-level evidence with the same provenance and review rules as built-in fields.
+- The dynamic-field catalog and selected fields are project-scoped and profile-scoped to `sub-base-locations`; they must not leak into `sub-base` or `sub-base-2` prompts, normalized entities, value rows, or forms.
+
 ### **Character Identity Rules**
 
 - `first_name` is the only required identity field.

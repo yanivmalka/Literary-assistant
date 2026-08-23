@@ -255,14 +255,29 @@ PLACE TYPE CATALOG (choose the closest type; do not impose a fixed hierarchy):
 - Do not invent location fields or containment when the text provides no evidence.
 `;
 
+const DYNAMIC_CHARACTER_FIELD_INSTRUCTIONS = `=== DYNAMIC CHARACTER FIELDS — SUB-BASE-LOCATIONS ONLY ===
+For characters in this profile, use attributes.character_fields for the selected project fields listed below.
+Keep the exact field_key. Extract a field only when the source explicitly supports it; otherwise omit the key entirely.
+Do not create empty or guessed values. Include field_evidence for every populated selected field.
+
+SELECTED CHARACTER FIELDS:
+`;
+
+export interface DynamicCharacterFieldPromptDefinition {
+  field_key: string;
+  label: string;
+  group_key: string;
+}
+
 /**
  * Builds the prompt for the selected extraction profile.
  * sub-base-2 remains the existing development profile; the locations profile
- * is exactly that profile plus an isolated location-specific instruction block.
+ * is exactly that profile plus isolated location and dynamic-character rules.
  */
 export function buildExtractionPromptForProfile(
   chunks: { position: number; content: string }[],
   profile: ExtractionPromptProfile,
+  dynamicCharacterFields: DynamicCharacterFieldPromptDefinition[] = [],
 ): string {
   const basePrompt = buildExtractionPrompt(chunks);
 
@@ -275,5 +290,10 @@ export function buildExtractionPromptForProfile(
     return subBase2Prompt;
   }
 
-  return `${subBase2Prompt}\n${LOCATIONS_PROFILE_INSTRUCTIONS}`;
+  const characterFields = dynamicCharacterFields.length > 0
+    ? `${DYNAMIC_CHARACTER_FIELD_INSTRUCTIONS}${dynamicCharacterFields
+      .map(field => `- ${field.field_key} (${field.label}; group: ${field.group_key})`)
+      .join("\n")}`
+    : "";
+  return `${subBase2Prompt}\n${LOCATIONS_PROFILE_INSTRUCTIONS}\n${characterFields}`;
 }

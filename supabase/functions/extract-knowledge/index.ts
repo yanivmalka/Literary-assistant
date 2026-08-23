@@ -1886,7 +1886,10 @@ Deno.serve(async (req) => {
     }
 
     let relationshipsSaved = 0;
-    for (const rel of [...(extraction.relationships || []), ...containmentRelationships]) {
+    const persistedRelationships = modelProfile === "sub-base-locations"
+      ? extraction.relationships || []
+      : (extraction.relationships || []).filter((relationship) => normalizeRelationshipType(relationship.relationship_type) !== "contained_in");
+    for (const rel of [...persistedRelationships, ...containmentRelationships]) {
       const relationshipType = normalizeRelationshipType(rel.relationship_type);
       if (!relationshipType) continue;
 
