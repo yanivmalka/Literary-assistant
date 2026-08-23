@@ -747,6 +747,78 @@ These features are identified but not scheduled for v2.0. They may move to earli
 - AI-powered location image generation
 - Multi-user collaboration
 
+### **Additional Future Capability Systems**
+
+The following systems are Wishlist items only. They are **not part of the current implementation phase or current release scope**. They must be designed as consumers of the Knowledge Layer that is being established in the current roadmap: canonical entities, structured fields, relationships, Timeline Events, provenance/evidence, Main/Branch overlays, and the Effective Branch View. New systems must not introduce parallel legacy entity models. Any generated or inferred change to story knowledge should remain reviewable and Branch-scoped until explicitly promoted to Main.
+
+#### **1. Narrative Consistency Engine**
+
+Build a structured model of the story from canonical entities, events, relationships, timeline data, extracted facts, mentions, and their provenance. The engine should evaluate the Effective Branch View rather than raw records so that checks respect the user's active Main/Branch context.
+
+Planned diagnostic categories include:
+- Plot holes and missing causal steps
+- Deus Ex Machina
+- Forced coincidence
+- Inconsistent character behavior or traits
+- Unmotivated actions
+- Continuity and timeline problems
+- Contradictory facts or information
+- Setups without payoffs
+- Broken or unsupported causality
+
+The engine should distinguish between a confirmed inconsistency and a possible narrative risk, preserve the source evidence for every finding, and create reviewable suggestions rather than modifying Main automatically.
+
+#### **2. Evidence-Based Diagnostics**
+
+Add a diagnostic model shared by the Narrative Consistency Engine and future analysis tools. Every finding should include:
+- The events, entities, relationships, and extracted facts on which it is based
+- Source references such as document, version, chunk, page, quote, or mention
+- Severity and an explicit certainty state, such as `confirmed` or `possible`
+- A clear explanation written for the author
+- A link to an in-product knowledge page explaining the concept, its meaning, examples, and possible repair strategies
+- Review status, resolution notes, and Branch context
+
+The system should prefer evidence-backed explanations, require multiple supporting signals where appropriate, expose why a warning was raised, and avoid presenting ambiguous interpretation as a definite error. User dismissals and intentional choices should be recorded so repeated false positives can be reduced over time.
+
+#### **3. Story Knowledge Graph**
+
+Create a temporal and state-aware graph over the structured story model. The graph should allow the system to follow, over time:
+- Character state and knowledge
+- Object ownership, location, condition, and transfer
+- Location occupancy, boundaries, and changes
+- Abilities, activation conditions, costs, limitations, and users
+- Knowledge held by characters or groups
+- Effective entity relationships
+- Events, participants, locations, prerequisites, and consequences
+
+The graph is intended to support continuity and causality checks, not replace the existing entity model. It should use canonical entity UUIDs, Timeline Events, relationship provenance, and temporal fields. Main and Branch graphs must remain isolated and provide an Effective Graph View consistent with the Effective Timeline and Effective Branch View. Derived state must be traceable back to source evidence and should be proposed for review when it conflicts with Main.
+
+#### **4. Visual Worldbuilding System**
+
+Allow fantasy-book users to independently create and manage a visual map of their world. The system should support manual creation and editing of:
+- Places and nested place hierarchy
+- Regions and boundaries
+- Routes, paths, and travel connections
+- Other geographic entities and map annotations
+
+Maps should link to the existing location entities and preserve the hierarchy of places used by the Knowledge Layer. Users should be able to work with a Main map and Branch-specific map proposals, compare changes, and promote approved changes without duplicating location records. Future extraction or AI assistance may suggest locations and connections, but users must be able to build and maintain the map independently. Map elements should support provenance and links to relevant events, characters, and chapters.
+
+#### **5. Character Image Generation**
+
+Generate character profile images from the character's structured appearance fields, description, user-defined information, and optional reference images. The feature should use the canonical character entity as its source and preserve the inputs and provenance of every generated asset.
+
+Visual consistency should be supported across works in the same series or shared story world through a reusable visual identity profile containing approved references, stable attributes, style preferences, and generation metadata. User edits and approved images should be reviewable, and an image generated from Branch-only character changes must not silently replace the Main profile. The system should clearly distinguish generated interpretation from facts established in the manuscript.
+
+#### **6. Story Event Gallery**
+
+Create a visual folder/gallery for important story material, including characters, locations, and major events or scenes. Users should be able to illustrate key moments from the book and organize assets by:
+- Entity
+- Chapter or source document location
+- Timeline Event
+- User-defined folders and collections
+
+Gallery items should link back to the relevant canonical entities, Timeline Events, chapters, and evidence. The gallery should support Main/Branch scope, asset provenance, captions, review status, and references to the prompts or source descriptions used to create an image. It should remain useful as a user-managed visualization workspace even when no AI image generation is available.
+
 ### **Deferred Features**
 These features are identified but explicitly deferred to post-v2.0:
 
