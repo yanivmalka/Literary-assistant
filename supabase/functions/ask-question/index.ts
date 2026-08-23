@@ -420,8 +420,13 @@ async function hybridSearch(
 async function findRelevantEntities(
   supabase: any,
   projectId: string,
-  question: string
+  question: string,
+  includeGlobalContext = true,
 ): Promise<{ entityInfo: string; entityNames: string[] }> {
+  if (!includeGlobalContext) {
+    return { entityInfo: "", entityNames: [] };
+  }
+
   // Search knowledge_entities for names matching question keywords
   const { data: entities, error } = await supabase
     .from("knowledge_entities")
@@ -557,10 +562,16 @@ Deno.serve(async (req) => {
     );
 
     // --- Step 2: Find relevant entities ---
+    const explicitSourceScope = Deno.env.get("QA_RETRIEVAL_MODE") === "enhanced" && (
+      (Array.isArray(body.source_version_ids) && body.source_version_ids.length > 0) ||
+      (Array.isArray(body.chapter_numbers) && body.chapter_numbers.length > 0) ||
+      (Array.isArray(body.chunk_ids) && body.chunk_ids.length > 0)
+    );
     const { entityInfo, entityNames } = await findRelevantEntities(
       supabase,
       projectId,
-      question
+      question,
+      !explicitSourceScope,
     );
 
     // --- No results: insufficient context ---
