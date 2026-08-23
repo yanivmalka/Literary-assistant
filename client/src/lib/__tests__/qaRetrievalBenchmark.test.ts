@@ -4,7 +4,7 @@ import {
   buildRetrievalTerms,
   mergeAdjacentRetrievalChunks,
   type RetrievalChunk,
-} from '../../../../../supabase/functions/_shared/qa-retrieval.ts'
+} from '../../../../supabase/functions/_shared/qa-retrieval.ts'
 
 type BenchmarkChunk = RetrievalChunk & {
   chapter: number
