@@ -1,6 +1,6 @@
 // ============================================
-// User Error Logging Middleware
-// Records failed HTTP actions without changing the response flow.
+// Request and Error Logging Middleware
+// Records requests and links failed requests to detailed error records.
 // ============================================
 
 import { randomUUID } from 'node:crypto'
@@ -8,34 +8,95 @@ import { STATUS_CODES } from 'node:http'
 import { Request, RequestHandler, Response } from 'express'
 import { getServiceClient } from './auth.js'
 
-interface UserErrorLog {
+interface RequestLog {
+  request_id: string
+  user_id: string | null
+  action: string
+  http_method: string
+  request_path: string
+  status_code: number
+  started_at: string
+  completed_at: string
+  duration_ms: number
+}
+
+interface ErrorDetail {
+  id: string
+  error_code: string
+  error_message: string
+  status_code: number
+  details: Record<string, unknown>
+}
+
+interface LegacyUserErrorLog extends ErrorDetail {
   user_id: string | null
   request_id: string
   action: string
   http_method: string
   request_path: string
-  status_code: number
-  error_code: string
-  error_message: string
-  details: Record<string, number>
+}
+
+function logPersistenceFailure(operation: string, message: string): void {
+  console.error(`[ErrorLogging] Failed to persist ${operation}:`, message)
 }
 
 /**
- * Writes a failed request to Supabase on a best-effort basis.
- * Logging must never affect the response that was already sent to the user.
+ * Persists the request, detailed error, legacy error log, and relation in order.
+ * Each operation is best-effort so logging never changes the completed response.
  */
-async function recordUserError(log: UserErrorLog): Promise<void> {
+async function persistRequestOutcome(request: RequestLog, errorDetail?: ErrorDetail): Promise<void> {
   try {
-    const { error } = await getServiceClient()
-      .from('user_error_logs')
-      .insert(log)
+    const supabase = getServiceClient()
+    const { error: requestError } = await supabase
+      .from('user_request_logs')
+      .insert(request)
 
-    if (error) {
-      console.error('[ErrorLogging] Failed to persist user error log:', error.message)
+    if (requestError) {
+      logPersistenceFailure('request log', requestError.message)
+    }
+
+    if (!errorDetail) return
+
+    const { error: detailError } = await supabase
+      .from('error_details')
+      .insert(errorDetail)
+
+    if (detailError) {
+      logPersistenceFailure('error detail', detailError.message)
+      return
+    }
+
+    const legacyLog: LegacyUserErrorLog = {
+      ...errorDetail,
+      user_id: request.user_id,
+      request_id: request.request_id,
+      action: request.action,
+      http_method: request.http_method,
+      request_path: request.request_path,
+    }
+
+    const { error: legacyError } = await supabase
+      .from('user_error_logs')
+      .insert(legacyLog)
+
+    if (legacyError) {
+      logPersistenceFailure('legacy user error log', legacyError.message)
+    }
+
+    const { error: relationError } = await supabase
+      .from('request_error_links')
+      .insert({
+        request_id: request.request_id,
+        error_detail_id: errorDetail.id,
+        user_error_log_id: legacyError ? null : errorDetail.id,
+      })
+
+    if (relationError) {
+      logPersistenceFailure('request/error relation', relationError.message)
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown logging error'
-    console.error('[ErrorLogging] Failed to persist user error log:', message)
+    logPersistenceFailure('request outcome', message)
   }
 }
 
@@ -45,30 +106,46 @@ function getAction(req: Request): string {
 }
 
 /**
- * Attach before application routes. Every 4xx/5xx response is logged after
- * Express finishes sending it, including responses returned by existing
- * route-level catch blocks and middleware such as multer.
+ * Attach before application routes. Every request gets a correlation ID and a
+ * request row; every 4xx/5xx response also gets an error detail and relation.
  */
 export const userErrorLoggingMiddleware: RequestHandler = (req: Request, res: Response, next) => {
   const requestId = randomUUID()
-  const startedAt = Date.now()
+  const startedAt = new Date()
+  const startedAtMs = startedAt.getTime()
+
+  res.setHeader('X-Request-ID', requestId)
 
   res.on('finish', () => {
-    if (res.statusCode < 400 || res.statusCode > 599) return
-
-    void recordUserError({
-      user_id: req.user?.id ?? null,
+    const completedAt = new Date()
+    const request: RequestLog = {
       request_id: requestId,
+      user_id: req.user?.id ?? null,
       action: getAction(req),
       http_method: req.method,
       request_path: req.path,
       status_code: res.statusCode,
-      error_code: `HTTP_${res.statusCode}`,
-      error_message: STATUS_CODES[res.statusCode] || 'Request failed',
-      details: {
-        duration_ms: Date.now() - startedAt,
-      },
-    })
+      started_at: startedAt.toISOString(),
+      completed_at: completedAt.toISOString(),
+      duration_ms: Math.max(0, completedAt.getTime() - startedAtMs),
+    }
+
+    if (res.statusCode >= 400 && res.statusCode <= 599) {
+      const errorDetail: ErrorDetail = {
+        id: randomUUID(),
+        error_code: `HTTP_${res.statusCode}`,
+        error_message: STATUS_CODES[res.statusCode] || 'Request failed',
+        status_code: res.statusCode,
+        details: {
+          duration_ms: request.duration_ms,
+        },
+      }
+
+      void persistRequestOutcome(request, errorDetail)
+      return
+    }
+
+    void persistRequestOutcome(request)
   })
 
   next()
