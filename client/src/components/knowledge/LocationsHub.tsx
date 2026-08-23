@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GitBranch, Plus } from 'lucide-react'
 import { useBranchStore } from '@/stores/branchStore'
@@ -31,14 +31,18 @@ export default function LocationsHub({ projectId, modelProfile }: LocationsHubPr
   const branchLocations = getEffectiveBranchEntities({ type: 'location' })
   const locations = selectedVersion === 'main' ? mainLocations : branchLocations
 
-  useEffect(() => {
-    loadPlaceHierarchy(projectId, selectedVersion === 'branch' ? currentBranch?.id : null)
+  const refreshHierarchy = useCallback(() => {
+    return loadPlaceHierarchy(projectId, selectedVersion === 'branch' ? currentBranch?.id : null)
       .then(result => setParentsByChild(result.parentsByChild))
       .catch(error => {
         console.error('Failed to load place hierarchy:', error)
         setParentsByChild({})
       })
-  }, [projectId, selectedVersion, currentBranch?.id, locations.length])
+  }, [projectId, selectedVersion, currentBranch?.id])
+
+  useEffect(() => {
+    void refreshHierarchy()
+  }, [refreshHierarchy, locations.length])
 
   const handleEditLocation = (location: Entity) => { setSelectedLocation(location); setEditModalOpen(true) }
   const handleCreateNew = () => { setSelectedLocation(null); setEditModalOpen(true) }
@@ -80,7 +84,7 @@ export default function LocationsHub({ projectId, modelProfile }: LocationsHubPr
         projectId={projectId}
         selectedVersion={selectedVersion}
         onClose={handleCloseEditModal}
-        onLocationUpdated={() => { handleCloseEditModal(); fetchEntitiesStore(projectId, undefined, modelProfile) }}
+        onLocationUpdated={() => { handleCloseEditModal(); void fetchEntitiesStore(projectId, undefined, modelProfile).then(() => refreshHierarchy()) }}
       />
     </div>
   )

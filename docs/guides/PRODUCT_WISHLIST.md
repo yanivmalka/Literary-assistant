@@ -189,6 +189,146 @@ Users can upload manuscripts, extract entities (characters, locations, objects, 
 
 ---
 
+## **Version 1.3A — Character Extraction Contract and Temporal Character States**
+
+### **Purpose**
+Complete and verify the character model for the `sub-base` extraction profile before building contradiction detection, temporal analysis, or deeper AI character analysis. This is a stabilization gate for v1.3, not a separate parallel character database.
+
+All character facts must use the shared Knowledge Layer and preserve source evidence, confidence, extraction lineage, review status, and Main/Branch scope. Profile-specific prompts and extraction rules may evolve independently, but they must write to the same canonical character contract.
+
+### **Character Identity Rules**
+
+- `first_name` is the only required identity field.
+- A character is created as a canonical `character` entity only when a first name is explicitly identified in the source text.
+- Unnamed characters are filtered completely for the current phase. They are not persisted as character entities or unnamed-character candidates.
+- `last_name` is optional and is extracted into a separate field.
+- The displayed title uses first name plus last name when both are available, while the stored fields remain separate.
+- `aliases` contains only actual alternate names: shortened names, nicknames, insults, jokes, pseudonyms, or other names used for the character. The ordinary first name is never duplicated as an alias.
+
+### **Baseline Character Fields**
+
+The extraction contract should support these potential fields. A field remains `null` when the source does not provide it; the extractor must not invent factual values.
+
+#### **Identity and personal details**
+
+- `first_name` — required
+- `last_name`
+- `aliases`
+- `age`
+- `gender`
+- `sexual_orientation`
+- `favorite_food`
+- `occupation`
+- `hobbies`
+- `dislikes`
+- `religion_and_beliefs`
+- `height`
+
+#### **Traits and appearance**
+
+- `personality_traits` — internal character traits
+- `appearance_traits` — externally observed qualities, including beauty-related descriptions
+- `skin_color`
+- `eye_color`
+- `eye_shape`
+- `hair_color`
+- `hair_type`
+- `tattoos`
+- `jewelry`
+- `scars`
+- `body_type`
+
+#### **World and status details**
+
+- `race` is extracted whenever the text identifies a non-human race. It is not restricted to stories that contain multiple races; human identity is not required to be stored as a race value unless the text explicitly establishes it as meaningful.
+- `status` is not a permanent profile string. Alive/dead state is represented as a temporal event or state transition linked to the relevant narrative position.
+
+### **Relationship Semantics**
+
+Relationships are first-class, time-aware Knowledge Layer records, not comma-separated character attributes. The initial relationship taxonomy is:
+
+- `acquaintance_or_no_significant_bond` — ordinary interaction such as classmates, colleagues, or people who know each other without a meaningful bond
+- `friendship` — a deep or highly meaningful friendship, stronger than ordinary acquaintance
+- `romantic_relationship` — two partners, including any sexual orientation or gender combination supported by the source
+- `hostility` — active enmity, antagonism, or sustained opposition
+- `work_relationship` — an employment or professional relationship
+- `employer_of`
+- `employee_or_worker_of`
+
+Each relationship must preserve source evidence, confidence, temporal validity, review status, and Branch context. Relationship strength and changes over time must be represented without overwriting earlier states.
+
+### **Temporal Character Model**
+
+Character data must support a future Effective Timeline in which the author can move through the story and see the character state at that point. The model must distinguish at least:
+
+- **Alpha state** — the initial story state, containing the characters and known facts from the opening section, initially defined as the first three chapters.
+- **Intermediate states** — states reconstructed from extracted events and narrative positions as the story progresses.
+- **Omega state** — the final story state after the last word, showing where each character is left at the end of the manuscript.
+
+Moving the timeline must not mutate canonical history. Instead, the system should calculate an effective character snapshot from facts and events valid at the selected narrative position. This includes identity-relevant facts, relationships, alive/dead status, occupation or affiliation changes, appearance changes, and other state transitions supported by evidence.
+
+Required temporal data for a state transition includes:
+
+- affected character
+- changed field or relationship
+- previous and new state when known
+- event or narrative position
+- source document, chapter, chunk, page, and quote where available
+- confidence and certainty
+- Main/Branch scope
+
+### **Manual AI Character Analysis**
+
+Deep character analysis is an on-demand capability. It must not run automatically after every extraction and must not silently modify canonical character facts.
+
+When the user explicitly requests analysis, the system should retrieve relevant character mentions, nearby context, related events, relationships, and source metadata before calling Gemini. The analysis should use a closed-source RAG flow:
+
+```text
+Sources → chunks → character mention retrieval → focused context → Gemini analysis → cited result
+```
+
+The analysis may produce:
+
+- A general description based on central traits, race where established, and appearance
+- A psychological analysis derived from the character's mentions across the plot
+- A narrative-role analysis covering function, conflict, motivation, development, and impact on the story
+
+AI analysis is provisional and user-controlled. Every result must include the retrieved sources/citations, confidence or certainty, model metadata, creation time, and review status. The user must be able to accept, edit, reject, or regenerate it. Any user-approved canonical change is written through the normal review and Main/Branch workflow; an AI inference must not become Main automatically.
+
+### **Implementation Tasks**
+
+- [ ] Extend the `CharacterFields` contract and extraction schema with the identity, personal, relationship, appearance, belief, race, and temporal-state fields above.
+- [ ] Enforce the required `first_name` rule and filter unnamed characters before canonical persistence.
+- [ ] Separate first name, last name, display title, and aliases during normalization and persistence.
+- [ ] Define and validate the initial relationship taxonomy, including the distinction between ordinary acquaintance and deep friendship.
+- [ ] Model alive/dead status and other character changes as Timeline Events or temporal state transitions.
+- [ ] Define Alpha, intermediate, and Omega Effective Character Views over the shared Effective Timeline.
+- [ ] Add full provenance and evidence checks for every extracted character field and relationship.
+- [ ] Add an explicit, user-triggered character-analysis action using retrieval-focused context and citations.
+- [ ] Store AI analyses as reviewable, versioned results that cannot silently overwrite Main facts.
+- [ ] Run the full character extraction verification against live Gemini and Supabase, including raw output, normalized fields, value synchronization, provenance, Main routing, Branch isolation, and UI coverage.
+
+### **Acceptance Criteria**
+
+- [ ] No canonical character entity is persisted without a non-empty extracted `first_name`.
+- [ ] First name, last name, display title, and aliases are stored and displayed according to the identity rules above.
+- [ ] The ordinary first name is absent from the aliases collection.
+- [ ] Character facts that are not present in the manuscript remain `null` rather than being inferred as factual values.
+- [ ] Non-human race is extracted whenever explicitly identified in the text.
+- [ ] Relationships distinguish ordinary acquaintance from deep friendship and support romantic relationships without assuming a particular orientation.
+- [ ] Character status changes are represented as time-aware events/state transitions rather than destructive profile updates.
+- [ ] Alpha, intermediate, and Omega views return the correct character state for the selected narrative position.
+- [ ] Deep AI analysis runs only after an explicit user action, cites retrieved source material, and remains reviewable.
+- [ ] The full character extraction verification gate is updated to cover every active field in the baseline contract before this milestone is marked complete.
+
+### **Priority**
+**High** — Required to make the character Story Model reliable before temporal analysis and deeper AI features.
+
+### **Status**
+**Pending** — Contract and implementation gate to complete after the current extraction verification and before v1.5/v1.6 dependent work.
+
+---
+
 ## **Version 1.4 — Stabilization & Architecture Cleanup**
 
 ### **Version Goal**

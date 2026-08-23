@@ -143,15 +143,46 @@ export async function loadPlaceSchema(projectId: string): Promise<PlaceSchema> {
   return { types, customFields: fieldsResult.error ? [] : (fieldsResult.data || []) as PlaceFieldDefinition[] }
 }
 
+function stableLabelHash(label: string): string {
+  let hash = 2166136261
+  for (const character of label.normalize('NFKC')) {
+    hash ^= character.codePointAt(0) || 0
+    hash = Math.imul(hash, 16777619)
+  }
+  return (hash >>> 0).toString(36).slice(0, 10)
+}
+
+/**
+ * Database keys are deliberately ASCII-only. Keep a readable prefix where
+ * possible and append a stable hash so Hebrew/custom labels cannot collide
+ * with one another or with a truncated ASCII label.
+ */
 export function toPlaceTypeKey(label: string): string {
-  const normalized = label.trim().toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_|_$/g, '')
-  return normalized.slice(0, 70) || `custom_${Date.now()}`
+  const source = label.trim().toLowerCase()
+  const readable = source
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  const prefix = readable && /^[a-z]/.test(readable) ? readable : `custom_${readable || 'value'}`
+  const suffix = stableLabelHash(source)
+  return `${prefix.slice(0, 59)}_${suffix}`.slice(0, 70)
 }
 
 export async function createCustomPlaceType(projectId: string, label: string, userId: string): Promise<PlaceTypeDefinition> {
-  const typeKey = toPlaceTypeKey(label)
+  const trimmedLabel = label.trim()
+  const typeKey = toPlaceTypeKey(trimmedLabel)
+  const existingResult = await supabase
+    .from('knowledge_place_types')
+    .select('id, project_id, type_key, label, category, is_system')
+    .eq('project_id', projectId)
+    .eq('type_key', typeKey)
+    .maybeSingle()
+  if (existingResult.error) throw existingResult.error
+  if (existingResult.data) return existingResult.data as PlaceTypeDefinition
+
   const { data, error } = await supabase.from('knowledge_place_types').insert({
-    project_id: projectId, type_key: typeKey, label: label.trim(), category: 'custom', is_system: false, created_by: userId,
+    project_id: projectId, type_key: typeKey, label: trimmedLabel, category: 'custom', is_system: false, created_by: userId,
   }).select('id, project_id, type_key, label, category, is_system').single()
   if (error || !data) throw error || new Error('Failed to create place type')
   return data as PlaceTypeDefinition
@@ -164,12 +195,23 @@ export async function createCustomPlaceField(params: {
   label: string
   fieldType?: PlaceFieldType
 }): Promise<PlaceFieldDefinition> {
-  const fieldKey = toPlaceTypeKey(params.label)
+  const trimmedLabel = params.label.trim()
+  const fieldKey = toPlaceTypeKey(trimmedLabel)
+  const existingResult = await supabase
+    .from('knowledge_place_field_definitions')
+    .select('*')
+    .eq('project_id', params.projectId)
+    .eq('place_type_key', params.placeTypeKey || '*')
+    .eq('field_key', fieldKey)
+    .maybeSingle()
+  if (existingResult.error) throw existingResult.error
+  if (existingResult.data) return existingResult.data as PlaceFieldDefinition
+
   const { data, error } = await supabase.from('knowledge_place_field_definitions').insert({
     project_id: params.projectId,
     place_type_key: params.placeTypeKey || '*',
     field_key: fieldKey,
-    label: params.label.trim(),
+    label: trimmedLabel,
     field_type: params.fieldType || 'text',
     options: [],
     group_key: 'שדות מותאמים אישית',

@@ -154,6 +154,9 @@ export function buildStructuredFields(type: string, entity: ExtractedEntity): Re
     for (const [key, value] of Object.entries(locationFields)) {
       if (key && value !== undefined) fields[key] = value;
     }
+    for (const key of ["continent", "country", "region", "city"] as const) {
+      if (entity[key] !== undefined) fields[key] = entity[key];
+    }
     // Keep legacy parent_location as a compatibility hint; containment is
     // persisted from explicit relationships, never inferred from this field.
     if (entity.parent_location) fields.parent_location = entity.parent_location;

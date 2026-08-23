@@ -63,43 +63,113 @@ export async function savePlaceContainers(params: {
 }): Promise<void> {
   const { projectId, locationId, containerIds, branchId = null } = params
   const cleanIds = [...new Set(containerIds)].filter(id => id && id !== locationId)
+  const relationshipTypes = [...CONTAINMENT_RELATIONSHIP_TYPES]
+
+  const rowToChildParent = (row: {
+    source_entity_id: string
+    target_entity_id: string
+    relationship_type: string
+  }) => row.relationship_type === 'parent_of'
+    ? { childId: row.target_entity_id, parentId: row.source_entity_id }
+    : { childId: row.source_entity_id, parentId: row.target_entity_id }
+  const edgeKey = (childId: string, parentId: string) => `${childId}:${parentId}`
+  const rowKey = (row: { source_entity_id: string; target_entity_id: string; relationship_type: string }) => {
+    const { childId, parentId } = rowToChildParent(row)
+    return edgeKey(childId, parentId)
+  }
 
   if (branchId) {
-    const existing = await supabase
-      .from('knowledge_entity_relationships')
-      .select('target_entity_id')
-      .eq('project_id', projectId)
-      .eq('source_entity_id', locationId)
-      .eq('branch_id', branchId)
-      .eq('relationship_type', 'contained_in')
-      .eq('operation', 'add')
+    const [mainResult, branchResult] = await Promise.all([
+      supabase
+        .from('knowledge_entity_relationships')
+        .select('source_entity_id, target_entity_id, relationship_type, operation, review_status')
+        .eq('project_id', projectId)
+        .is('branch_id', null)
+        .in('relationship_type', relationshipTypes),
+      supabase
+        .from('knowledge_entity_relationships')
+        .select('source_entity_id, target_entity_id, relationship_type, operation, review_status, branch_id')
+        .eq('project_id', projectId)
+        .eq('branch_id', branchId)
+        .in('relationship_type', relationshipTypes),
+    ])
+    if (mainResult.error) throw mainResult.error
+    if (branchResult.error) throw branchResult.error
 
-    for (const row of existing.data || []) {
-      if (!cleanIds.includes(row.target_entity_id)) {
-        await supabase.from('knowledge_entity_relationships').insert({
-          project_id: projectId, source_entity_id: locationId, target_entity_id: row.target_entity_id,
-          relationship_type: 'contained_in', branch_id: branchId, operation: 'remove', review_status: 'pending', base_exists: true,
-        })
-      }
+    const mainRows = mainResult.data || []
+    const branchRows = branchResult.data || []
+    const effective = new Map<string, typeof mainRows[number] | typeof branchRows[number]>()
+    for (const row of mainRows) {
+      if ((row.review_status || 'approved') === 'approved' && (row.operation || 'add') === 'add') effective.set(rowKey(row), row)
+    }
+    for (const row of branchRows) {
+      if (row.review_status !== 'approved') continue
+      const key = rowKey(row)
+      if (row.operation === 'remove') effective.delete(key)
+      else effective.set(key, row)
     }
 
-    for (const targetId of cleanIds) {
-      await supabase.from('knowledge_entity_relationships').insert({
-        project_id: projectId, source_entity_id: locationId, target_entity_id: targetId,
-        relationship_type: 'contained_in', branch_id: branchId, operation: 'add', review_status: 'pending', base_exists: false,
+    const desired = new Set(cleanIds.map(parentId => edgeKey(locationId, parentId)))
+    const mainEdges = new Set(mainRows.map(rowKey))
+    const branchAdds = new Set(branchRows.filter(row => (row.operation || 'add') === 'add').map(rowKey))
+    const branchRemoves = new Set(branchRows.filter(row => row.operation === 'remove').map(rowKey))
+    const removals: Record<string, unknown>[] = []
+    for (const [key, row] of effective) {
+      const { childId } = rowToChildParent(row)
+      if (childId !== locationId || desired.has(key) || branchRemoves.has(key)) continue
+      removals.push({
+        project_id: projectId,
+        source_entity_id: row.source_entity_id,
+        target_entity_id: row.target_entity_id,
+        relationship_type: row.relationship_type,
+        branch_id: branchId,
+        operation: 'remove',
+        review_status: 'pending',
+        base_exists: mainEdges.has(key),
       })
     }
+
+    const additions = cleanIds
+      .map(parentId => edgeKey(locationId, parentId))
+      .filter(key => !effective.has(key) && !branchAdds.has(key))
+      .map(key => {
+        const [, parentId] = key.split(':')
+        return {
+          project_id: projectId,
+          source_entity_id: locationId,
+          target_entity_id: parentId,
+          relationship_type: 'contained_in',
+          branch_id: branchId,
+          operation: 'add',
+          review_status: 'pending',
+          base_exists: mainEdges.has(key),
+        }
+      })
+
+    const changes = [...removals, ...additions]
+    if (changes.length === 0) return
+    const { error } = await supabase.from('knowledge_entity_relationships').insert(changes)
+    if (error) throw error
     return
   }
 
-  const { error: deleteError } = await supabase
+  const { error: deleteContainedError } = await supabase
     .from('knowledge_entity_relationships')
     .delete()
     .eq('project_id', projectId)
     .eq('source_entity_id', locationId)
     .is('branch_id', null)
     .eq('relationship_type', 'contained_in')
-  if (deleteError) throw deleteError
+  if (deleteContainedError) throw deleteContainedError
+
+  const { error: deleteParentError } = await supabase
+    .from('knowledge_entity_relationships')
+    .delete()
+    .eq('project_id', projectId)
+    .eq('target_entity_id', locationId)
+    .is('branch_id', null)
+    .eq('relationship_type', 'parent_of')
+  if (deleteParentError) throw deleteParentError
 
   if (cleanIds.length === 0) return
   const { error } = await supabase.from('knowledge_entity_relationships').insert(

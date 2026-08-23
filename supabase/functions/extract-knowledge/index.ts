@@ -195,7 +195,7 @@ function buildPrompt(
 
   const fieldInstructions = customPlaceFields
     .map(field => `- ${field.place_type_key}: ${field.field_key} (${field.label})`)
-    .join("\\n");
+    .join("\n");
   return `${basePrompt}
 
 === PROJECT-SPECIFIC LOCATION FIELDS ===
@@ -260,6 +260,9 @@ function buildStructuredFields(type: string, entity: ExtractedEntity): Record<st
     fields.description = entity.description || entity.significance || null;
     for (const [key, value] of Object.entries(locationFields)) {
       if (key && value !== undefined) fields[key] = value;
+    }
+    for (const key of ["continent", "country", "region", "city"] as const) {
+      if (entity[key] !== undefined) fields[key] = entity[key];
     }
     if (entity.parent_location) fields.parent_location = entity.parent_location;
     fields.narrative_impact = null;

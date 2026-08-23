@@ -29,6 +29,24 @@ interface LocationEditModalProps {
 
 type FormData = Record<string, string | null>
 
+const LEGACY_LOCATION_FIELDS = ['continent', 'country', 'region', 'city'] as const
+
+function parseMultiSelectValue(value: string | null): string[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed.map(item => String(item)) : [value]
+  } catch {
+    return value.split(',').map(item => item.trim()).filter(Boolean)
+  }
+}
+
+function formatInitialFieldValue(value: unknown, fieldType: PlaceFieldDefinition['field_type']): string | null {
+  if (value == null) return null
+  if (fieldType === 'multi_select' && Array.isArray(value)) return JSON.stringify(value)
+  return String(value)
+}
+
 export default function LocationEditModal({
   isOpen,
   location,
@@ -81,13 +99,18 @@ export default function LocationEditModal({
   useEffect(() => {
     if (!isOpen) return
     const structured = (location?.structured_fields || {}) as Record<string, unknown>
+    const attributes = (location?.attributes || {}) as Record<string, unknown>
     const placeType = String(structured.place_type || structured.location_type || 'other')
     setSelectedPlaceType(placeType)
     setCustomTypeLabel(placeType === 'other' ? '' : (getPlaceType(schema.types, placeType).label || ''))
     const values: FormData = {}
     for (const field of getPlaceFields(placeType, schema)) {
-      const value = structured[field.field_key]
-      values[field.field_key] = value == null ? null : String(value)
+      values[field.field_key] = formatInitialFieldValue(structured[field.field_key], field.field_type)
+    }
+    for (const key of LEGACY_LOCATION_FIELDS) {
+      if (values[key] == null) {
+        values[key] = formatInitialFieldValue(structured[key] ?? attributes[key], 'text')
+      }
     }
     values.name = values.name || location?.name || null
     values.description = values.description || location?.description || null
@@ -126,10 +149,26 @@ export default function LocationEditModal({
         setSchema(effectiveSchema)
       }
 
-      const structuredFields: Record<string, unknown> = {}
+      const existingStructured = (location?.structured_fields || {}) as Record<string, unknown>
+      const existingAttributes = (location?.attributes || {}) as Record<string, unknown>
+      const structuredFields: Record<string, unknown> = { ...existingStructured }
+      for (const key of LEGACY_LOCATION_FIELDS) {
+        if (structuredFields[key] == null && existingAttributes[key] != null) structuredFields[key] = existingAttributes[key]
+      }
+      const requiredMissing: string[] = []
       for (const field of getPlaceFields(effectiveType, effectiveSchema)) {
-        const value = formData[field.field_key]
-        structuredFields[field.field_key] = value && value.trim() ? value.trim() : null
+        const rawValue = formData[field.field_key]
+        const isEmpty = !rawValue || (field.field_type === 'multi_select' && parseMultiSelectValue(rawValue).length === 0)
+        if (field.is_required && isEmpty) requiredMissing.push(field.label)
+        if (field.field_type === 'multi_select') {
+          structuredFields[field.field_key] = isEmpty ? null : parseMultiSelectValue(rawValue)
+        } else {
+          structuredFields[field.field_key] = rawValue && rawValue.trim() ? rawValue.trim() : null
+        }
+      }
+      if (requiredMissing.length > 0) {
+        alert(`יש למלא את השדות החובה: ${requiredMissing.join(', ')}`)
+        return
       }
       const locationName = String(structuredFields.name || '').trim()
       if (!locationName) {
@@ -184,13 +223,27 @@ export default function LocationEditModal({
     try {
       const { data: authData } = await import('@/lib/supabase').then(module => module.supabase.auth.getUser())
       if (!authData.user) return
+      let placeTypeKey = selectedPlaceType
+      if (placeTypeKey === 'other') {
+        if (!customTypeLabel.trim()) {
+          alert('יש להזין סוג מקום מותאם אישית לפני הוספת שדה')
+          return
+        }
+        const customType = await createCustomPlaceType(projectId, customTypeLabel, authData.user.id)
+        placeTypeKey = customType.type_key
+        setSelectedPlaceType(placeTypeKey)
+        setCustomTypeLabel(customType.label)
+        setSchema(current => current.types.some(type => type.type_key === placeTypeKey)
+          ? current
+          : { ...current, types: [...current.types, customType] })
+      }
       const created = await createCustomPlaceField({
         projectId,
         userId: authData.user.id,
-        placeTypeKey: selectedPlaceType,
+        placeTypeKey,
         label: newFieldLabel,
       })
-      setSchema(current => ({ ...current, customFields: [...current.customFields, created] }))
+      setSchema(current => ({ ...current, customFields: [...current.customFields.filter(field => field.id !== created.id), created] }))
       setFormData(current => ({ ...current, [created.field_key]: null }))
       setNewFieldLabel('')
     } catch (error) {
@@ -225,19 +278,35 @@ export default function LocationEditModal({
   const renderField = (field: PlaceFieldDefinition) => {
     const value = formData[field.field_key] || ''
     const isLong = field.field_type === 'long_text'
+    const setValue = (nextValue: string) => setFormData(current => ({ ...current, [field.field_key]: nextValue || null }))
     return (
       <div key={field.field_key}>
         <label className="text-sm font-medium" htmlFor={field.field_key}>
           {field.label} {field.is_required && <span className="text-red-600">*</span>}
         </label>
         {field.field_type === 'boolean' ? (
-          <select id={field.field_key} value={value} onChange={e => setFormData(current => ({ ...current, [field.field_key]: e.target.value || null }))} className="mt-1 w-full px-3 py-2 border rounded-md bg-background">
+          <select id={field.field_key} value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full px-3 py-2 border rounded-md bg-background">
             <option value="">לא ידוע</option><option value="true">כן</option><option value="false">לא</option>
           </select>
+        ) : field.field_type === 'select' ? (
+          <select id={field.field_key} value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full px-3 py-2 border rounded-md bg-background">
+            <option value="">בחר</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}
+          </select>
+        ) : field.field_type === 'multi_select' ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {field.options.map(option => {
+              const selected = parseMultiSelectValue(value).includes(option)
+              return <label key={option} className="flex items-center gap-2 border rounded px-2 py-1 text-sm"><input type="checkbox" checked={selected} onChange={e => {
+                const next = new Set(parseMultiSelectValue(value))
+                e.target.checked ? next.add(option) : next.delete(option)
+                setValue(JSON.stringify([...next]))
+              }} />{option}</label>
+            })}
+          </div>
         ) : isLong ? (
-          <textarea id={field.field_key} value={value} onChange={e => setFormData(current => ({ ...current, [field.field_key]: e.target.value || null }))} className="mt-1 w-full px-3 py-2 border rounded-md bg-background resize-none" rows={3} />
+          <textarea id={field.field_key} value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full px-3 py-2 border rounded-md bg-background resize-none" rows={3} />
         ) : (
-          <input id={field.field_key} type={field.field_type === 'number' ? 'number' : 'text'} value={value} onChange={e => setFormData(current => ({ ...current, [field.field_key]: e.target.value || null }))} className="mt-1 w-full px-3 py-2 border rounded-md bg-background" />
+          <input id={field.field_key} type={field.field_type === 'number' ? 'number' : 'text'} value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full px-3 py-2 border rounded-md bg-background" />
         )}
       </div>
     )
