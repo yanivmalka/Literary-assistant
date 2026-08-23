@@ -290,7 +290,7 @@ export function buildSubBaseLocationsInstructions(
     sections.push(
       `${DYNAMIC_CHARACTER_FIELD_INSTRUCTIONS}${dynamicCharacterFields
         .map(field => `- ${field.field_key} (${field.label}; group: ${field.group_key})`)
-        .join("\\n")}`,
+        .join("\n")}`,
     );
   }
 
@@ -299,10 +299,10 @@ export function buildSubBaseLocationsInstructions(
 For a location, use attributes.location_fields for the following user-defined fields when the text explicitly supports them. Keep the exact field_key; do not invent a value. If the field does not apply or has no evidence, omit it.
 ${customPlaceFields
   .map(field => `- ${field.place_type_key}: ${field.field_key} (${field.label})`)
-  .join("\\n")}`);
+  .join("\n")}`);
   }
 
-  return sections.join("\\n");
+  return sections.join("\n");
 }
 
 /**

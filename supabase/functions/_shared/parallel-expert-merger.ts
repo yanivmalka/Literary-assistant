@@ -520,6 +520,9 @@ export async function executeParallelExpertExtraction(
     window,
     chunks: context.chunks,
     model_profile: context.model_profile,
+    profile_instructions: context.model_profile === "sub-base-locations"
+      ? buildSubBaseLocationsInstructions(context.project_place_fields, context.project_character_fields)
+      : undefined,
   }));
 
   const invoker = createGeminiExpertInvoker({

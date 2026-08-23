@@ -1355,6 +1355,8 @@ Deno.serve(async (req) => {
           extraction_run_id: extractionRunId,
           branch_id: targetBranchId,
           model_profile: modelProfile,
+          project_place_fields: projectPlaceFields,
+          project_character_fields: projectCharacterFields,
           chunks: chunkData,
           offset,
           limit,

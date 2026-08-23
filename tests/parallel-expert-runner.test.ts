@@ -10,6 +10,7 @@ import {
   type ExpertJobResult,
 } from "../supabase/functions/_shared/parallel-expert-runner.ts";
 import { EXPERT_CONTRACT_VERSION } from "../supabase/functions/_shared/parallel-experts.ts";
+import { buildSubBaseLocationsInstructions } from "../supabase/functions/_shared/rules/prompt.ts";
 import { assert, assertEquals } from "https://deno.land/std@0.208.0/assert/mod.ts";
 
 const context: ExpertArtifactContext = {
@@ -87,6 +88,23 @@ function makeJob(role: ExpertJob["role"], windowId: string, offset = 0): ExpertJ
     model_profile: "sub-base",
   };
 }
+
+Deno.test("locations specialist prompt carries the dedicated profile rules", () => {
+  const profileInstructions = buildSubBaseLocationsInstructions(
+    [{ place_type_key: "castle", field_key: "has moat", label: "Has moat" }],
+    [{ field_key: "faction", label: "Faction", group_key: "identity" }],
+  );
+  const prompt = buildExpertPrompt({
+    ...makeJob("locations", "locations-profile"),
+    model_profile: "sub-base-locations",
+    profile_instructions: profileInstructions,
+  });
+
+  assert(prompt.includes("LOCATION EXTRACTION PROFILE INSTRUCTIONS"));
+  assert(prompt.includes("contained_in"));
+  assert(prompt.includes("has moat (Has moat)"));
+  assert(prompt.includes("faction (Faction; group: identity)"));
+});
 
 function validResponse(job: ExpertJob, totalTokens = 1): ExpertInvocationResult {
   return {
