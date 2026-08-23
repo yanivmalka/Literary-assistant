@@ -182,6 +182,32 @@ function normalizeRelationshipType(value: string | null | undefined): string | n
   return normalized || null;
 }
 
+function normalizeRelationshipLabels(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .map((item) => item.trim());
+  }
+  if (typeof value === "string" && value.trim()) return [value.trim()];
+  return [];
+}
+
+function mergeRelationshipLabelsIntoAttributes(attributes: Record<string, unknown>, labels: string[]): void {
+  if (labels.length === 0) return;
+  const current = attributes.relationships;
+  if (current == null || Array.isArray(current) || typeof current === "string") {
+    attributes.relationships = [...new Set([
+      ...normalizeRelationshipLabels(current),
+      ...labels,
+    ])];
+    return;
+  }
+  attributes.relationship_labels = [...new Set([
+    ...normalizeRelationshipLabels(attributes.relationship_labels),
+    ...labels,
+  ])];
+}
+
 // ============================================
 // Prompt — delegates to centralized rules
 // ============================================
@@ -392,8 +418,9 @@ function normalizeEntities(
       // They should NOT be stored in character.attributes.abilities.
       // Instead, create relationship records linking character → ability after normalization.
       // This preserves the line for backwards compatibility but does not accumulate abilities here.
-      if (entity.relationships && entity.relationships.length > 0) {
-        existing.attributes.relationships = [...((existing.attributes.relationships as string[]) || []), ...entity.relationships];
+      const relationshipLabels = normalizeRelationshipLabels(entity.relationships);
+      if (relationshipLabels.length > 0) {
+        mergeRelationshipLabelsIntoAttributes(existing.attributes, relationshipLabels);
       }
       if (entity.users && entity.users.length > 0) {
         existing.attributes.users = [...((existing.attributes.users as string[]) || []), ...entity.users];
@@ -411,7 +438,8 @@ function normalizeEntities(
     } else {
       const attrs: Record<string, unknown> = { ...(entity.attributes || {}) };
       if (entity.abilities && entity.abilities.length > 0) attrs.abilities = entity.abilities;
-      if (entity.relationships && entity.relationships.length > 0) attrs.relationships = entity.relationships;
+      const relationshipLabels = normalizeRelationshipLabels(entity.relationships);
+      if (relationshipLabels.length > 0) mergeRelationshipLabelsIntoAttributes(attrs, relationshipLabels);
       if (entity.users && entity.users.length > 0) attrs.users = entity.users;
       if (entity.members && entity.members.length > 0) attrs.members = entity.members;
       if (entity.purpose) attrs.purpose = entity.purpose;
@@ -517,8 +545,8 @@ function normalizeEntities(
       }
 
       // 4. MATCHING RELATIONSHIPS: Same relationships (if we have them)
-      const relationshipsA = (entityA.attributes.relationships as string[]) || [];
-      const relationshipsB = (entityB.attributes.relationships as string[]) || [];
+      const relationshipsA = normalizeRelationshipLabels(entityA.attributes.relationships);
+      const relationshipsB = normalizeRelationshipLabels(entityB.attributes.relationships);
       const commonRelationships = relationshipsA.filter((r) => relationshipsB.includes(r));
       if (commonRelationships.length > 0) {
         evidence_score += CONSOLIDATION_THRESHOLDS.EVIDENCE_SCORES["matching_relationships"];

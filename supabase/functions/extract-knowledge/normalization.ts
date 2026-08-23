@@ -122,6 +122,34 @@ function normalizeStringList(value: unknown): string[] {
   return []
 }
 
+function mergeRelationshipLabels(attributes: Record<string, unknown>, labels: string[]): void {
+  if (labels.length === 0) return;
+
+  const current = attributes.relationships;
+  if (current == null || Array.isArray(current) || typeof current === "string") {
+    attributes.relationships = [...new Set([
+      ...normalizeStringList(current),
+      ...labels,
+    ])];
+    return;
+  }
+
+  // Preserve a non-array value from Gemini instead of overwriting it. It is
+  // not safe for relationship matching, so valid legacy labels are retained
+  // separately until the raw extraction can be reviewed.
+  attributes.relationship_labels = [...new Set([
+    ...normalizeStringList(attributes.relationship_labels),
+    ...labels,
+  ])];
+}
+
+function relationshipLabelsForMatching(attributes: Record<string, unknown>): string[] {
+  return [...new Set([
+    ...normalizeStringList(attributes.relationships),
+    ...normalizeStringList(attributes.relationship_labels),
+  ])];
+}
+
 export interface DynamicCharacterFieldOptions {
   profile?: ExtractionProfile;
   activeCharacterFieldKeys?: readonly string[];
@@ -331,8 +359,9 @@ export function normalizeEntities(
       }
       if (entity.description && !existing.description) existing.description = entity.description;
       if (entity.significance && !existing.description) existing.description = entity.significance;
-      if (entity.relationships && entity.relationships.length > 0) {
-        existing.attributes.relationships = [...((existing.attributes.relationships as string[]) || []), ...entity.relationships];
+      const relationshipLabels = normalizeStringList(entity.relationships);
+      if (relationshipLabels.length > 0) {
+        mergeRelationshipLabels(existing.attributes, relationshipLabels);
       }
       const entityUsers = normalizeStringList(entity.users)
       if (entityUsers.length > 0) {
@@ -353,7 +382,8 @@ export function normalizeEntities(
       const extractionMetadata = buildExtractionMetadata(entity);
       if (extractionMetadata) attributes.extraction_meta = extractionMetadata;
       if (entity.abilities && entity.abilities.length > 0) attributes.abilities = entity.abilities;
-      if (entity.relationships && entity.relationships.length > 0) attributes.relationships = entity.relationships;
+      const relationshipLabels = normalizeStringList(entity.relationships);
+      if (relationshipLabels.length > 0) mergeRelationshipLabels(attributes, relationshipLabels);
       const entityUsers = normalizeStringList(entity.users)
       if (entityUsers.length > 0) attributes.users = entityUsers;
       if (entity.members && entity.members.length > 0) attributes.members = entity.members;
@@ -448,8 +478,8 @@ export function normalizeEntities(
       if (entityA.description && entityB.description && entityA.description === entityB.description) {
         score += CONSOLIDATION_THRESHOLDS.EVIDENCE_SCORES.matching_description;
       }
-      const relationshipsA = (entityA.attributes.relationships as string[]) || [];
-      const relationshipsB = (entityB.attributes.relationships as string[]) || [];
+      const relationshipsA = relationshipLabelsForMatching(entityA.attributes);
+      const relationshipsB = relationshipLabelsForMatching(entityB.attributes);
       if (relationshipsA.some((relationship) => relationshipsB.includes(relationship))) {
         score += CONSOLIDATION_THRESHOLDS.EVIDENCE_SCORES.matching_relationships;
       }
