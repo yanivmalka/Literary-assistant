@@ -149,16 +149,20 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                   </select>
                   <button
                     onClick={() => handleExtractKnowledge(doc)}
-                    disabled={extractionInProgress || hasPausedExtraction}
+                    disabled={extractionInProgress}
                     className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
-                      extractionInProgress || hasPausedExtraction
+                      extractionInProgress
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                         : 'bg-green-50 text-green-700 hover:bg-green-100'
                     }`}
-                    title={t('ui.documents.extractKnowledgeTitle')}
+                    title={hasPausedExtraction
+                      ? t('documents.extraction.resumeButton')
+                      : t('ui.documents.extractKnowledgeTitle')}
                   >
                     <Brain className="h-3.5 w-3.5" />
-                    {t('ui.documents.extractKnowledge')}
+                    {hasPausedExtraction
+                      ? t('documents.extraction.resumeButton')
+                      : t('ui.documents.extractKnowledge')}
                   </button>
                 </>
               )}
