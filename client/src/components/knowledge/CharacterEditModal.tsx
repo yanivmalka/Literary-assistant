@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Save, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { X, Save, Trash2, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useEntityStore } from '@/stores/entityStore'
 import { useBranchStore } from '@/stores/branchStore'
@@ -9,8 +9,10 @@ import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import {
   CHARACTER_FIELD_CATALOG,
   DYNAMIC_CHARACTER_PROFILE,
+  createCustomCharacterField,
   enableCharacterField,
   getCatalogCharacterField,
+  isDynamicCharacterProfile,
   isPopulatedCharacterField,
   loadCharacterFieldSchema,
   type CharacterFieldDefinition,
@@ -31,6 +33,17 @@ interface FormData {
   [key: string]: string | null
 }
 
+function parseMultiValue(value: string | null): string[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value)
+    if (Array.isArray(parsed)) return parsed.map(item => String(item).trim()).filter(Boolean)
+  } catch {
+    // Fall through to comma-separated compatibility values.
+  }
+  return value.split(',').map(item => item.trim()).filter(Boolean)
+}
+
 const DYNAMIC_GROUP_TRANSLATION_KEYS: Record<string, string> = {
   'זהות': 'entityFields.dynamic.groups.identityShort',
   'זהות ופרטים אישיים': 'entityFields.dynamic.groups.identity',
@@ -38,6 +51,7 @@ const DYNAMIC_GROUP_TRANSLATION_KEYS: Record<string, string> = {
   'מראה חיצוני': 'entityFields.dynamic.groups.appearance',
   'עולם הדמות': 'entityFields.dynamic.groups.world',
   'ניתוח ותיאור': 'entityFields.dynamic.groups.analysis',
+  'שדות מותאמים אישית': 'entityFields.dynamic.groups.custom',
 }
 
 function dynamicGroupLabel(groupKey: string, translate: (key: string, options?: { defaultValue?: string }) => string) {
@@ -66,8 +80,10 @@ export default function CharacterEditModal({
   const [dynamicFields, setDynamicFields] = useState<CharacterFieldDefinition[]>([])
   const [dynamicSchemaLoading, setDynamicSchemaLoading] = useState(false)
   const [fieldToAdd, setFieldToAdd] = useState('')
+  const [newFieldLabel, setNewFieldLabel] = useState('')
+  const [newFieldType, setNewFieldType] = useState<'text' | 'long_text'>('text')
 
-  const isDynamicProfile = modelProfile === DYNAMIC_CHARACTER_PROFILE
+  const isDynamicProfile = isDynamicCharacterProfile(modelProfile)
   const structuredValues = useMemo(
     () => (character.structured_fields || {}) as Record<string, unknown>,
     [character.structured_fields],
@@ -84,30 +100,39 @@ export default function CharacterEditModal({
   )
   const populatedDynamicKeys = useMemo(
     () => Object.entries(structuredValues)
-      .filter(([key, value]) => key !== 'name' && isPopulatedCharacterField(value) && !!getCatalogCharacterField(key))
+      .filter(([key, value]) => key !== 'name' && isPopulatedCharacterField(value))
       .map(([key]) => key),
     [structuredValues]
   )
   const visibleDynamicFields = useMemo(() => {
     if (!isDynamicProfile) return []
-    const selectedKeys = new Set(dynamicFields.map(field => field.field_key))
-    const visibleKeys = new Set([...populatedDynamicKeys, ...selectedKeys])
-    return CHARACTER_FIELD_CATALOG
-      .filter(field => visibleKeys.has(field.field_key))
-      .sort((a, b) => a.sort_order - b.sort_order)
+    const selectedFields = new Map(dynamicFields.map(field => [field.field_key, field]))
+    for (const field of CHARACTER_FIELD_CATALOG) {
+      if (populatedDynamicKeys.includes(field.field_key)) selectedFields.set(field.field_key, field)
+    }
+    return [...selectedFields.values()].sort((a, b) => a.sort_order - b.sort_order)
   }, [dynamicFields, isDynamicProfile, populatedDynamicKeys])
   const dynamicGroups = useMemo(() => {
     const groups = new Map<string, CharacterFieldDefinition[]>()
-    groups.set('זהות', [{
-      model_profile: DYNAMIC_CHARACTER_PROFILE,
-      field_key: 'name',
-      label: t('entityFields.name'),
-      field_type: 'text',
-      group_key: 'זהות',
-      options: [],
-      is_active: true,
-      sort_order: 0,
-    }])
+    groups.set('זהות', [
+      {
+        model_profile: DYNAMIC_CHARACTER_PROFILE,
+        field_key: 'name',
+        label: t('entityFields.name'),
+        field_type: 'text',
+        group_key: 'זהות',
+        options: [],
+        is_active: true,
+        sort_order: 0,
+      },
+      {
+        ...(getCatalogCharacterField('first_name') as CharacterFieldDefinition),
+        field_key: 'first_name',
+        label: getCatalogCharacterField('first_name')?.label || 'שם פרטי',
+        group_key: 'זהות',
+        sort_order: 1,
+      },
+    ])
     for (const field of visibleDynamicFields) {
       const group = groups.get(field.group_key) || []
       group.push(field)
@@ -123,12 +148,12 @@ export default function CharacterEditModal({
   )
   const allFields = useMemo(
     () => isDynamicProfile
-      ? ['name', ...visibleDynamicFields.map(field => field.field_key)]
+      ? ['name', 'first_name', ...visibleDynamicFields.filter(field => field.field_key !== 'first_name').map(field => field.field_key)]
       : staticFields,
     [isDynamicProfile, staticFields, visibleDynamicFields],
   )
   const availableDynamicFields = CHARACTER_FIELD_CATALOG.filter(
-    field => !dynamicFields.some(selected => selected.field_key === field.field_key),
+    field => !visibleDynamicFields.some(selected => selected.field_key === field.field_key),
   )
 
   useEffect(() => {
@@ -153,9 +178,16 @@ export default function CharacterEditModal({
     if (!character) return
 
     const data: FormData = {}
+    const attributes = (character.attributes || {}) as Record<string, unknown>
+    const structured = (character.structured_fields || {}) as Record<string, unknown>
     for (const field of allFields) {
-      const value = (character.structured_fields as Record<string, unknown>)?.[field]
-      data[field] = value != null ? String(value) : null
+      const definition = typeof field === 'string' ? getCatalogCharacterField(field) : field
+      const rawValue = structured[field] ?? attributes[field] ?? (field === 'name' ? character.name : field === 'aliases' ? character.aliases : null)
+      data[field] = rawValue == null
+        ? null
+        : definition?.field_type === 'multi_select' && Array.isArray(rawValue)
+          ? JSON.stringify(rawValue)
+          : String(rawValue)
     }
     setFormData(data)
     setOriginalFormData(data)
@@ -195,13 +227,29 @@ export default function CharacterEditModal({
       }
       for (const field of allFields) {
         const value = formData[field]
-        structuredFields[field] = value && value.trim() ? value.trim() : null
+        const definition = dynamicFields.find(item => item.field_key === field) || getCatalogCharacterField(field)
+        if (definition?.field_type === 'multi_select') {
+          structuredFields[field] = parseMultiValue(value)
+        } else {
+          structuredFields[field] = value && value.trim() ? value.trim() : null
+        }
       }
 
+      const firstName = String(structuredFields.first_name || '').trim()
+      const lastName = String(structuredFields.last_name || '').trim()
+      const canonicalName = String(structuredFields.name || '').trim() || [firstName, lastName].filter(Boolean).join(' ')
+      if (!canonicalName) {
+        alert(t('entityModal.nameRequired'))
+        return
+      }
+      structuredFields.name = canonicalName
+      const aliases = parseMultiValue(formData.aliases)
+
       const updates = {
-        canonical_name: structuredFields.name as string || character.name,
+        canonical_name: canonicalName,
         description: (structuredFields.description as string) || null,
         structured_fields: structuredFields,
+        aliases,
       }
 
       // Route based on selectedVersion, not currentBranch existence
@@ -233,7 +281,10 @@ export default function CharacterEditModal({
     const field = getCatalogCharacterField(fieldToAdd)
     if (!field) return
     try {
-      const enabled = await enableCharacterField(projectId, field)
+      const enabled = await enableCharacterField(projectId, {
+        ...field,
+        model_profile: modelProfile as 'sub-base-c-characters' | 'sub-base-locations',
+      })
       setDynamicFields(current => [
         ...current.filter(item => item.field_key !== enabled.field_key),
         enabled,
@@ -243,6 +294,27 @@ export default function CharacterEditModal({
       setExpandedGroups(current => new Set([...current, enabled.group_key]))
     } catch (error) {
       console.error('Failed to enable character field:', error)
+    }
+  }
+
+  const handleAddCustomField = async () => {
+    if (!isDynamicProfile || !newFieldLabel.trim()) return
+    try {
+      const created = await createCustomCharacterField({
+        projectId,
+        label: newFieldLabel,
+        fieldType: newFieldType,
+        modelProfile: modelProfile as 'sub-base-c-characters' | 'sub-base-locations',
+      })
+      setDynamicFields(current => [
+        ...current.filter(item => item.field_key !== created.field_key),
+        created,
+      ].sort((a, b) => a.sort_order - b.sort_order))
+      setFormData(current => ({ ...current, [created.field_key]: null }))
+      setNewFieldLabel('')
+      setExpandedGroups(current => new Set([...current, created.group_key]))
+    } catch (error) {
+      console.error('Failed to create custom character field:', error)
     }
   }
 
@@ -322,7 +394,9 @@ export default function CharacterEditModal({
                 <div className="border-t p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                   {group.fields.map(field => {
                     const fieldKey = typeof field === 'string' ? field : field.field_key
-                    const fieldDefinition = typeof field === 'string' ? getCatalogCharacterField(field) : field
+                    const fieldDefinition = typeof field === 'string'
+                      ? dynamicFields.find(item => item.field_key === field) || getCatalogCharacterField(field)
+                      : field
                     const value = formData[fieldKey] ?? ''
                     const isTextarea = fieldDefinition?.field_type === 'long_text' || TEXTAREA_FIELDS.has(fieldKey)
                     const fieldLabel = isDynamicProfile && fieldDefinition
@@ -361,34 +435,58 @@ export default function CharacterEditModal({
           ))}
 
           {isDynamicProfile && (
-            <section className="border border-dashed rounded-lg p-4 space-y-3">
-              <div>
-                <h3 className="font-semibold">{t('ui.character.addFieldTitle')}</h3>
-                <p className="text-xs text-muted-foreground">
-                  {t('ui.character.addFieldHint')}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <label htmlFor="character-field-to-add" className="sr-only">{t('ui.character.selectField')}</label>
-                <select
-                  id="character-field-to-add"
-                  name="character-field-to-add"
-                  autoComplete="off"
-                  onChange={event => setFieldToAdd(event.target.value)}
-                  disabled={dynamicSchemaLoading || availableDynamicFields.length === 0}
-                  className="flex-1 px-3 py-2 border rounded-md bg-background"
-                >
-                  <option value="">{t('ui.character.selectField')}</option>
-                  {availableDynamicFields.map(field => (
-                    <option key={field.field_key} value={field.field_key}>{field.label}</option>
-                  ))}
-                </select>
-                <button onClick={handleAddField} disabled={!fieldToAdd || dynamicSchemaLoading} className="px-3 py-2 border rounded-md disabled:opacity-50">
-                  {t('ui.character.addField')}
-                </button>
-              </div>
-              {availableDynamicFields.length === 0 && <p className="text-xs text-muted-foreground">{t('ui.character.allFieldsSelected')}</p>}
-            </section>
+            <>
+              <section className="border border-dashed rounded-lg p-4 space-y-3">
+                <div>
+                  <h3 className="font-semibold">{t('ui.character.addFieldTitle')}</h3>
+                  <p className="text-xs text-muted-foreground">{t('ui.character.addFieldHint')}</p>
+                </div>
+                <div className="flex gap-2">
+                  <label htmlFor="character-field-to-add" className="sr-only">{t('ui.character.selectField')}</label>
+                  <select
+                    id="character-field-to-add"
+                    name="character-field-to-add"
+                    autoComplete="off"
+                    value={fieldToAdd}
+                    onChange={event => setFieldToAdd(event.target.value)}
+                    disabled={dynamicSchemaLoading || availableDynamicFields.length === 0}
+                    className="flex-1 px-3 py-2 border rounded-md bg-background"
+                  >
+                    <option value="">{t('ui.character.selectField')}</option>
+                    {availableDynamicFields.map(field => <option key={field.field_key} value={field.field_key}>{field.label}</option>)}
+                  </select>
+                  <button onClick={handleAddField} disabled={!fieldToAdd || dynamicSchemaLoading} className="px-3 py-2 border rounded-md disabled:opacity-50">
+                    {t('ui.character.addField')}
+                  </button>
+                </div>
+                {availableDynamicFields.length === 0 && <p className="text-xs text-muted-foreground">{t('ui.character.allFieldsSelected')}</p>}
+              </section>
+              <section className="border border-dashed rounded-lg p-4 space-y-3">
+                <div>
+                  <h3 className="font-semibold">{t('ui.character.addCustomFieldTitle')}</h3>
+                  <p className="text-xs text-muted-foreground">{t('ui.character.addCustomFieldHint')}</p>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    id="character-custom-field-label"
+                    name="character-custom-field-label"
+                    autoComplete="off"
+                    value={newFieldLabel}
+                    onChange={event => setNewFieldLabel(event.target.value)}
+                    onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void handleAddCustomField() } }}
+                    placeholder={t('ui.character.customFieldPlaceholder')}
+                    className="flex-1 px-3 py-2 border rounded-md bg-background"
+                  />
+                  <select value={newFieldType} onChange={event => setNewFieldType(event.target.value as 'text' | 'long_text')} className="px-3 py-2 border rounded-md bg-background">
+                    <option value="text">{t('ui.character.textField')}</option>
+                    <option value="long_text">{t('ui.character.longTextField')}</option>
+                  </select>
+                  <button onClick={() => void handleAddCustomField()} disabled={!newFieldLabel.trim()} className="flex items-center gap-1 px-3 py-2 border rounded-md disabled:opacity-50">
+                    <Plus className="h-4 w-4" />{t('ui.character.addField')}
+                  </button>
+                </div>
+              </section>
+            </>
           )}
         </div>
 

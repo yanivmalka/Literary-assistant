@@ -384,12 +384,14 @@ Model A מקבל את כל ה־chunks של ה־batch, אך instruction שלו מ
 
 ### שלב 5 — UI דמויות
 
-- [ ] לעדכן tile להצגת fields populated בלבד.
-- [ ] לעדכן detail modal.
-- [ ] לעדכן expanded edit page.
-- [ ] להוסיף Add existing field/Add custom field.
-- [ ] להוסיף placeholder לאזור יכולות וחפצים.
-- [ ] להוסיף חיפוש דמויות לפי שם, alias ושדות מאוכלסים.
+- [x] לעדכן tile להצגת fields populated בלבד.
+- [x] לעדכן detail modal.
+- [x] לעדכן expanded edit page.
+- [x] להוסיף Add existing field/Add custom field.
+- [x] להוסיף placeholder לאזור יכולות וחפצים.
+- [x] להוסיף חיפוש דמויות לפי שם, alias ושדות מאוכלסים.
+
+> שלב 5 ממומש על גבי ה־Knowledge Layer הקיים: פרופיל C והפרופיל הישן של locations משתמשים בחוזה dynamic profile-aware, ה־Hub מציג Main או Effective Branch עם חיפוש מקומי, וה־tile/detail/expanded profile מציגים רק ערכים מאוכלסים. העריכה משתמשת במנגנון Main/Branch הקיים, מסנכרנת aliases בסקופ המתאים, ותומכת בהוספת שדות מהקטלוג או שדות עצמאיים מסוג `text`/`long_text`. ה־detail modal מציג provenance/evidence כאשר קיימים values/evidence, בעוד Objects ו־Abilities נשארים placeholders עבור C ללא fallback חילוץ פעיל.
 
 ### שלב 6 — אימות חי
 

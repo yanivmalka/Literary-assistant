@@ -43,6 +43,35 @@ export interface MergeSuggestion {
   reason: string
 }
 
+function normalizeAliases(value: unknown): string[] {
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : []
+  return [...new Set(values
+    .filter(item => typeof item === 'string')
+    .map(item => item.trim())
+    .filter(Boolean))]
+}
+
+async function syncEntityAliases(entityId: string, aliases: string[], branchId: string | null): Promise<void> {
+  let deleteQuery = supabase
+    .from('knowledge_entity_aliases')
+    .delete()
+    .eq('entity_id', entityId)
+  deleteQuery = branchId ? deleteQuery.eq('branch_id', branchId) : deleteQuery.is('branch_id', null)
+  const { error: deleteError } = await deleteQuery
+  if (deleteError) throw deleteError
+
+  const normalizedAliases = normalizeAliases(aliases)
+  if (normalizedAliases.length === 0) return
+  const { error } = await supabase
+    .from('knowledge_entity_aliases')
+    .insert(normalizedAliases.map(alias => ({ entity_id: entityId, alias, branch_id: branchId })))
+  if (error) throw error
+}
+
 interface EntityState {
   entities: Entity[]
   mergeSuggestions: MergeSuggestion[]
@@ -61,7 +90,7 @@ interface EntityState {
   updateReviewStatus: (projectId: string, entityId: string, reviewStatus: 'confirmed' | 'dismissed' | 'pending') => Promise<void>
   fetchEntityDetail: (projectId: string, entityId: string) => Promise<void>
   createEntity: (projectId: string, entityType: EntityType, structuredFields: Record<string, unknown>, branchContext?: { branchId: string; layer: 'branch' | 'main' }) => Promise<Entity | null>
-  updateEntity: (entityId: string, updates: { canonical_name?: string; description?: string | null; structured_fields?: Record<string, unknown>; attributes?: Record<string, unknown> }, branchContext?: { branchId: string; sourceEntityId: string }) => Promise<boolean>
+  updateEntity: (entityId: string, updates: { canonical_name?: string; description?: string | null; structured_fields?: Record<string, unknown>; attributes?: Record<string, unknown>; aliases?: string[] }, branchContext?: { branchId: string; sourceEntityId: string }) => Promise<boolean>
   deleteEntity: (entityId: string, branchContext?: { branchId: string; layer: 'branch' } | { layer: 'main' }) => Promise<boolean>
   getMainOnlyEntities: (filters?: { type?: string; status?: string }) => Entity[]
   getEffectiveBranchEntities: (filters?: { type?: string; status?: string }) => Entity[]
@@ -472,12 +501,15 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         return null
       }
 
+      const aliases = normalizeAliases(structuredFields.aliases)
+      await syncEntityAliases(data.id, aliases, branchId)
+
       const newEntity: Entity = {
         id: data.id,
         name: data.canonical_name,
         entity_type: data.entity_type,
         status: 'confirmed',
-        aliases: [],
+        aliases,
         metadata: data.attributes || {},
         created_at: data.created_at,
         updated_at: data.updated_at,
@@ -517,8 +549,49 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           .single()
 
         if (!mainEntity) {
-          console.error('Main entity not found for branch overlay')
-          return false
+          // Branch-only entities are stored directly in knowledge_entities.
+          const { data: branchEntity } = await supabase
+            .from('knowledge_entities')
+            .select('*')
+            .eq('id', entityId)
+            .eq('layer', 'branch')
+            .eq('branch_id', branchId)
+            .single()
+          if (!branchEntity) {
+            console.error('Branch entity not found for update')
+            return false
+          }
+
+          const branchUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+          if (updates.canonical_name !== undefined) branchUpdates.canonical_name = updates.canonical_name
+          if (updates.description !== undefined) branchUpdates.description = updates.description
+          if (updates.structured_fields !== undefined) branchUpdates.structured_fields = updates.structured_fields
+          if (updates.attributes !== undefined) branchUpdates.attributes = updates.attributes
+          const { error } = await supabase
+            .from('knowledge_entities')
+            .update(branchUpdates)
+            .eq('id', entityId)
+          if (error) {
+            console.error('Failed to update branch entity:', error)
+            return false
+          }
+
+          const aliases = updates.aliases ?? (get().entities.find(entity => entity.id === entityId)?.aliases || [])
+          await syncEntityAliases(entityId, aliases, branchId)
+          const updatedAt = new Date().toISOString()
+          set({
+            entities: get().entities.map(entity => entity.id !== entityId ? entity : {
+              ...entity,
+              name: updates.canonical_name ?? entity.name,
+              description: updates.description !== undefined ? updates.description : entity.description,
+              structured_fields: updates.structured_fields ?? entity.structured_fields,
+              attributes: updates.attributes ?? entity.attributes,
+              metadata: updates.attributes ?? entity.metadata,
+              aliases,
+              updated_at: updatedAt,
+            }),
+          })
+          return true
         }
 
         // Check if overlay already exists
@@ -616,6 +689,9 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           }
         }
 
+        if (updates.aliases !== undefined) {
+          await syncEntityAliases(sourceEntityId, updates.aliases, branchId)
+        }
         return true
       } else {
         // Main mode: update Main entity directly
@@ -636,6 +712,10 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           return false
         }
 
+        if (updates.aliases !== undefined) {
+          await syncEntityAliases(entityId, updates.aliases, null)
+        }
+
         // Update local state
         set({
           entities: get().entities.map(e => {
@@ -647,6 +727,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
               structured_fields: updates.structured_fields ?? e.structured_fields,
               attributes: updates.attributes ?? e.attributes,
               metadata: updates.attributes ?? e.metadata,
+              aliases: updates.aliases ?? e.aliases,
               updated_at: new Date().toISOString(),
             }
           }),
@@ -657,6 +738,7 @@ export const useEntityStore = create<EntityState>((set, get) => ({
                 description: updates.description !== undefined ? updates.description : get().selectedEntity!.description,
                 structured_fields: updates.structured_fields ?? get().selectedEntity!.structured_fields,
                 attributes: updates.attributes ?? get().selectedEntity!.attributes,
+                aliases: updates.aliases ?? get().selectedEntity!.aliases,
                 updated_at: new Date().toISOString(),
               }
             : get().selectedEntity,

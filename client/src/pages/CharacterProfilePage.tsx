@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Edit3, Save } from 'lucide-react'
 import { useEntityStore } from '@/stores/entityStore'
 import { useBranchStore } from '@/stores/branchStore'
@@ -10,6 +10,16 @@ import {
   TEXTAREA_FIELDS,
 } from '@/lib/entityTypes'
 import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
+import type { ExtractionModelProfile } from '@/lib/extractionModels'
+import { EXTRACTION_MODEL_PROFILES, getStoredExtractionModelProfile } from '@/lib/extractionModels'
+import {
+  getCatalogCharacterField,
+  getPopulatedCharacterFields,
+  isDynamicCharacterProfile,
+  loadCharacterFieldSchema,
+  type CharacterFieldDefinition,
+} from '@/lib/characterSchema'
+import CharacterEditModal from '@/components/knowledge/CharacterEditModal'
 import RelationshipPanel from '@/components/entities/RelationshipPanel'
 import { getEntityRelationships, createBranchRelationship, reviewBranchRelationship, removeBranchRelationship } from '@/lib/relationshipService'
 import type { Relationship } from '@/lib/relationshipService'
@@ -24,7 +34,11 @@ export default function CharacterProfilePage() {
   const { t } = useTranslation()
   const { projectId, entityId } = useParams<{ projectId: string; entityId: string }>()
   const navigate = useNavigate()
-  
+  const [searchParams] = useSearchParams()
+  const requestedProfile = searchParams.get('profile')
+  const modelProfile: ExtractionModelProfile = EXTRACTION_MODEL_PROFILES.includes(requestedProfile as ExtractionModelProfile)
+    ? requestedProfile as ExtractionModelProfile
+    : getStoredExtractionModelProfile()
   const { fetchEntities, updateEntity, getMainOnlyEntities, getEffectiveBranchEntities } = useEntityStore()
   const { currentBranch, fetchCurrentBranch } = useBranchStore()
 
@@ -35,6 +49,8 @@ export default function CharacterProfilePage() {
   const [selectedVersion, setSelectedVersion] = useState<'main' | 'branch'>('main')
   const [relationships, setRelationships] = useState<Relationship[]>([])
   const [loadingRelationships, setLoadingRelationships] = useState(false)
+  const [dynamicFields, setDynamicFields] = useState<CharacterFieldDefinition[]>([])
+  const [editModalOpen, setEditModalOpen] = useState(false)
 
   // Resolve entity from version-specific dataset
   const versionEntities = selectedVersion === 'main'
@@ -42,30 +58,61 @@ export default function CharacterProfilePage() {
     : getEffectiveBranchEntities()
   const entity = versionEntities.find(e => e.id === entityId)
   const entityType = entity?.entity_type as any
+  const isDynamicProfile = isDynamicCharacterProfile(modelProfile)
 
-  // Memoize field lists so they only change when entity type actually changes,
-  // not on every render. This prevents form reinitialization while user is typing.
+  const visibleDynamicDefinitions = useMemo(() => {
+    if (!isDynamicProfile || !entity) return []
+    const fields = new Map(dynamicFields.map(field => [field.field_key, field]))
+    for (const field of getPopulatedCharacterFields(entity, modelProfile, dynamicFields)) {
+      fields.set(field.key, field.definition)
+    }
+    return [...fields.values()].sort((a, b) => a.sort_order - b.sort_order)
+  }, [dynamicFields, entity, isDynamicProfile, modelProfile])
+
   const fieldGroups = useMemo(
-    () => entity ? getFieldGroupsForType(entityType) : [],
-    [entityType]
+    () => {
+      if (!entity) return []
+      if (!isDynamicProfile) return getFieldGroupsForType(entityType)
+      const groups = new Map<string, string[]>()
+      groups.set('זהות', ['name', 'first_name'])
+      for (const field of visibleDynamicDefinitions) {
+        const group = groups.get(field.group_key) || []
+        if (!group.includes(field.field_key)) group.push(field.field_key)
+        groups.set(field.group_key, group)
+      }
+      return [...groups.entries()].map(([key, fields]) => ({ key, labelKey: '', fields }))
+    },
+    [entity, entityType, isDynamicProfile, visibleDynamicDefinitions]
   )
   const allFields = useMemo(
-    () => entity ? getFieldsForType(entityType) : [],
-    [entityType]
+    () => entity
+      ? isDynamicProfile
+        ? ['name', 'first_name', ...visibleDynamicDefinitions.filter(field => field.field_key !== 'first_name').map(field => field.field_key)]
+        : getFieldsForType(entityType)
+      : [],
+    [entity, entityType, isDynamicProfile, visibleDynamicDefinitions]
   )
 
-  // Initialize entity and branch state on mount
   useEffect(() => {
-    if (projectId) {
-      fetchEntities(projectId)
-      fetchCurrentBranch(projectId).then(branch => {
-        // If a branch exists, default to branch view; otherwise stay on main
-        if (branch) {
-          setSelectedVersion('branch')
-        }
-      })
+    if (!projectId) return
+    fetchEntities(projectId, undefined, modelProfile)
+    fetchCurrentBranch(projectId, modelProfile).then(branch => {
+      if (branch) setSelectedVersion('branch')
+    })
+  }, [projectId, modelProfile, fetchEntities, fetchCurrentBranch])
+
+  useEffect(() => {
+    if (!projectId || !isDynamicProfile) {
+      setDynamicFields([])
+      return
     }
-  }, [projectId, fetchEntities, fetchCurrentBranch])
+    loadCharacterFieldSchema(projectId, modelProfile)
+      .then(setDynamicFields)
+      .catch(error => {
+        console.error('Failed to load character field schema:', error)
+        setDynamicFields([])
+      })
+  }, [isDynamicProfile, modelProfile, projectId])
 
   // Load relationships
   useEffect(() => {
@@ -86,10 +133,11 @@ export default function CharacterProfilePage() {
     if (!entity) return
 
     const data: FormData = {}
-    // Use allFields value that was memoized based on entityType
+    const structured = (entity.structured_fields || {}) as Record<string, unknown>
+    const attributes = (entity.attributes || {}) as Record<string, unknown>
     for (const field of allFields) {
-      const value = (entity.structured_fields as Record<string, unknown>)?.[field]
-      data[field] = value != null ? String(value) : null
+      const value = structured[field] ?? attributes[field] ?? (field === 'name' ? entity.name : field === 'aliases' ? entity.aliases : null)
+      data[field] = value != null ? (Array.isArray(value) ? JSON.stringify(value) : String(value)) : null
     }
     setFormData(data)
     setOriginalFormData(data)
@@ -162,7 +210,7 @@ export default function CharacterProfilePage() {
   }
 
   const handleEdit = () => {
-    setViewMode('edit')
+    setEditModalOpen(true)
   }
 
   return (
@@ -236,24 +284,32 @@ export default function CharacterProfilePage() {
         {fieldGroups.map(group => (
           <div key={group.key} className="mb-8 last:mb-0">
             <h3 className="text-lg font-semibold mb-4 text-muted-foreground">
-              {t(group.labelKey)}
+              {isDynamicProfile
+                ? t(`entityFields.dynamic.groups.${group.key === 'זהות' ? 'identity' : group.key === 'זהות ופרטים אישיים' ? 'identity' : group.key === 'תכונות' ? 'traits' : group.key === 'מראה חיצוני' ? 'appearance' : group.key === 'עולם הדמות' ? 'world' : group.key === 'שדות מותאמים אישית' ? 'custom' : 'analysis'}`, { defaultValue: group.key })
+                : t(group.labelKey)}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {group.fields.map(field => {
-                const value = formData[field as string] ?? ''
-                const isTextarea = TEXTAREA_FIELDS.has(field as string)
-                const fieldLabel = t(`entityFields.${field}`, { defaultValue: field })
+                const fieldKey = field as string
+                const value = formData[fieldKey] ?? ''
+                const dynamicDefinition = dynamicFields.find(item => item.field_key === fieldKey) || getCatalogCharacterField(fieldKey)
+                const populatedValue = isDynamicProfile
+                  ? getPopulatedCharacterFields(entity, modelProfile, dynamicFields).find(item => item.key === fieldKey)?.value
+                  : value
+                const displayValue = Array.isArray(populatedValue) ? populatedValue.join(', ') : populatedValue == null ? '' : String(populatedValue)
+                const isTextarea = dynamicDefinition?.field_type === 'long_text' || TEXTAREA_FIELDS.has(fieldKey)
+                const fieldLabel = isDynamicProfile && dynamicDefinition
+                  ? t(`entityFields.dynamic.${fieldKey}`, { defaultValue: dynamicDefinition.label || fieldKey })
+                  : t(`entityFields.${fieldKey}`, { defaultValue: fieldKey })
 
                 if (viewMode === 'profile') {
-                  // Read-only mode
+                  if (isDynamicProfile && !displayValue.trim()) return null
                   return (
-                    <div key={field}>
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {fieldLabel}
-                      </span>
+                    <div key={fieldKey}>
+                      <span className="text-sm font-medium text-muted-foreground">{fieldLabel}</span>
                       <div className="mt-1 p-2 rounded bg-muted/50 min-h-[2.5rem] flex items-center">
-                        <p className={value ? '' : 'text-muted-foreground italic'}>
-                          {value || t('ui.common.unknown')}
+                        <p className={displayValue ? '' : 'text-muted-foreground italic'}>
+                          {displayValue || t('ui.common.unknown')}
                         </p>
                       </div>
                     </div>
@@ -371,6 +427,20 @@ export default function CharacterProfilePage() {
           />
         )}
       </div>
+      {editModalOpen && (
+        <CharacterEditModal
+          isOpen={editModalOpen}
+          character={entity}
+          projectId={projectId}
+          selectedVersion={selectedVersion}
+          modelProfile={modelProfile}
+          onClose={() => setEditModalOpen(false)}
+          onCharacterUpdated={() => {
+            setEditModalOpen(false)
+            void fetchEntities(projectId, undefined, modelProfile)
+          }}
+        />
+      )}
     </div>
   )
 }

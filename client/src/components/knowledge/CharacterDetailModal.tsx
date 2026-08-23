@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { X, ExternalLink } from 'lucide-react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import type { Entity } from '@/stores/entityStore'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
-import { CHARACTER_FIELD_CATALOG, DYNAMIC_CHARACTER_PROFILE, isPopulatedCharacterField } from '@/lib/characterSchema'
+import {
+  getPopulatedCharacterFields,
+  isDynamicCharacterProfile,
+  isPopulatedCharacterField,
+  loadCharacterFieldProvenance,
+  type CharacterFieldDefinition,
+  type CharacterFieldProvenance,
+} from '@/lib/characterSchema'
 import ObjectsPanel from './ObjectsPanel'
 import AbilitiesPanel from './AbilitiesPanel'
 
@@ -13,6 +21,7 @@ interface CharacterDetailModalProps {
   character: Entity
   projectId: string
   modelProfile: ExtractionModelProfile
+  definitions?: CharacterFieldDefinition[]
   branchId: string | null
   onClose: () => void
 }
@@ -20,11 +29,30 @@ interface CharacterDetailModalProps {
 type ViewType = 'detail' | 'objects' | 'abilities'
 
 function getField(entity: Entity, field: string): string | null {
-  const sf = entity.structured_fields as Record<string, unknown> | undefined
-  if (sf && sf[field] != null && sf[field] !== '') return String(sf[field])
-  const attr = entity.attributes as Record<string, unknown> | undefined
-  if (attr && attr[field] != null && attr[field] !== '') return String(attr[field])
+  const structured = entity.structured_fields as Record<string, unknown> | undefined
+  if (structured && isPopulatedCharacterField(structured[field])) return String(structured[field])
+  const attributes = entity.attributes as Record<string, unknown> | undefined
+  if (attributes && isPopulatedCharacterField(attributes[field])) return String(attributes[field])
   return null
+}
+
+function formatValue(value: unknown): string {
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'object' && value !== null) return JSON.stringify(value)
+  return String(value)
+}
+
+function dynamicGroupTranslationKey(groupKey: string): string {
+  const keys: Record<string, string> = {
+    'זהות': 'identityShort',
+    'זהות ופרטים אישיים': 'identity',
+    'תכונות': 'traits',
+    'מראה חיצוני': 'appearance',
+    'עולם הדמות': 'world',
+    'ניתוח ותיאור': 'analysis',
+    'שדות מותאמים אישית': 'custom',
+  }
+  return keys[groupKey] || groupKey
 }
 
 export default function CharacterDetailModal({
@@ -32,66 +60,87 @@ export default function CharacterDetailModal({
   character,
   projectId,
   modelProfile,
+  definitions = [],
   branchId,
   onClose,
 }: CharacterDetailModalProps) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [mountNode, setMountNode] = useState<HTMLElement | null>(null)
   const [view, setView] = useState<ViewType>('detail')
+  const [provenance, setProvenance] = useState<Record<string, CharacterFieldProvenance>>({})
+
+  useEffect(() => setMountNode(document.body), [])
 
   useEffect(() => {
-    setMountNode(document.body)
-  }, [])
+    if (!isOpen) return
+    setView('detail')
+    setProvenance({})
+    loadCharacterFieldProvenance(character.id, branchId)
+      .then(setProvenance)
+      .catch(error => console.error('Failed to load character provenance:', error))
+  }, [branchId, character.id, isOpen])
 
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (view !== 'detail') {
-          setView('detail')
-        } else {
-          onClose()
-        }
-      }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (view !== 'detail') setView('detail')
+      else onClose()
     }
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape)
-      return () => document.removeEventListener('keydown', handleEscape)
-    }
+    if (!isOpen) return
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
   }, [isOpen, onClose, view])
-
-  useEffect(() => {
-    if (isOpen) {
-      setView('detail')
-    }
-  }, [isOpen])
 
   if (!isOpen || !mountNode) return null
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      if (view !== 'detail') {
-        setView('detail')
-      } else {
-        onClose()
-      }
-    }
+  const handleBackdropClick = (event: React.MouseEvent) => {
+    if (event.target !== event.currentTarget) return
+    if (view !== 'detail') setView('detail')
+    else onClose()
   }
 
-  const name = character.name
-  const age = getField(character, 'age')
-  const gender = getField(character, 'gender')
-  const height = getField(character, 'height')
-  const hairColor = getField(character, 'hair_color')
-  const eyeColor = getField(character, 'eye_color')
-  const description = getField(character, 'description')
-  const dynamicFields = Object.entries(character.structured_fields || {})
-    .map(([key, value]) => ({
-      key,
-      value,
-      definition: CHARACTER_FIELD_CATALOG.find(field => field.field_key === key),
-    }))
-    .filter(item => modelProfile === DYNAMIC_CHARACTER_PROFILE && item.definition && isPopulatedCharacterField(item.value))
+  const isDynamicProfile = isDynamicCharacterProfile(modelProfile)
+  const populatedFields = getPopulatedCharacterFields(character, modelProfile, definitions)
+  const dynamicGroups = new Map<string, typeof populatedFields>()
+  for (const field of populatedFields) {
+    const group = dynamicGroups.get(field.definition.group_key) || []
+    group.push(field)
+    dynamicGroups.set(field.definition.group_key, group)
+  }
+  const legacyFields = [
+    ['basicInfo', ['age', 'gender', 'height']],
+    ['appearance', ['hair_color', 'eye_color']],
+    ['description', ['description']],
+  ] as const
+
+  const renderProvenance = (fieldKey: string) => {
+    const item = provenance[fieldKey]
+    if (!item) return null
+    return (
+      <div className="mt-2 text-xs text-muted-foreground space-y-1">
+        <div className="flex flex-wrap gap-x-2 gap-y-1">
+          <span>{item.sourceType === 'user' ? t('ui.character.sourceUser') : t('ui.character.sourceAI')}</span>
+          {item.inferred && <span>{t('ui.character.inferred')}</span>}
+          {item.confidence !== null && <span>{t('ui.character.confidence', { value: Math.round(item.confidence * 100) })}</span>}
+        </div>
+        {item.inferenceNote && <p>{item.inferenceNote}</p>}
+        {item.evidence.slice(0, 1).map((evidence, index) => (
+          <blockquote key={index} className="border-s-2 ps-2 italic">“{evidence.quote}”{evidence.pageNumber !== null ? ` · ${t('qa.page')} ${evidence.pageNumber}` : ''}</blockquote>
+        ))}
+      </div>
+    )
+  }
+
+  const renderDynamicField = ({ key, value, definition }: { key: string; value: unknown; definition: CharacterFieldDefinition }) => (
+    <div key={key} className="p-3 bg-muted/50 rounded">
+      <p className="text-xs text-muted-foreground font-medium mb-1">
+        {t(`entityFields.dynamic.${key}`, { defaultValue: definition.label || key })}
+      </p>
+      <p className="font-medium whitespace-pre-wrap">{formatValue(value)}</p>
+      {renderProvenance(key)}
+    </div>
+  )
 
   const handleClose = () => {
     setView('detail')
@@ -99,181 +148,76 @@ export default function CharacterDetailModal({
   }
 
   return createPortal(
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-      onClick={handleBackdropClick}
-    >
-      <div className="bg-background rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-auto">
-        {/* Header */}
-        <div className="sticky top-0 bg-background border-b p-6 flex items-start justify-between">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
+      <div className="bg-background rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-auto">
+        <div className="sticky top-0 bg-background border-b p-6 flex items-start justify-between z-10">
           <div>
-            <h2 className="text-2xl font-bold">{name}</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {t('entities.typesSingular.character')}
-            </p>
+            <h2 className="text-2xl font-bold">{character.name}</h2>
+            <p className="text-sm text-muted-foreground mt-1">{t('entities.typesSingular.character')}</p>
           </div>
-          <button
-            onClick={handleClose}
-            className="p-1 rounded-md hover:bg-muted transition-colors"
-          >
+          <button onClick={handleClose} className="p-1 rounded-md hover:bg-muted transition-colors" aria-label={t('common.close')}>
             <X className="h-6 w-6" />
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6">
           {view === 'detail' && (
             <div className="space-y-6">
-              {/* Primary Attributes */}
-              {(age || gender || height) && (
-                <div>
-                  <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                    {t('entityFields.basicInfo')}
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {age && (
-                      <div className="p-3 bg-muted/50 rounded">
-                        <p className="text-xs text-muted-foreground font-medium mb-1">
-                          {t('entityFields.age')}
-                        </p>
-                        <p className="font-medium">{age}</p>
+              {isDynamicProfile ? (
+                [...dynamicGroups.entries()].map(([groupKey, fields]) => (
+                  <section key={groupKey}>
+                    <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+                      {t(`entityFields.dynamic.groups.${dynamicGroupTranslationKey(groupKey)}`, { defaultValue: groupKey })}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{fields.map(renderDynamicField)}</div>
+                  </section>
+                ))
+              ) : (
+                legacyFields.map(([groupKey, keys]) => {
+                  const fields = keys.map(key => ({ key, value: getField(character, key) })).filter(field => field.value)
+                  if (fields.length === 0) return null
+                  return (
+                    <section key={groupKey}>
+                      <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">{t(`entityFields.${groupKey}`)}</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {fields.map(field => <div key={field.key} className="p-3 bg-muted/50 rounded"><p className="text-xs text-muted-foreground font-medium mb-1">{t(`entityFields.${field.key}`)}</p><p className="font-medium">{field.value}</p></div>)}
                       </div>
-                    )}
-                    {gender && (
-                      <div className="p-3 bg-muted/50 rounded">
-                        <p className="text-xs text-muted-foreground font-medium mb-1">
-                          {t('entityFields.gender')}
-                        </p>
-                        <p className="font-medium">{gender}</p>
-                      </div>
-                    )}
-                    {height && (
-                      <div className="p-3 bg-muted/50 rounded">
-                        <p className="text-xs text-muted-foreground font-medium mb-1">
-                          {t('entityFields.height')}
-                        </p>
-                        <p className="font-medium">{height}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                    </section>
+                  )
+                })
               )}
 
-              {/* Appearance */}
-              {(hairColor || eyeColor) && (
-                <div>
-                  <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                    {t('entityFields.appearance')}
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    {hairColor && (
-                      <div className="p-3 bg-muted/50 rounded">
-                        <p className="text-xs text-muted-foreground font-medium mb-1">
-                          {t('entityFields.hair_color')}
-                        </p>
-                        <p className="font-medium">{hairColor}</p>
-                      </div>
-                    )}
-                    {eyeColor && (
-                      <div className="p-3 bg-muted/50 rounded">
-                        <p className="text-xs text-muted-foreground font-medium mb-1">
-                          {t('entityFields.eye_color')}
-                        </p>
-                        <p className="font-medium">{eyeColor}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              {character.aliases?.length > 0 && (
+                <section>
+                  <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">{t('entityFields.aliases')}</h3>
+                  <div className="flex flex-wrap gap-2">{character.aliases.map(alias => <span key={alias} className="px-3 py-1 bg-muted text-sm rounded-full text-muted-foreground">{alias}</span>)}</div>
+                </section>
               )}
 
-              {/* Description */}
-              {description && (
-                <div>
-                  <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                    {t('entityFields.description')}
-                  </h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground bg-muted/50 p-3 rounded">
-                    {description}
-                  </p>
-                </div>
-              )}
-
-              {/* Dynamic extracted fields — only populated values are shown. */}
-              {modelProfile === DYNAMIC_CHARACTER_PROFILE && dynamicFields.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                    {t('entityFields.dynamicFields')}
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    {dynamicFields.map(({ key, value, definition }) => (
-                      <div key={key} className="p-3 bg-muted/50 rounded">
-                        <p className="text-xs text-muted-foreground font-medium mb-1">
-                          {t(`entityFields.dynamic.${key}`, { defaultValue: definition?.label || key })}
-                        </p>
-                        <p className="font-medium">
-                          {Array.isArray(value) ? value.join(', ') : String(value)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Aliases */}
-              {character.aliases && character.aliases.length > 0 && (
-                <div>
-                  <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                    {t('entityFields.aliases')}
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {character.aliases.map((alias, idx) => (
-                      <span
-                        key={idx}
-                        className="px-3 py-1 bg-muted text-sm rounded-full text-muted-foreground"
-                      >
-                        {alias}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Action Tiles */}
-              <div className="pt-4 border-t grid grid-cols-2 gap-4">
+              <div className="pt-4 border-t flex flex-wrap gap-3">
                 <button
-                  onClick={() => setView('objects')}
-                  className="p-4 border rounded-lg hover:bg-muted transition-colors text-center"
+                  onClick={() => navigate(`/projects/${projectId}/entities/${character.id}?profile=${modelProfile}${branchId ? `&branch=${branchId}` : ''}`)}
+                  className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-muted"
                 >
+                  <ExternalLink className="h-4 w-4" />
+                  {t('ui.character.openProfile')}
+                </button>
+                <button onClick={() => setView('objects')} className="flex-1 min-w-32 p-4 border rounded-lg hover:bg-muted transition-colors text-center">
                   <div className="font-semibold mb-1">{t('entities.types.object')}</div>
                   <p className="text-xs text-muted-foreground">{t('ui.common.viewDetails')}</p>
                 </button>
-                <button
-                  onClick={() => setView('abilities')}
-                  className="p-4 border rounded-lg hover:bg-muted transition-colors text-center"
-                >
+                <button onClick={() => setView('abilities')} className="flex-1 min-w-32 p-4 border rounded-lg hover:bg-muted transition-colors text-center">
                   <div className="font-semibold mb-1">{t('ui.abilities.title')}</div>
                   <p className="text-xs text-muted-foreground">{t('ui.common.viewDetails')}</p>
                 </button>
               </div>
             </div>
           )}
-
-          {view === 'objects' && (
-            <ObjectsPanel character={character} onBack={() => setView('detail')} />
-          )}
-
-          {view === 'abilities' && (
-            <AbilitiesPanel
-              character={character}
-              projectId={projectId}
-              modelProfile={modelProfile}
-              branchId={branchId}
-              onBack={() => setView('detail')}
-            />
-          )}
+          {view === 'objects' && <ObjectsPanel character={character} onBack={() => setView('detail')} />}
+          {view === 'abilities' && <AbilitiesPanel character={character} projectId={projectId} modelProfile={modelProfile} branchId={branchId} onBack={() => setView('detail')} />}
         </div>
       </div>
     </div>,
-    mountNode
+    mountNode,
   )
 }

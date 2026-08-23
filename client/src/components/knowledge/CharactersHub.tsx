@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { GitBranch, Plus } from 'lucide-react'
+import { GitBranch, Plus, Search } from 'lucide-react'
 import { useBranchStore } from '@/stores/branchStore'
 import { useEntityStore } from '@/stores/entityStore'
 import type { Entity } from '@/stores/entityStore'
@@ -8,6 +8,12 @@ import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import { shouldUseProfileBranch } from '@/lib/extractionModels'
 import CharacterTile from './CharacterTile'
 import CharacterDetailModal from './CharacterDetailModal'
+import {
+  getPopulatedCharacterFields,
+  isDynamicCharacterProfile,
+  loadCharacterFieldSchema,
+  type CharacterFieldDefinition,
+} from '@/lib/characterSchema'
 import CharacterEditModal from './CharacterEditModal'
 
 interface CharactersHubProps {
@@ -31,11 +37,30 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedCharacter, setSelectedCharacter] = useState<Entity | null>(null)
   const [isCreating, setIsCreating] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [dynamicFields, setDynamicFields] = useState<CharacterFieldDefinition[]>([])
+  const [dynamicSchemaLoading, setDynamicSchemaLoading] = useState(false)
   const createInProgressRef = useRef(false)
 
   useEffect(() => {
     setSelectedVersion(shouldUseProfileBranch(modelProfile) ? 'branch' : 'main')
   }, [modelProfile])
+
+  useEffect(() => {
+    setSearchTerm('')
+    if (!isDynamicCharacterProfile(modelProfile)) {
+      setDynamicFields([])
+      return
+    }
+    setDynamicSchemaLoading(true)
+    loadCharacterFieldSchema(projectId, modelProfile)
+      .then(setDynamicFields)
+      .catch(error => {
+        console.error('Failed to load character field schema:', error)
+        setDynamicFields([])
+      })
+      .finally(() => setDynamicSchemaLoading(false))
+  }, [projectId, modelProfile])
 
   // Get characters for selected version (Main or Branch)
   const mainCharacters = getMainOnlyEntities({ type: 'character' })
@@ -43,7 +68,19 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
   const branchId = selectedVersion === 'branch' && currentBranch?.profile === modelProfile
     ? currentBranch.id
     : null
-  const characters = selectedVersion === 'main' ? mainCharacters : branchCharacters
+  const versionCharacters = selectedVersion === 'main' ? mainCharacters : branchCharacters
+  const characters = useMemo(() => {
+    const query = searchTerm.trim().toLocaleLowerCase()
+    if (!query) return versionCharacters
+    return versionCharacters.filter(character => {
+      const populatedValues = getPopulatedCharacterFields(character, modelProfile, dynamicFields)
+        .map(field => Array.isArray(field.value) ? field.value.join(' ') : String(field.value))
+      const haystack = [character.name, ...(character.aliases || []), ...populatedValues]
+        .join(' ')
+        .toLocaleLowerCase()
+      return haystack.includes(query)
+    })
+  }, [dynamicFields, modelProfile, searchTerm, versionCharacters])
 
   const handleCharacterClick = (character: Entity) => {
     setSelectedCharacter(character)
@@ -151,23 +188,37 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
 
       {/* Character Tiles */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-4">
           <h2 className="text-lg font-semibold">
             {selectedVersion === 'main' ? t('branch.main') : currentBranch?.name}
           </h2>
-          <button
-            onClick={handleCreateNew}
-            disabled={isCreating}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            {t('entities.newCharacter')}
-          </button>
+          <div className="flex items-center gap-3">
+            <label className="relative block min-w-56">
+              <span className="sr-only">{t('ui.character.searchPlaceholder')}</span>
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                value={searchTerm}
+                onChange={event => setSearchTerm(event.target.value)}
+                placeholder={t('ui.character.searchPlaceholder')}
+                className="w-full ps-9 pe-3 py-2 border rounded-md bg-background text-sm"
+              />
+            </label>
+            <button
+              onClick={handleCreateNew}
+              disabled={isCreating || dynamicSchemaLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              {t('entities.newCharacter')}
+            </button>
+          </div>
         </div>
 
         {characters.length === 0 ? (
           <div className="border-2 border-dashed rounded-lg p-12 text-center">
-            <p className="text-muted-foreground">{t('entities.emptyCharacters')}</p>
+            <p className="text-muted-foreground">
+              {searchTerm.trim() ? t('ui.character.noSearchResults') : t('entities.emptyCharacters')}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -176,6 +227,7 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
                 key={character.id}
                 character={character}
                 modelProfile={modelProfile}
+                definitions={dynamicFields}
                 onClick={() => handleCharacterClick(character)}
                 onEditClick={(e) => handleEditClick(e, character)}
               />
@@ -191,6 +243,7 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
           character={selectedCharacter}
           projectId={projectId}
           modelProfile={modelProfile}
+          definitions={dynamicFields}
           branchId={branchId}
           onClose={handleCloseDetailModal}
         />
