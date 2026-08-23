@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
 
-export const DYNAMIC_CHARACTER_PROFILE: ExtractionModelProfile = 'sub-base-locations'
+export const DYNAMIC_CHARACTER_PROFILE = 'sub-base-locations' as const
 
 export type CharacterFieldType = 'text' | 'long_text' | 'number' | 'boolean' | 'select' | 'multi_select'
 

@@ -85,6 +85,16 @@ export default function CharacterEditModal({
   }, [dynamicFields, isDynamicProfile, populatedDynamicKeys])
   const dynamicGroups = useMemo(() => {
     const groups = new Map<string, CharacterFieldDefinition[]>()
+    groups.set('זהות', [{
+      model_profile: DYNAMIC_CHARACTER_PROFILE,
+      field_key: 'name',
+      label: 'שם פרטי',
+      field_type: 'text',
+      group_key: 'זהות',
+      options: [],
+      is_active: true,
+      sort_order: 0,
+    }])
     for (const field of visibleDynamicFields) {
       const group = groups.get(field.group_key) || []
       group.push(field)

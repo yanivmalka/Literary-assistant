@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS public.knowledge_character_field_definitions (
   project_id UUID NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
   model_profile TEXT NOT NULL DEFAULT 'sub-base-locations'
     CHECK (model_profile = 'sub-base-locations'),
-  field_key TEXT NOT NULL CHECK (field_key ~ '^[a-z][a-z0-9_\\-]{0,80}$'),
+  field_key TEXT NOT NULL CHECK (field_key ~ '^[a-z][a-z0-9_\-]{0,80}$'),
   label TEXT NOT NULL,
   field_type TEXT NOT NULL CHECK (field_type IN ('text', 'long_text', 'number', 'boolean', 'select', 'multi_select')),
   group_key TEXT NOT NULL DEFAULT 'custom',

@@ -146,27 +146,6 @@ export function buildStructuredFields(
   fields.description = entity.description || entity.significance || null;
 
   if (type === "character") {
-    fields.age = entity.age || null;
-    fields.gender = entity.gender || null;
-    fields.height = entity.height || null;
-    fields.hair_color = entity.hair_color || null;
-    fields.eye_color = entity.eye_color || null;
-    fields.face_structure = entity.face_structure || null;
-    fields.cheekbones = null;
-    fields.eye_shape = null;
-    fields.forehead = null;
-    fields.nose = null;
-    fields.beard_mustache = null;
-    fields.common_clothing = entity.common_clothing || null;
-    fields.jewelry = null;
-    fields.scars = entity.scars || null;
-    fields.tattoos = entity.tattoos || null;
-    fields.other_visual_features = null;
-    fields.narrative_role = entity.narrative_role || null;
-    fields.narrative_impact = null;
-
-    // Dynamic character fields are deliberately profile-scoped. They are
-    // omitted when absent instead of becoming empty null placeholders.
     if (profile === "sub-base-locations") {
       const entityAttributes = entity.attributes || {};
       const dynamicFields = entity.character_fields
@@ -176,6 +155,25 @@ export function buildStructuredFields(
       for (const [key, value] of Object.entries(dynamicFields)) {
         if (allowedKeys.has(key) && hasExtractedValue(value)) fields[key] = value;
       }
+    } else {
+      fields.age = entity.age || null;
+      fields.gender = entity.gender || null;
+      fields.height = entity.height || null;
+      fields.hair_color = entity.hair_color || null;
+      fields.eye_color = entity.eye_color || null;
+      fields.face_structure = entity.face_structure || null;
+      fields.cheekbones = null;
+      fields.eye_shape = null;
+      fields.forehead = null;
+      fields.nose = null;
+      fields.beard_mustache = null;
+      fields.common_clothing = entity.common_clothing || null;
+      fields.jewelry = null;
+      fields.scars = entity.scars || null;
+      fields.tattoos = entity.tattoos || null;
+      fields.other_visual_features = null;
+      fields.narrative_role = entity.narrative_role || null;
+      fields.narrative_impact = null;
     }
   } else if (type === "location") {
     if (profile !== "sub-base-locations") {

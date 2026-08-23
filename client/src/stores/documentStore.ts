@@ -425,7 +425,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         const invalidProfileResponse = typeof data?.error === 'string'
           && /invalid model_profile/i.test(data.error)
         if (!error && !data?.success && invalidProfileResponse) {
-          const legacyProfile = getLegacyExtractionModelProfile(modelProfile)
+          const legacyProfile = getLegacyExtractionModelProfile(
+            modelProfile,
+            extractionMode === 'bootstrap' ? 'bootstrap' : 'branch',
+          )
           if (requestModelProfile !== legacyProfile) {
             requestModelProfile = legacyProfile
             console.warn(

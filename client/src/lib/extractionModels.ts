@@ -34,7 +34,11 @@ export type LegacyExtractionModelProfile = 'current' | 'development'
  */
 export function getLegacyExtractionModelProfile(
   profile: ExtractionModelProfile,
+  extractionMode: 'bootstrap' | 'branch' = 'branch',
 ): LegacyExtractionModelProfile {
+  // Older Edge Functions require `current` for bootstrap runs because those
+  // runs have no target Branch. Development is valid only for Branch runs.
+  if (extractionMode === 'bootstrap') return 'current'
   return profile === 'sub-base' ? 'current' : 'development'
 }
 
