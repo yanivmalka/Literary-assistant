@@ -1318,30 +1318,6 @@ Deno.serve(async (req) => {
     }
 
     let quillCharge;
-    try {
-      quillCharge = await consumeGeminiUsage(
-        supabase,
-        authenticatedUser.id,
-        usage,
-        "extract-knowledge",
-        {
-          project_id: body.project_id,
-          document_id: body.document_id,
-          version_id: body.version_id,
-          extraction_run_id: extractionRunId,
-          offset,
-          model: modelUsed,
-        },
-        `extract:${extractionRunId ?? body.version_id}:${offset}`,
-      );
-    } catch (chargeError) {
-      const chargeMessage = chargeError instanceof Error ? chargeError.message : "Quill consumption failed";
-      if (chargeMessage.includes("INSUFFICIENT_QUILLS")) {
-        return errorResponse("INSUFFICIENT_QUILLS", 402);
-      }
-      console.error("[extract-knowledge] Quill consumption failed:", chargeMessage);
-      return errorResponse("Failed to update Quill balance", 500, chargeMessage);
-    }
 
     // ==============================
     // Step 4: Save raw extraction
@@ -2027,6 +2003,31 @@ Deno.serve(async (req) => {
       ].join(", ");
       console.error(`[extract-knowledge] ${message} ${details}`);
       return errorResponse(message, 422, details);
+    }
+
+    try {
+      quillCharge = await consumeGeminiUsage(
+        supabase,
+        authenticatedUser.id,
+        usage,
+        "extract-knowledge",
+        {
+          project_id: body.project_id,
+          document_id: body.document_id,
+          version_id: body.version_id,
+          extraction_run_id: extractionRunId,
+          offset,
+          model: modelUsed,
+        },
+        `extract:${extractionRunId ?? body.version_id}:${offset}`,
+      );
+    } catch (chargeError) {
+      const chargeMessage = chargeError instanceof Error ? chargeError.message : "Quill consumption failed";
+      if (chargeMessage.includes("INSUFFICIENT_QUILLS")) {
+        return errorResponse("INSUFFICIENT_QUILLS", 402);
+      }
+      console.error("[extract-knowledge] Quill consumption failed after successful persistence:", chargeMessage);
+      return errorResponse("Failed to update Quill balance", 500, chargeMessage);
     }
 
     // ==============================
