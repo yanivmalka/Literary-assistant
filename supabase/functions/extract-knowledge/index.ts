@@ -1273,7 +1273,7 @@ Deno.serve(async (req) => {
           offset,
           model: modelUsed,
         },
-        `extract:${extractionRunId ?? `${body.version_id}:${offset}`}`,
+        `extract:${extractionRunId ?? body.version_id}:${offset}`,
       );
     } catch (chargeError) {
       const chargeMessage = chargeError instanceof Error ? chargeError.message : "Quill consumption failed";
