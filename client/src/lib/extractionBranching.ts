@@ -12,10 +12,7 @@
 import { supabase } from '@/lib/supabase'
 import { LEGACY_BOOTSTRAP_CANONICAL_NAME } from '@/lib/mainLayer'
 import {
-  DEFAULT_EXTRACTION_STRATEGY,
-  isExtractionStrategy,
   type ExtractionModelProfile,
-  type ExtractionStrategy,
 } from '@/lib/extractionModels'
 
 export interface BranchEntityData {
@@ -155,7 +152,6 @@ export function buildExtractionRequest(
   branchId: string | null,
   offset: number,
   limit: number,
-  extractionStrategy: ExtractionStrategy = DEFAULT_EXTRACTION_STRATEGY,
 ): Record<string, unknown> {
   // If branchId is null, signal to Edge Function to use Main (bootstrap mode)
   // If branchId is provided, use Branch
@@ -170,9 +166,6 @@ export function buildExtractionRequest(
     user_id: userId,
     target_branch_id: branchId || null,  // null = use Main (bootstrap)
     use_main: branchId === null,         // explicit flag for Edge Function
-    extraction_strategy: isExtractionStrategy(extractionStrategy)
-      ? extractionStrategy
-      : DEFAULT_EXTRACTION_STRATEGY,
     offset,
     limit,
   }

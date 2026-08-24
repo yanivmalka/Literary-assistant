@@ -55,26 +55,20 @@ import {
   parseExtractionJson,
   cloneJsonValue,
   normalizeExtractionPayload,
+  adaptSubBaseCSerialExtraction,
   validateExtractionMode,
   validateExtractionPayload,
   validateExtractionStrategy,
-  isParallelExpertsRolloutEnabled,
-  validateExtractionStrategyRollout,
-  PARALLEL_EXPERTS_ROLLOUT_ENV,
   type ExtractionStrategy,
 } from "./testable-pipeline.ts";
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
 import { buildAbilityLinks, mergeAbilityLinkEntries } from "../_shared/ability-links.ts";
 import type { AbilityLinkEntity } from "../_shared/ability-links.ts";
 import { buildSkippedBatchResponse, getExtractionSkipReason } from "./skip-policy.ts";
-import { executeParallelExpertExtraction } from "../_shared/parallel-expert-merger.ts";
 import {
   fingerprintShadowInput,
   persistShadowComparison,
   validateBaselineScope,
-  validateShadowExecutionGuard,
-  SHADOW_COMPARISON_PROFILE,
-  SHADOW_COMPARISON_STRATEGY,
   type BaselineRawExtraction,
 } from "../_shared/shadow-comparison.ts";
 
@@ -1112,30 +1106,6 @@ Deno.serve(async (req) => {
       return errorResponse(`Invalid extraction strategy: ${strategyValidation.error}`, 400);
     }
     const extractionStrategy: ExtractionStrategy = strategyValidation.strategy;
-    if (modelProfile === "sub-base-c-characters" && extractionStrategy !== "parallel-experts") {
-      return errorResponse(
-        "sub-base-c-characters requires the explicit parallel-experts strategy; legacy-sequential remains unchanged for existing profiles.",
-        400,
-      );
-    }
-    if (shadowOnly) {
-      const shadowGuard = validateShadowExecutionGuard({
-        shadow_only: true,
-        model_profile: modelProfile,
-        extraction_strategy: extractionStrategy,
-        baseline_raw_extraction_id: body.baseline_raw_extraction_id,
-        shadow_run_id: shadowRunId,
-      });
-      if (!shadowGuard.ok) return errorResponse(`Invalid shadow comparison request: ${shadowGuard.errors.join("; ")}`, 400);
-      if (modelProfile !== SHADOW_COMPARISON_PROFILE || extractionStrategy !== SHADOW_COMPARISON_STRATEGY) {
-        return errorResponse("Shadow comparison is restricted to the isolated Sub-base C parallel strategy.", 400);
-      }
-    }
-    const rolloutValidation = validateExtractionStrategyRollout(
-      extractionStrategy,
-      isParallelExpertsRolloutEnabled(Deno.env.get(PARALLEL_EXPERTS_ROLLOUT_ENV)),
-    );
-    if (!rolloutValidation.ok) return errorResponse(rolloutValidation.error, 403);
 
     // ==============================
     // Validation: Main vs Branch extraction mode
@@ -1426,76 +1396,7 @@ Deno.serve(async (req) => {
     let modelUsed: string;
     let latencyMs: number;
     let usage: Record<string, unknown>;
-    let expertModels: Array<{
-      id: string;
-      role: string;
-      window_id: string;
-      model: string | null;
-      primary_model: string | null;
-      artifact_contract: string;
-      fallback_chain: Array<Record<string, unknown>>;
-    }> = [];
-
-    if (extractionStrategy === "parallel-experts") {
-      if (!extractionRunId) {
-        return errorResponse("parallel-experts requires extraction_run_id so specialist artifacts can be resumed safely.", 400);
-      }
-      try {
-        const merged = await executeParallelExpertExtraction({
-          supabase,
-          api_key: geminiApiKey,
-          project_id: body.project_id,
-          document_id: body.document_id,
-          version_id: body.version_id,
-          user_id: body.user_id,
-          extraction_run_id: extractionRunId,
-          branch_id: targetBranchId,
-          model_profile: modelProfile,
-          project_place_fields: projectPlaceFields,
-          project_character_fields: projectCharacterFields,
-          chunks: chunkData,
-          offset,
-          limit,
-        });
-        extraction = merged.extraction as GeminiExtraction;
-        expertModels = merged.expert_models;
-        modelUsed = merged.model;
-        latencyMs = merged.latency_ms;
-        usage = {
-          promptTokenCount: merged.usage.input_tokens,
-          candidatesTokenCount: merged.usage.output_tokens,
-          thoughtsTokenCount: merged.usage.thinking_tokens,
-          cachedContentTokenCount: merged.usage.cached_tokens,
-          totalTokenCount: merged.usage.total_tokens,
-        };
-        const parallelValidation = validateExtractionPayload(extraction);
-        if (!parallelValidation.valid) {
-          throw new Error(`Merged parallel extraction is invalid: ${parallelValidation.errors.join("; ")}`);
-        }
-        storageSafeExtraction = cloneJsonValue(extraction) as GeminiExtraction | null;
-        if (!storageSafeExtraction) {
-          throw new Error("Merged parallel extraction could not be serialized as JSON.");
-        }
-      } catch (parallelError) {
-        const message = parallelError instanceof Error ? parallelError.message : "Parallel expert execution failed";
-        console.error(
-          "[extract-knowledge] Parallel expert execution failed",
-          JSON.stringify({
-            response_status: 200,
-            error_status: 502,
-            extraction_run_id: extractionRunId,
-            version_id: body.version_id,
-            offset,
-            limit,
-            model_profile: modelProfile,
-            extraction_strategy: extractionStrategy,
-            error: message,
-          }),
-        );
-        return errorResponse(message, 502);
-      }
-    } else {
-      const geminiResult = await callGeminiWithFallback(
+    const geminiResult = await callGeminiWithFallback(
       {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
@@ -1559,7 +1460,10 @@ Deno.serve(async (req) => {
     }
 
     const parsedExtraction = parseExtractionJson<unknown>(responseText);
-    const normalizedExtraction = normalizeExtractionPayload<GeminiExtraction>(parsedExtraction);
+    const normalizedPayload = normalizeExtractionPayload<GeminiExtraction>(parsedExtraction);
+    const normalizedExtraction = modelProfile === "sub-base-c-characters" && normalizedPayload
+      ? adaptSubBaseCSerialExtraction(normalizedPayload) as GeminiExtraction | null
+      : normalizedPayload;
     if (!normalizedExtraction) {
       const message = "Gemini returned JSON that does not match the extraction schema.";
       console.error(`[extract-knowledge] ${message} offset=${offset}`);
@@ -1594,7 +1498,6 @@ Deno.serve(async (req) => {
       console.error(`[extract-knowledge] ${message} offset=${offset}`);
       return errorResponse(message, 422);
     }
-    }
 
     if (shadowOnly) {
       if (!baselineRawExtraction || !storageSafeExtraction || !shadowInputFingerprint || !shadowRunId) {
@@ -1628,8 +1531,8 @@ Deno.serve(async (req) => {
           candidate_model_profile: modelProfile,
           candidate_extraction_strategy: extractionStrategy,
           candidate_model: modelUsed,
-          candidate_primary_model: expertModels[0]?.primary_model ?? null,
-          candidate_fallback_chain: expertModels,
+          candidate_primary_model: null,
+          candidate_fallback_chain: [],
           input_tokens: Number((usage as Record<string, unknown>).promptTokenCount ?? 0),
           output_tokens: Number((usage as Record<string, unknown>).candidatesTokenCount ?? 0),
           thinking_tokens: Number((usage as Record<string, unknown>).thoughtsTokenCount ?? 0),
@@ -1649,7 +1552,7 @@ Deno.serve(async (req) => {
               model: modelUsed,
               model_profile: modelProfile,
               extraction_strategy: extractionStrategy,
-              expert_models: expertModels,
+              expert_models: [],
               input_tokens: usage.promptTokenCount ?? null,
               output_tokens: usage.candidatesTokenCount ?? null,
               thinking_tokens: usage.thoughtsTokenCount ?? null,
@@ -2481,7 +2384,7 @@ Deno.serve(async (req) => {
           model: modelUsed,
           model_profile: modelProfile,
           extraction_strategy: extractionStrategy,
-          expert_models: expertModels,
+          expert_models: [],
           input_tokens: (usage as Record<string, unknown>).promptTokenCount ?? null,
           output_tokens: (usage as Record<string, unknown>).candidatesTokenCount ?? null,
           thinking_tokens: (usage as Record<string, unknown>).thoughtsTokenCount ?? null,

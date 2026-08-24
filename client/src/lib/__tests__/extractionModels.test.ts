@@ -1,16 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
-  DEFAULT_EXTRACTION_STRATEGY,
-  getStoredExtractionStrategy,
-  isExtractionStrategy,
-  setStoredExtractionStrategy,
+  EXTRACTION_MODEL_PROFILES,
+  getStoredExtractionModelProfile,
+  setStoredExtractionModelProfile,
 } from '../extractionModels'
 
-describe('extraction strategy selection', () => {
-  const values = new Map<string, string>()
+describe('extraction model profile selection', () => {
+  it('exposes only the four supported sub-base profiles', () => {
+    expect(EXTRACTION_MODEL_PROFILES).toEqual([
+      'sub-base',
+      'sub-base-2',
+      'sub-base-locations',
+      'sub-base-c-characters',
+    ])
+  })
 
-  beforeEach(() => {
-    values.clear()
+  it('persists a selected sub-base profile', () => {
+    const values = new Map<string, string>()
     vi.stubGlobal('window', {
       sessionStorage: {
         getItem: (key: string) => values.get(key) ?? null,
@@ -18,22 +24,9 @@ describe('extraction strategy selection', () => {
       },
       dispatchEvent: vi.fn(),
     })
-  })
 
-  afterEach(() => {
+    setStoredExtractionModelProfile('sub-base-c-characters')
+    expect(getStoredExtractionModelProfile()).toBe('sub-base-c-characters')
     vi.unstubAllGlobals()
-  })
-
-  it('defaults missing and invalid stored values to legacy sequential', () => {
-    expect(getStoredExtractionStrategy()).toBe(DEFAULT_EXTRACTION_STRATEGY)
-    values.set('literary-assistant.extraction-strategy', 'invalid')
-    expect(getStoredExtractionStrategy()).toBe('legacy-sequential')
-  })
-
-  it('persists the manually selected parallel strategy independently', () => {
-    expect(isExtractionStrategy('parallel-experts')).toBe(true)
-    setStoredExtractionStrategy('parallel-experts')
-    expect(values.get('literary-assistant.extraction-strategy')).toBe('parallel-experts')
-    expect(getStoredExtractionStrategy()).toBe('parallel-experts')
   })
 })

@@ -310,7 +310,11 @@ export interface ProjectPlaceFieldPromptDefinition {
 export function buildSubBaseCCharactersInstructions(
   dynamicCharacterFields: DynamicCharacterFieldPromptDefinition[] = [],
 ): string {
-  const sections = [CHARACTER_PROFILE_INSTRUCTIONS];
+  const sections = [CHARACTER_PROFILE_INSTRUCTIONS, `=== SERIAL EXTRACTION OUTPUT CONTRACT ===
+This profile runs as one serial extraction call per chunk window; do not use the parallel-experts contract, artifact fields, role fields, or window metadata.
+Return the common schema_version "2" object with an entities array. For every character entity, put first_name, last_name, all populated character fields, and character_field_observations inside attributes.
+Each character_field_observations entry must be an array of objects with value, evidence (short exact quotes or objects containing quote and chunk_position), confidence, inferred, and inference_note. Keep the character's entity type equal to "character".
+Return character-to-character relationships in the common relationships array using source, target, type, evidence, source_references, and chunk_positions. Do not return a separate characters array or a parallel specialist wrapper.`];
   if (dynamicCharacterFields.length > 0) {
     sections.push(`=== PROJECT-SPECIFIC CHARACTER FIELDS ===
 Return these fields only when the source supports them. Keep the exact field_key and include the same evidence/confidence/inferred metadata as fixed fields.

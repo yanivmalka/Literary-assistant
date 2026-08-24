@@ -25,7 +25,6 @@ describe('AI extraction branch routing', () => {
       user_id: 'u1',
       target_branch_id: 'branch-1',
       use_main: false,
-      extraction_strategy: 'legacy-sequential',
       offset: 0,
       limit: 2,
     })
@@ -39,17 +38,9 @@ describe('AI extraction branch routing', () => {
       user_id: 'u1',
       target_branch_id: null,
       use_main: true,
-      extraction_strategy: 'legacy-sequential',
       offset: 0,
       limit: 2,
     })
-  })
-
-  it('forwards an explicitly selected strategy without changing the default', () => {
-    expect(buildExtractionRequest('v1', 'p1', 'd1', 'u1', 'branch-1', 0, 2, 'parallel-experts').extraction_strategy)
-      .toBe('parallel-experts')
-    expect(buildExtractionRequest('v1', 'p1', 'd1', 'u1', 'branch-1', 0, 2, 'invalid' as never).extraction_strategy)
-      .toBe('legacy-sequential')
   })
 
   it('creates a new AI entity as Branch-only, never Main', () => {

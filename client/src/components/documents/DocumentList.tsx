@@ -6,13 +6,9 @@ import ProcessingStatus from './ProcessingStatus'
 import ExtractionProgress from './ExtractionProgress'
 import {
   EXTRACTION_MODEL_PROFILES,
-  EXTRACTION_STRATEGIES,
   getStoredExtractionModelProfile,
-  getStoredExtractionStrategy,
   setStoredExtractionModelProfile,
-  setStoredExtractionStrategy,
   type ExtractionModelProfile,
-  type ExtractionStrategy,
 } from '@/lib/extractionModels'
 
 interface DocumentListProps {
@@ -34,9 +30,6 @@ export default function DocumentList({ projectId }: DocumentListProps) {
   const { t } = useTranslation()
   const [selectedModelProfile, setSelectedModelProfile] = useState<ExtractionModelProfile>(
     getStoredExtractionModelProfile,
-  )
-  const [selectedExtractionStrategy, setSelectedExtractionStrategy] = useState<ExtractionStrategy>(
-    getStoredExtractionStrategy,
   )
   const {
     documents,
@@ -89,14 +82,11 @@ export default function DocumentList({ projectId }: DocumentListProps) {
 
     console.log('[Knowledge] Manual extraction triggered for', doc.name)
     setStoredExtractionModelProfile(selectedModelProfile)
-    setStoredExtractionStrategy(selectedExtractionStrategy)
     await triggerEntityExtraction(
       doc.latest_version.id,
       projectId,
       doc.id,
       selectedModelProfile,
-      undefined,
-      selectedExtractionStrategy,
     )
   }
 
@@ -154,32 +144,6 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                     {EXTRACTION_MODEL_PROFILES.map(profile => (
                       <option key={profile} value={profile}>
                         {t(`ui.documents.modelProfiles.${profile}`)}
-                      </option>
-                    ))}
-                  </select>
-                  <label htmlFor={`extraction-strategy-${doc.id}`} className="sr-only">
-                    {t('ui.documents.extractionStrategy')}
-                  </label>
-                  <select
-                    id={`extraction-strategy-${doc.id}`}
-                    name={`extraction-strategy-${doc.id}`}
-                    autoComplete="off"
-                    value={selectedExtractionStrategy}
-                    onChange={event => {
-                      const strategy = event.target.value as ExtractionStrategy
-                      if (strategy === 'parallel-experts' && !window.confirm(t('ui.documents.parallelExpertsWarning'))) {
-                        return
-                      }
-                      setSelectedExtractionStrategy(strategy)
-                      setStoredExtractionStrategy(strategy)
-                    }}
-                    disabled={extractionInProgress || hasPausedExtraction}
-                    className="max-w-40 rounded border bg-background px-2 py-1 text-xs text-foreground disabled:opacity-50"
-                    title={t('ui.documents.extractionStrategy')}
-                  >
-                    {EXTRACTION_STRATEGIES.map(strategy => (
-                      <option key={strategy} value={strategy}>
-                        {t(`ui.documents.extractionStrategies.${strategy}`)}
                       </option>
                     ))}
                   </select>

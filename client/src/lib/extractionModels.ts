@@ -4,19 +4,6 @@ export type ExtractionModelProfile =
   | 'sub-base-locations'
   | 'sub-base-c-characters'
 
-export type ExtractionStrategy = 'legacy-sequential' | 'parallel-experts'
-
-export const DEFAULT_EXTRACTION_STRATEGY: ExtractionStrategy = 'legacy-sequential'
-
-export const EXTRACTION_STRATEGIES: readonly ExtractionStrategy[] = [
-  'legacy-sequential',
-  'parallel-experts',
-]
-
-export function isExtractionStrategy(value: unknown): value is ExtractionStrategy {
-  return EXTRACTION_STRATEGIES.includes(value as ExtractionStrategy)
-}
-
 export const DEFAULT_EXTRACTION_MODEL_PROFILE: ExtractionModelProfile = 'sub-base'
 
 export const EXTRACTION_MODEL_PROFILES: readonly ExtractionModelProfile[] = [
@@ -28,8 +15,6 @@ export const EXTRACTION_MODEL_PROFILES: readonly ExtractionModelProfile[] = [
 
 const EXTRACTION_MODEL_PROFILE_STORAGE_KEY = 'literary-assistant.extraction-model-profile'
 export const EXTRACTION_MODEL_PROFILE_CHANGED_EVENT = 'literary-assistant.extraction-model-profile-changed'
-const EXTRACTION_STRATEGY_STORAGE_KEY = 'literary-assistant.extraction-strategy'
-export const EXTRACTION_STRATEGY_CHANGED_EVENT = 'literary-assistant.extraction-strategy-changed'
 
 export function getStoredExtractionModelProfile(): ExtractionModelProfile {
   if (typeof window === 'undefined') return DEFAULT_EXTRACTION_MODEL_PROFILE
@@ -45,24 +30,12 @@ export function setStoredExtractionModelProfile(profile: ExtractionModelProfile)
   window.dispatchEvent(new Event(EXTRACTION_MODEL_PROFILE_CHANGED_EVENT))
 }
 
-export function getStoredExtractionStrategy(): ExtractionStrategy {
-  if (typeof window === 'undefined') return DEFAULT_EXTRACTION_STRATEGY
-  const stored = window.sessionStorage.getItem(EXTRACTION_STRATEGY_STORAGE_KEY)
-  return isExtractionStrategy(stored) ? stored : DEFAULT_EXTRACTION_STRATEGY
-}
-
-export function setStoredExtractionStrategy(strategy: ExtractionStrategy): void {
-  if (typeof window === 'undefined') return
-  window.sessionStorage.setItem(EXTRACTION_STRATEGY_STORAGE_KEY, strategy)
-  window.dispatchEvent(new Event(EXTRACTION_STRATEGY_CHANGED_EVENT))
-}
-
 export type LegacyExtractionModelProfile = 'current' | 'development'
 
 /**
  * Maps canonical profile IDs to the names used by older deployed Edge Functions.
- * The locations profile has no legacy equivalent, so it uses the development
- * profile's compatible server behavior until the Edge Function is upgraded.
+ * The locations and C profiles have no legacy equivalent, so they use the
+ * development profile's compatible server behavior until the Edge Function is upgraded.
  */
 export function getLegacyExtractionModelProfile(
   profile: ExtractionModelProfile,

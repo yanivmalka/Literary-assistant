@@ -6,6 +6,7 @@ import {
 import {
   parseExtractionJson,
   normalizeExtractionPayload,
+  adaptSubBaseCSerialExtraction,
   validateExtractionMode,
   validateExtractionStrategy,
 } from '../../../../../supabase/functions/extract-knowledge/testable-pipeline.ts'
@@ -186,13 +187,58 @@ describe('Entity Extraction automatic checks (in-memory fixtures)', () => {
     })
   })
 
-  it('[validation] defaults missing extraction strategy to legacy-sequential and rejects unknown strategies', () => {
+  it('[sub-base-c] adapts serial character fields and provenance for the C normalizer', () => {
+    const normalized = normalizeExtractionPayload({
+      schema_version: '2',
+      entities: [{
+        name: 'Leah Frost',
+        type: 'character',
+        attributes: {
+          first_name: 'Leah',
+          last_name: 'Frost',
+          hair_color: 'black',
+          character_field_observations: {
+            hair_color: [{
+              value: 'black',
+              evidence: [{ quote: 'her black hair', chunk_position: 2 }],
+              confidence: 0.92,
+              inferred: false,
+              inference_note: null,
+            }],
+          },
+        },
+        evidence: ['her black hair'],
+        chunk_positions: [2],
+      }],
+      relationships: [],
+      events: [],
+    })
+    const adapted = adaptSubBaseCSerialExtraction(normalized)
+    expect(adapted?.characters).toHaveLength(1)
+    expect(adapted?.characters?.[0]).toMatchObject({
+      name: 'Leah Frost',
+      type: 'character',
+      attributes: {
+        first_name: 'Leah',
+        last_name: 'Frost',
+        hair_color: 'black',
+      },
+    })
+    expect((adapted?.characters?.[0] as Record<string, any>).attributes.character_field_observations.hair_color[0].value)
+      .toBe('black')
+  })
+
+
+  it('[validation] defaults missing strategy to serial and rejects parallel/unknown strategies', () => {
     expect(validateExtractionStrategy(undefined)).toEqual({ ok: true, strategy: 'legacy-sequential' })
     expect(validateExtractionStrategy('legacy-sequential')).toEqual({ ok: true, strategy: 'legacy-sequential' })
-    expect(validateExtractionStrategy('parallel-experts')).toEqual({ ok: true, strategy: 'parallel-experts' })
+    expect(validateExtractionStrategy('parallel-experts')).toEqual({
+      ok: false,
+      error: 'Only the legacy-sequential extraction strategy is supported; parallel-experts has been removed.',
+    })
     expect(validateExtractionStrategy('unknown')).toEqual({
       ok: false,
-      error: "extraction_strategy must be 'legacy-sequential' or 'parallel-experts'.",
+      error: 'Only the legacy-sequential extraction strategy is supported; parallel-experts has been removed.',
     })
   })
 

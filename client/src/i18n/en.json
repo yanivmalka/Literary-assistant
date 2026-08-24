@@ -790,17 +790,11 @@
       "extractKnowledge": "Extract",
       "extractKnowledgeTitle": "Extract knowledge from this document",
       "modelProfile": "Extraction model",
-      "extractionStrategy": "Extraction strategy",
-      "parallelExpertsWarning": "Parallel Experts is experimental and uses multiple Gemini calls. It may consume more tokens. Continue?",
       "modelProfiles": {
         "sub-base": "Sub-base model",
         "sub-base-2": "Sub-base model 2",
         "sub-base-locations": "Sub-base model - Locations",
         "sub-base-c-characters": "Sub-base C model - Characters"
-      },
-      "extractionStrategies": {
-        "legacy-sequential": "Legacy Sequential",
-        "parallel-experts": "Parallel Experts (Experimental)"
       },
       "uploadNotAuthenticated": "Please log in before uploading a document",
       "uploadFailed": "The document upload failed. Please try again.",

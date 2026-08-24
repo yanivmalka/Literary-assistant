@@ -13,7 +13,6 @@
     "test:entities:all": "npm --prefix client run test:entities:all",
     "test:golden": "deno test --no-prompt --allow-net tests/golden-dataset.test.ts",
     "test:regression": "deno test --no-prompt --allow-net tests/regression-main-branch.test.ts",
-    "test:parallel": "deno test --no-prompt --allow-net tests/parallel-experts-contract.test.ts tests/parallel-expert-artifacts.test.ts tests/parallel-expert-runner.test.ts tests/parallel-expert-merger.test.ts && npm --prefix client run test:extraction-strategy",
     "test:verification": "npm run test:golden && npm run test:regression",
     "install:all": "npm install && npm install --prefix client && npm install --prefix server"
   },

@@ -790,17 +790,11 @@
       "extractKnowledge": "חלץ",
       "extractKnowledgeTitle": "חלץ ידע מהמסמך",
       "modelProfile": "מודל חילוץ",
-      "extractionStrategy": "אסטרטגיית חילוץ",
-      "parallelExpertsWarning": "מומחים במקביל היא אפשרות ניסיונית המשתמשת במספר קריאות Gemini ועלולה לצרוך יותר tokens. להמשיך?",
       "modelProfiles": {
         "sub-base": "מודל תת-בסיס",
         "sub-base-2": "מודל תת-בסיס 2",
         "sub-base-locations": "מודל תת-בסיס - מקומות",
         "sub-base-c-characters": "תת־בסיס C דמויות"
-      },
-      "extractionStrategies": {
-        "legacy-sequential": "חילוץ סדרתי",
-        "parallel-experts": "מומחים במקביל (ניסיוני)"
       },
       "uploadNotAuthenticated": "יש להתחבר לפני העלאת מסמך",
       "uploadFailed": "העלאת המסמך נכשלה. נסה שוב.",

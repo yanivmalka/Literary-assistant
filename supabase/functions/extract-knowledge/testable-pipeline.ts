@@ -6,7 +6,7 @@ import {
 
 export type ExtractionMode = 'bootstrap' | 'branch';
 
-export type ExtractionStrategy = 'legacy-sequential' | 'parallel-experts';
+export type ExtractionStrategy = 'legacy-sequential';
 
 export const DEFAULT_EXTRACTION_STRATEGY: ExtractionStrategy = 'legacy-sequential';
 
@@ -35,34 +35,14 @@ export type ExtractionStrategyValidationResult = {
 
 export function validateExtractionStrategy(value: unknown): ExtractionStrategyValidationResult {
   const strategy = value ?? DEFAULT_EXTRACTION_STRATEGY;
-  if (strategy === 'legacy-sequential' || strategy === 'parallel-experts') {
-    return { ok: true, strategy };
+  if (strategy === DEFAULT_EXTRACTION_STRATEGY) {
+    return { ok: true, strategy: DEFAULT_EXTRACTION_STRATEGY };
   }
 
   return {
     ok: false,
-    error: "extraction_strategy must be 'legacy-sequential' or 'parallel-experts'.",
+    error: "Only the legacy-sequential extraction strategy is supported; parallel-experts has been removed.",
   };
-}
-
-export const PARALLEL_EXPERTS_ROLLOUT_ENV = 'EXTRACTION_PARALLEL_EXPERTS_ENABLED';
-
-/** Server-side rollout is fail-closed: only the exact string "true" enables it. */
-export function isParallelExpertsRolloutEnabled(value: unknown): boolean {
-  return value === 'true';
-}
-
-export function validateExtractionStrategyRollout(
-  strategy: ExtractionStrategy,
-  rolloutEnabled: boolean,
-): { ok: true } | { ok: false; error: string } {
-  if (strategy === 'parallel-experts' && !rolloutEnabled) {
-    return {
-      ok: false,
-      error: 'parallel-experts is disabled. Enable EXTRACTION_PARALLEL_EXPERTS_ENABLED=true for an explicit rollout.',
-    };
-  }
-  return { ok: true };
 }
 
 /** Mirrors the handler's JSON cleanup and fallback object extraction without I/O. */
@@ -426,4 +406,83 @@ export function validateExtractionMode(request: ExtractionModeRequest): Extracti
     mode: mode || (useMain ? 'bootstrap' : 'branch'),
     branchId: hasBranchId ? request.target_branch_id! : null,
   };
+}
+
+/**
+ * Adapts serial Sub-base C output to the C normalizer contract.
+ *
+ * The generic serial schema may place character fields at the top level,
+ * under attributes, or under a `fields` object. C persistence needs the
+ * stable attributes.character_field_observations map so field provenance,
+ * inference flags, and first/last names survive normalization.
+ */
+export function adaptSubBaseCSerialExtraction(payload: unknown): Record<string, unknown[]> | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const record = payload as Record<string, unknown>;
+  const rawCharacters = Array.isArray(record.characters) ? record.characters : [];
+  const characters = rawCharacters
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
+    .map((candidate) => {
+      const attributes = candidate.attributes && typeof candidate.attributes === 'object' && !Array.isArray(candidate.attributes)
+        ? { ...(candidate.attributes as Record<string, unknown>) }
+        : {};
+      const observations = attributes.character_field_observations && typeof attributes.character_field_observations === 'object'
+        ? { ...(attributes.character_field_observations as Record<string, unknown>) }
+        : candidate.field_observations && typeof candidate.field_observations === 'object'
+          ? { ...(candidate.field_observations as Record<string, unknown>) }
+          : {};
+      const fields = candidate.fields && typeof candidate.fields === 'object' && !Array.isArray(candidate.fields)
+        ? candidate.fields as Record<string, unknown>
+        : {};
+
+      for (const [field, rawValue] of Object.entries(fields)) {
+        if (rawValue && typeof rawValue === 'object' && !Array.isArray(rawValue) && 'value' in rawValue) {
+          const observation = rawValue as Record<string, unknown>;
+          attributes[field] = observation.value;
+          observations[field] = [observation];
+        } else if (rawValue !== null && rawValue !== undefined) {
+          attributes[field] = rawValue;
+        }
+      }
+
+      const candidateFirstName = typeof candidate.first_name === 'string' ? candidate.first_name.trim() : '';
+      const candidateLastName = typeof candidate.last_name === 'string' ? candidate.last_name.trim() : '';
+      if (candidateFirstName && attributes.first_name == null) attributes.first_name = candidateFirstName;
+      if (candidateLastName && attributes.last_name == null) attributes.last_name = candidateLastName;
+
+      const fieldEvidence = candidate.field_evidence && typeof candidate.field_evidence === 'object' && !Array.isArray(candidate.field_evidence)
+        ? candidate.field_evidence as Record<string, unknown>
+        : {};
+      for (const [field, rawEvidence] of Object.entries(fieldEvidence)) {
+        if (observations[field] || attributes[field] == null || !Array.isArray(rawEvidence)) continue;
+        const evidence = rawEvidence
+          .filter((quote): quote is string => typeof quote === 'string' && quote.trim().length > 0)
+          .map((quote) => ({ quote }));
+        if (evidence.length > 0) {
+          observations[field] = [{
+            value: attributes[field],
+            evidence,
+            confidence: null,
+            inferred: false,
+            inference_note: null,
+          }];
+        }
+      }
+
+      attributes.character_field_observations = observations;
+      const firstName = typeof attributes.first_name === 'string' ? attributes.first_name.trim() : '';
+      const lastName = typeof attributes.last_name === 'string' ? attributes.last_name.trim() : '';
+      const name = typeof candidate.name === 'string' && candidate.name.trim()
+        ? candidate.name.trim()
+        : [firstName, lastName].filter(Boolean).join(' ');
+
+      return {
+        ...candidate,
+        name,
+        type: 'character',
+        attributes,
+      };
+    });
+
+  return { ...record, characters };
 }
