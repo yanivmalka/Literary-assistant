@@ -1,4 +1,7 @@
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { normalizeCharacterAge } from "../_shared/character-age.ts";
+import { buildSubBaseCCharactersInstructions } from "../_shared/rules/prompt.ts";
+import { adaptSubBaseCSerialExtraction } from "./testable-pipeline.ts";
 import {
   buildStructuredFields,
   normalizeEntities,
@@ -80,4 +83,95 @@ Deno.test("dynamic fields remain profile-scoped and legacy fields stay compatibl
   }, "sub-base");
   assertEquals(legacyFields.age, "30");
   assertEquals(legacyFields.custom_motto, undefined);
+});
+
+Deno.test("C age normalization accepts canonical numeric and narrow Hebrew forms", () => {
+  for (const [raw, expected] of [
+    [17, "17"],
+    ["17", "17"],
+    ["שבע־עשרה", "17"],
+    ["שבע עשרה", "17"],
+    ["שבע-עשרה", "17"],
+    ["בת שבע־עשרה", "17"],
+  ] as const) {
+    assertEquals(normalizeCharacterAge(raw), expected);
+  }
+  assertEquals(normalizeCharacterAge("נערה מהכפר שבע־עשרה, בעלת שיער שחור"), null);
+  assertEquals(normalizeCharacterAge("בת שבע־עשרה מהכפר"), null);
+});
+
+Deno.test("C adapter keeps age evidence separate and rejects compound age values", () => {
+  const adapted = adaptSubBaseCSerialExtraction({
+    characters: [{
+      name: "אליה",
+      age: "נערה מהכפר שבע־עשרה, בעלת שיער שחור",
+      attributes: {
+        first_name: "אליה",
+        character_field_observations: {
+          age: [
+            {
+              value: "בת שבע־עשרה",
+              evidence: [{ quote: "אליה, נערה בת שבע־עשרה, מהכפר רינור" }],
+              confidence: 0.8,
+              inferred: false,
+            },
+            {
+              value: "נערה מהכפר שבע־עשרה",
+              evidence: [{ quote: "נערה מהכפר שבע־עשרה" }],
+              confidence: 0.99,
+              inferred: false,
+            },
+          ],
+        },
+      },
+    }],
+  });
+
+  const entity = (adapted?.characters as Array<Record<string, unknown>>)[0];
+  const attributes = entity.attributes as Record<string, unknown>;
+  const observations = attributes.character_field_observations as Record<string, Array<Record<string, unknown>>>;
+  assertEquals(attributes.age, "17");
+  assertEquals(observations.age.map((observation) => observation.value), ["17", null]);
+  assertEquals((observations.age[0].evidence as Array<Record<string, unknown>>)[0].quote, "אליה, נערה בת שבע־עשרה, מהכפר רינור");
+});
+
+Deno.test("C normalization aligns canonical age with the strongest explicit observation", () => {
+  const extraction = {
+    characters: [character({
+      description: "נערה מהכפר שבע עשרה",
+      attributes: {
+        first_name: "אליה",
+        age: "נערה מהכפר שבע־עשרה, בעלת שיער שחור",
+        character_field_observations: {
+          age: [
+            {
+              value: "נערה מהכפר שבע־עשרה",
+              evidence: [{ quote: "נערה מהכפר שבע־עשרה" }],
+              confidence: 0.99,
+              inferred: false,
+            },
+            {
+              value: "בת שבע־עשרה",
+              evidence: [{ quote: "אליה, נערה בת שבע־עשרה" }],
+              confidence: 0.7,
+              inferred: false,
+            },
+          ],
+        },
+      },
+    })],
+  } as unknown as GeminiExtraction;
+  const [entity] = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+
+  assertEquals(entity.structured_fields.age, "17");
+  assertEquals(entity.description, "נערה מהכפר שבע עשרה");
+  assertEquals(entity.field_observations?.age.map((observation) => observation.value), ["17", null]);
+  assert(entity.field_evidence?.age.some((reference) => reference.quote === "אליה, נערה בת שבע־עשרה"));
+});
+
+Deno.test("C prompt requires a canonical age value and evidence separation", () => {
+  const prompt = buildSubBaseCCharactersInstructions();
+  assert(prompt.includes("canonical ASCII decimal string"));
+  assert(prompt.includes("Keep the original wording only in that observation's evidence"));
+  assert(prompt.includes("Keep description independent from age and evidence"));
 });

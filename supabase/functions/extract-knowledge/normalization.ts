@@ -9,6 +9,11 @@ import type { ExtractionNameUncertainty, ExtractionSourceReference } from "../_s
 import { getEmbeddedAbilityReferences } from "../_shared/ability-links.ts";
 import { CHARACTER_FIELD_KEYS } from "../_shared/character-specialist.ts";
 import {
+  normalizeCharacterAge,
+  normalizeSubBaseCCharacterAttributes,
+  prioritizeCharacterAgeObservations,
+} from "../_shared/character-age.ts";
+import {
   deriveFieldProvenance,
   mergeFieldObservationMaps,
   normalizeFieldObservationMap,
@@ -190,16 +195,21 @@ export function buildStructuredFields(
 
   if (type === "character") {
     if (profile === "sub-base-c-characters") {
-      const entityAttributes = entity.attributes || {};
+      const entityAttributes = normalizeSubBaseCCharacterAttributes(entity.attributes || {});
       const characterFields = entity.character_fields
-        || (entityAttributes.character_fields as Record<string, unknown> | undefined)
-        || entityAttributes;
+        ? normalizeSubBaseCCharacterAttributes(entity.character_fields)
+        : (entityAttributes.character_fields as Record<string, unknown> | undefined) || entityAttributes;
       const allowedKeys = new Set<string>([
         ...CHARACTER_FIELD_KEYS,
         ...(options.activeCharacterFieldKeys || []),
       ]);
       for (const [key, value] of Object.entries(characterFields)) {
         if (!allowedKeys.has(key)) continue;
+        if (key === "age") {
+          const normalizedAge = normalizeCharacterAge(value);
+          if (normalizedAge !== null) fields[key] = normalizedAge;
+          continue;
+        }
         if (hasExtractedValue(value)) fields[key] = value;
       }
     } else if (profile === "sub-base-locations") {
@@ -332,13 +342,23 @@ export function normalizeEntities(
 
   function addEntity(name: string, type: string, entity: ExtractedEntity) {
     if (!name || !name.trim()) return;
+    if (profile === "sub-base-c-characters" && type === "character") {
+      entity.attributes = normalizeSubBaseCCharacterAttributes(entity.attributes || {});
+    }
     const incomingStructuredFields = buildStructuredFields(type, entity, profile, options);
-    const incomingObservations = profile === "sub-base-c-characters" && type === "character"
+    const incomingObservations: FieldObservationMap = profile === "sub-base-c-characters" && type === "character"
       ? normalizeFieldObservationMap(
         (entity.attributes || {}).character_field_observations,
         chunkLookup,
       )
       : {};
+    if (profile === "sub-base-c-characters" && type === "character" && incomingObservations.age) {
+      incomingObservations.age = prioritizeCharacterAgeObservations(incomingObservations.age);
+      const primaryAge = incomingObservations.age.find((observation) => normalizeCharacterAge(observation.value) !== null);
+      if (incomingStructuredFields.age == null && primaryAge) {
+        incomingStructuredFields.age = normalizeCharacterAge(primaryAge.value);
+      }
+    }
     const incomingProvenance = deriveFieldProvenance(incomingObservations);
     const firstName = typeof incomingStructuredFields.first_name === "string"
       ? incomingStructuredFields.first_name.trim()
@@ -422,6 +442,9 @@ export function normalizeEntities(
       if (entity.purpose) existing.attributes.purpose = entity.purpose;
       if (Object.keys(incomingObservations).length > 0) {
         existing.field_observations = mergeFieldObservationMaps(existing.field_observations || {}, incomingObservations);
+        if (existing.field_observations.age) {
+          existing.field_observations.age = prioritizeCharacterAgeObservations(existing.field_observations.age);
+        }
         const mergedProvenance = deriveFieldProvenance(existing.field_observations);
         existing.field_evidence = mergedProvenance.field_evidence;
         existing.field_confidence = mergedProvenance.field_confidence;
@@ -575,6 +598,9 @@ export function normalizeEntities(
     }
     if (remove.field_observations) {
       keep.field_observations = mergeFieldObservationMaps(keep.field_observations || {}, remove.field_observations);
+      if (keep.field_observations.age) {
+        keep.field_observations.age = prioritizeCharacterAgeObservations(keep.field_observations.age);
+      }
       const mergedProvenance = deriveFieldProvenance(keep.field_observations);
       keep.field_evidence = mergedProvenance.field_evidence;
       keep.field_confidence = mergedProvenance.field_confidence;

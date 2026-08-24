@@ -3,6 +3,10 @@ import {
   referenceName,
   sourceReferencesToLegacyFields,
 } from '../_shared/extraction-contract.ts';
+import {
+  normalizeCharacterAgeObservationMap,
+  normalizeSubBaseCCharacterAttributes,
+} from '../_shared/character-age.ts';
 
 export type ExtractionMode = 'bootstrap' | 'branch';
 
@@ -423,10 +427,11 @@ export function adaptSubBaseCSerialExtraction(payload: unknown): Record<string, 
   const characters = rawCharacters
     .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item))
     .map((candidate) => {
-      const attributes = candidate.attributes && typeof candidate.attributes === 'object' && !Array.isArray(candidate.attributes)
+      let attributes = candidate.attributes && typeof candidate.attributes === 'object' && !Array.isArray(candidate.attributes)
         ? { ...(candidate.attributes as Record<string, unknown>) }
         : {};
-      const observations = attributes.character_field_observations && typeof attributes.character_field_observations === 'object'
+      if (attributes.age === undefined && candidate.age !== undefined) attributes.age = candidate.age;
+      let observations = attributes.character_field_observations && typeof attributes.character_field_observations === 'object'
         ? { ...(attributes.character_field_observations as Record<string, unknown>) }
         : candidate.field_observations && typeof candidate.field_observations === 'object'
           ? { ...(candidate.field_observations as Record<string, unknown>) }
@@ -444,6 +449,10 @@ export function adaptSubBaseCSerialExtraction(payload: unknown): Record<string, 
           attributes[field] = rawValue;
         }
       }
+
+      attributes.character_field_observations = observations;
+      attributes = normalizeSubBaseCCharacterAttributes(attributes);
+      observations = normalizeCharacterAgeObservationMap(attributes.character_field_observations);
 
       const candidateFirstName = typeof candidate.first_name === 'string' ? candidate.first_name.trim() : '';
       const candidateLastName = typeof candidate.last_name === 'string' ? candidate.last_name.trim() : '';

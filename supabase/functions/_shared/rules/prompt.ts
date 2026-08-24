@@ -314,7 +314,13 @@ export function buildSubBaseCCharactersInstructions(
 This profile runs as one serial extraction call per chunk window; do not use the parallel-experts contract, artifact fields, role fields, or window metadata.
 Return the common schema_version "2" object with an entities array. For every character entity, put first_name, last_name, all populated character fields, and character_field_observations inside attributes.
 Each character_field_observations entry must be an array of objects with value, evidence (short exact quotes or objects containing quote and chunk_position), confidence, inferred, and inference_note. Keep the character's entity type equal to "character".
-Return character-to-character relationships in the common relationships array using source, target, type, evidence, source_references, and chunk_positions. Do not return a separate characters array or a parallel specialist wrapper.`];
+Return character-to-character relationships in the common relationships array using source, target, type, evidence, source_references, and chunk_positions. Do not return a separate characters array or a parallel specialist wrapper.
+
+=== AGE OUTPUT CONTRACT — C ONLY ===
+- When the text gives a character's age, return age as one canonical ASCII decimal string only, such as "17". Never return a sentence, noun phrase, location phrase, quotation, or mixed description in age.
+- For an unambiguous Hebrew age such as "בת שבע־עשרה", "בת שבע עשרה", or "בת שבע-עשרה", return age="17". Keep the original wording only in that observation's evidence.
+- Do not create age from a phrase such as "נערה מהכפר שבע עשרה" or any value containing unrelated description text. If the age is not unambiguous, omit the age value while retaining any exact supporting wording as evidence.
+- Keep description independent from age and evidence: never copy description text or an evidence quote into the age value.`];
   if (dynamicCharacterFields.length > 0) {
     sections.push(`=== PROJECT-SPECIFIC CHARACTER FIELDS ===
 Return these fields only when the source supports them. Keep the exact field_key and include the same evidence/confidence/inferred metadata as fixed fields.
