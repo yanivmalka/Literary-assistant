@@ -10,6 +10,9 @@ import {
   TEXTAREA_FIELDS,
 } from '@/lib/entityTypes'
 import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
+import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
+import { Card } from '@/components/ui/Card'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import { EXTRACTION_MODEL_PROFILES, getStoredExtractionModelProfile } from '@/lib/extractionModels'
 import {
@@ -162,12 +165,14 @@ export default function CharacterProfilePage() {
   if (!entity) {
     return (
       <div className="max-w-3xl mx-auto p-6">
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => navigate(`/projects/${projectId}/knowledge`)}
-          className="p-2 rounded-md hover:bg-accent transition-colors mb-4"
+          className="mb-4"
         >
           <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
-        </button>
+        </Button>
         <p className="text-center text-muted-foreground">{t('common.notFound')}</p>
       </div>
     )
@@ -232,33 +237,29 @@ export default function CharacterProfilePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => navigate(`/projects/${projectId}/knowledge`)}
-            className="p-2 rounded-md hover:bg-accent transition-colors"
           >
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
-          </button>
+          </Button>
           <div>
-            <h1 className="text-2xl font-bold">{entity.name}</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="font-display text-2xl font-semibold tracking-tight">{entity.name}</h1>
+            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
               {t('entities.typesSingular.character')}
               {currentBranch && (
-                <span className="ms-2 text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                  {currentBranch.name}
-                </span>
+                <Badge variant="accent">{currentBranch.name}</Badge>
               )}
             </p>
           </div>
         </div>
 
         {viewMode === 'profile' && (
-          <button
-            onClick={handleEdit}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
-          >
+          <Button onClick={handleEdit} size="sm">
             <Edit3 className="h-4 w-4" />
             {t('common.edit')}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -269,20 +270,20 @@ export default function CharacterProfilePage() {
             <span className="text-muted-foreground">{t('branch.version')}:</span>
             <button
               onClick={() => setSelectedVersion('main')}
-              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+              className={`px-3 py-1 rounded-md text-sm font-semibold transition-colors ${
                 selectedVersion === 'main'
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted hover:bg-muted/80'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
               {t('branch.main')}
             </button>
             <button
               onClick={() => setSelectedVersion('branch')}
-              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+              className={`px-3 py-1 rounded-md text-sm font-semibold transition-colors ${
                 selectedVersion === 'branch'
                   ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted hover:bg-muted/80'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
             >
               {currentBranch.name}
@@ -292,7 +293,7 @@ export default function CharacterProfilePage() {
       )}
 
       {/* Content */}
-      <div className="border rounded-lg p-6 bg-card">
+      <Card className="p-6">
         {fieldGroups.map(group => {
           const appearanceSummaries = isDynamicProfile && viewMode === 'profile' && group.key === 'מראה חיצוני'
             ? getCharacterAppearanceSummaries(entity, modelProfile, dynamicFields)
@@ -322,7 +323,7 @@ export default function CharacterProfilePage() {
 
           return (
             <div key={group.key} className="mb-8 last:mb-0">
-              <h3 className="text-lg font-semibold mb-4 text-muted-foreground">
+              <h3 className="font-display text-base font-semibold mb-4 text-muted-foreground">
                 {isDynamicProfile
                   ? t(`entityFields.dynamic.groups.${group.key === 'זהות' ? 'identity' : group.key === 'תכונות' ? 'traits' : group.key === 'מראה חיצוני' ? 'appearance' : group.key === 'עולם הדמות' ? 'world' : group.key === 'שדות מותאמים אישית' ? 'custom' : 'analysis'}`, { defaultValue: group.key })
                   : t(group.labelKey)}
@@ -347,7 +348,7 @@ export default function CharacterProfilePage() {
                     return (
                       <div key={fieldKey}>
                         <span className="text-sm font-medium text-muted-foreground">{fieldLabel}</span>
-                        <div className="mt-1 p-2 rounded bg-muted/50 min-h-[2.5rem] flex items-center">
+                        <div className="mt-1 p-2 rounded-md bg-muted/50 min-h-[2.5rem] flex items-center">
                           <p className={displayValue ? '' : 'text-muted-foreground italic'}>
                             {displayValue || t('ui.common.unknown')}
                           </p>
@@ -368,7 +369,7 @@ export default function CharacterProfilePage() {
                           autoComplete="off"
                           value={value}
                           onChange={e => handleFieldChange(fieldKey, e.target.value)}
-                          className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground resize-none"
+                          className="mt-1 w-full px-3 py-2 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
                           rows={4}
                         />
                       ) : (
@@ -379,7 +380,7 @@ export default function CharacterProfilePage() {
                           autoComplete="off"
                           value={value}
                           onChange={e => handleFieldChange(fieldKey, e.target.value)}
-                          className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground"
+                          className="mt-1 w-full h-10 px-3 border border-input rounded-md bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
                         />
                       )}
                     </div>
@@ -389,30 +390,23 @@ export default function CharacterProfilePage() {
             </div>
           )
         })}
-      </div>
+      </Card>
 
       {/* Action buttons in edit mode */}
       {viewMode === 'edit' && (
         <div className="flex justify-end gap-3 mt-6">
-          <button
-            onClick={handleCancel}
-            className="px-4 py-2 rounded-md border hover:bg-muted transition-colors"
-          >
+          <Button variant="secondary" onClick={handleCancel}>
             {t('common.cancel')}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          >
+          </Button>
+          <Button onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4" />
             {saving ? t('common.saving') : t('common.save')}
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Relationships */}
-      <div className="mt-10 border-t pt-6">
+      <div className="mt-10 border-t border-border pt-6">
         {loadingRelationships ? (
           <p className="text-center text-muted-foreground">{t('common.loading')}</p>
         ) : (

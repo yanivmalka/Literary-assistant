@@ -15,6 +15,9 @@ import {
   type CharacterFieldDefinition,
 } from '@/lib/characterSchema'
 import CharacterEditModal from './CharacterEditModal'
+import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 
 interface CharactersHubProps {
   projectId: string
@@ -135,50 +138,54 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
     <div>
       {/* Version Selection */}
       <div className="mb-8">
-        <h2 className="text-lg font-semibold mb-4">{t('branch.version')}</h2>
+        <h2 className="font-display text-lg font-semibold mb-4">{t('branch.version')}</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Main Version Tile */}
           <button
             onClick={() => setSelectedVersion('main')}
-            className={`border-2 rounded-lg p-6 text-start transition-all ${
-              selectedVersion === 'main'
-                ? 'border-primary bg-primary/5'
-                : 'border-muted hover:border-muted-foreground/50'
-            }`}
+            className="text-start"
           >
-            <div className="font-semibold text-lg mb-2">{t('branch.main')}</div>
-            <p className="text-sm text-muted-foreground mb-4">{t('branch.mainDescription')}</p>
-            <div className="text-2xl font-bold text-primary">
-              {mainCharacters.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{t('entities.types.character')}</p>
+            <Card className={`p-6 transition-all ${
+              selectedVersion === 'main'
+                ? 'border-primary bg-primary-soft/40'
+                : 'hover:border-muted-foreground/50'
+            }`}>
+              <div className="font-display font-semibold text-lg mb-2">{t('branch.main')}</div>
+              <p className="text-sm text-muted-foreground mb-4">{t('branch.mainDescription')}</p>
+              <div className="font-display text-2xl font-bold text-primary">
+                {mainCharacters.length}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">{t('entities.types.character')}</p>
+            </Card>
           </button>
 
           {/* Branch Version Tile */}
           {currentBranch ? (
             <button
               onClick={() => setSelectedVersion('branch')}
-              className={`border-2 rounded-lg p-6 text-start transition-all ${
-                selectedVersion === 'branch'
-                  ? 'border-primary bg-primary/5'
-                  : 'border-muted hover:border-muted-foreground/50'
-              }`}
+              className="text-start"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <GitBranch className="h-4 w-4" />
-                <div className="font-semibold text-lg">{currentBranch.name}</div>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">{t('branch.branchDescription')}</p>
-              <div className="text-2xl font-bold text-primary">
-                {branchCharacters.length}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">{t('entities.types.character')}</p>
+              <Card className={`p-6 transition-all ${
+                selectedVersion === 'branch'
+                  ? 'border-primary bg-primary-soft/40'
+                  : 'hover:border-muted-foreground/50'
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <GitBranch className="h-4 w-4" />
+                  <div className="font-display font-semibold text-lg">{currentBranch.name}</div>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">{t('branch.branchDescription')}</p>
+                <div className="font-display text-2xl font-bold text-primary">
+                  {branchCharacters.length}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">{t('entities.types.character')}</p>
+              </Card>
             </button>
           ) : (
-            <div className="border-2 border-dashed rounded-lg p-6 opacity-50 cursor-not-allowed">
+            <div className="border-2 border-dashed border-border rounded-lg p-6 opacity-50 cursor-not-allowed">
               <div className="flex items-center gap-2 mb-2">
                 <GitBranch className="h-4 w-4" />
-                <div className="font-semibold text-lg">{t('branch.noBranch')}</div>
+                <div className="font-display font-semibold text-lg">{t('branch.noBranch')}</div>
               </div>
               <p className="text-sm text-muted-foreground">{t('branch.createBranchFirst')}</p>
             </div>
@@ -189,33 +196,33 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
       {/* Character Tiles */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4 gap-4">
-          <h2 className="text-lg font-semibold">
+          <h2 className="font-display text-lg font-semibold">
             {selectedVersion === 'main' ? t('branch.main') : currentBranch?.name}
           </h2>
           <div className="flex items-center gap-3">
             <label className="relative block min-w-56">
               <span className="sr-only">{t('ui.character.searchPlaceholder')}</span>
               <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <input
+              <Input
                 value={searchTerm}
                 onChange={event => setSearchTerm(event.target.value)}
                 placeholder={t('ui.character.searchPlaceholder')}
-                className="w-full ps-9 pe-3 py-2 border rounded-md bg-background text-sm"
+                className="ps-9 pe-3"
               />
             </label>
-            <button
+            <Button
               onClick={handleCreateNew}
               disabled={isCreating || dynamicSchemaLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              size="sm"
             >
               <Plus className="h-4 w-4" />
               {t('entities.newCharacter')}
-            </button>
+            </Button>
           </div>
         </div>
 
         {characters.length === 0 ? (
-          <div className="border-2 border-dashed rounded-lg p-12 text-center">
+          <div className="border-2 border-dashed border-border rounded-lg p-12 text-center">
             <p className="text-muted-foreground">
               {searchTerm.trim() ? t('ui.character.noSearchResults') : t('entities.emptyCharacters')}
             </p>

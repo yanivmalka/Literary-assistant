@@ -19,6 +19,8 @@ import {
   type CharacterFieldDefinition,
 } from '@/lib/characterSchema'
 import type { Entity } from '@/stores/entityStore'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 
 interface CharacterEditModalProps {
   isOpen: boolean
@@ -365,19 +367,19 @@ export default function CharacterEditModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4"
       onClick={handleBackdropClick}
     >
-      <div className="bg-background rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-auto">
+      <div className="bg-card border border-border rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-background border-b p-6 flex items-start justify-between">
+        <div className="sticky top-0 bg-card border-b border-border p-6 flex items-start justify-between">
           <div>
-            <h2 className="text-2xl font-bold">{t('common.edit')}</h2>
+            <h2 className="font-display text-2xl font-semibold tracking-tight">{t('common.edit')}</h2>
             <p className="text-sm text-muted-foreground mt-1">{character.name}</p>
           </div>
           <button
             onClick={handleCancel}
-            className="p-1 rounded-md hover:bg-muted transition-colors"
+            className="p-1 rounded-md hover:bg-accent transition-colors"
           >
             <X className="h-6 w-6" />
           </button>
@@ -386,18 +388,18 @@ export default function CharacterEditModal({
         {/* Form Content */}
         <div className="p-6 space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto">
           {fieldGroups.map(group => (
-            <div key={group.key} className="border rounded-lg">
+            <div key={group.key} className="rounded-lg border border-border bg-card">
               <button
                 onClick={() => toggleGroup(group.key)}
-                className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-accent/50 transition-colors"
               >
-                <h3 className="font-semibold text-muted-foreground">
+                <h3 className="font-display font-semibold text-muted-foreground">
                   {isDynamicProfile ? dynamicGroupLabel(group.key, t) : t(group.labelKey)}
                 </h3>
                 {expandedGroups.has(group.key) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </button>
               {expandedGroups.has(group.key) && (
-                <div className="border-t p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="border-t border-border p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                   {group.fields.map(field => {
                     const fieldKey = typeof field === 'string' ? field : field.field_key
                     const fieldDefinition = typeof field === 'string'
@@ -418,7 +420,7 @@ export default function CharacterEditModal({
                             autoComplete="off"
                             value={value}
                             onChange={e => handleFieldChange(fieldKey, e.target.value)}
-                            className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground resize-none"
+                            className="mt-1 w-full px-3 py-2 rounded-md border border-input bg-background text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
                             rows={4}
                           />
                         ) : (
@@ -429,7 +431,7 @@ export default function CharacterEditModal({
                             autoComplete="off"
                             value={value}
                             onChange={e => handleFieldChange(fieldKey, e.target.value)}
-                            className="mt-1 w-full px-3 py-2 border rounded-md bg-background text-foreground placeholder-muted-foreground"
+                            className="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
                           />
                         )}
                       </div>
@@ -442,9 +444,9 @@ export default function CharacterEditModal({
 
           {isDynamicProfile && (
             <>
-              <section className="border border-dashed rounded-lg p-4 space-y-3">
+              <section className="rounded-lg border border-dashed border-border p-4 space-y-3">
                 <div>
-                  <h3 className="font-semibold">{t('ui.character.addFieldTitle')}</h3>
+                  <h3 className="font-display font-semibold">{t('ui.character.addFieldTitle')}</h3>
                   <p className="text-xs text-muted-foreground">{t('ui.character.addFieldHint')}</p>
                 </div>
                 <div className="flex gap-2">
@@ -456,24 +458,24 @@ export default function CharacterEditModal({
                     value={fieldToAdd}
                     onChange={event => setFieldToAdd(event.target.value)}
                     disabled={dynamicSchemaLoading || availableDynamicFields.length === 0}
-                    className="flex-1 px-3 py-2 border rounded-md bg-background"
+                    className="flex-1 h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
                   >
                     <option value="">{t('ui.character.selectField')}</option>
                     {availableDynamicFields.map(field => <option key={field.field_key} value={field.field_key}>{field.label}</option>)}
                   </select>
-                  <button onClick={handleAddField} disabled={!fieldToAdd || dynamicSchemaLoading} className="px-3 py-2 border rounded-md disabled:opacity-50">
+                  <Button variant="secondary" onClick={handleAddField} disabled={!fieldToAdd || dynamicSchemaLoading}>
                     {t('ui.character.addField')}
-                  </button>
+                  </Button>
                 </div>
                 {availableDynamicFields.length === 0 && <p className="text-xs text-muted-foreground">{t('ui.character.allFieldsSelected')}</p>}
               </section>
-              <section className="border border-dashed rounded-lg p-4 space-y-3">
+              <section className="rounded-lg border border-dashed border-border p-4 space-y-3">
                 <div>
-                  <h3 className="font-semibold">{t('ui.character.addCustomFieldTitle')}</h3>
+                  <h3 className="font-display font-semibold">{t('ui.character.addCustomFieldTitle')}</h3>
                   <p className="text-xs text-muted-foreground">{t('ui.character.addCustomFieldHint')}</p>
                 </div>
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     id="character-custom-field-label"
                     name="character-custom-field-label"
                     autoComplete="off"
@@ -481,15 +483,15 @@ export default function CharacterEditModal({
                     onChange={event => setNewFieldLabel(event.target.value)}
                     onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void handleAddCustomField() } }}
                     placeholder={t('ui.character.customFieldPlaceholder')}
-                    className="flex-1 px-3 py-2 border rounded-md bg-background"
+                    className="flex-1"
                   />
-                  <select value={newFieldType} onChange={event => setNewFieldType(event.target.value as 'text' | 'long_text')} className="px-3 py-2 border rounded-md bg-background">
+                  <select value={newFieldType} onChange={event => setNewFieldType(event.target.value as 'text' | 'long_text')} className="h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring">
                     <option value="text">{t('ui.character.textField')}</option>
                     <option value="long_text">{t('ui.character.longTextField')}</option>
                   </select>
-                  <button onClick={() => void handleAddCustomField()} disabled={!newFieldLabel.trim()} className="flex items-center gap-1 px-3 py-2 border rounded-md disabled:opacity-50">
+                  <Button variant="secondary" onClick={() => void handleAddCustomField()} disabled={!newFieldLabel.trim()}>
                     <Plus className="h-4 w-4" />{t('ui.character.addField')}
-                  </button>
+                  </Button>
                 </div>
               </section>
             </>
@@ -497,53 +499,39 @@ export default function CharacterEditModal({
         </div>
 
         {/* Footer - Action Buttons */}
-        <div className="sticky bottom-0 bg-background border-t p-6 flex items-center justify-between gap-3">
+        <div className="sticky bottom-0 bg-card border-t border-border p-6 flex items-center justify-between gap-3">
           <div>
             {showDeleteConfirm ? (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-red-600">{t('entityModal.confirmDelete')}</span>
-                <button
-                  onClick={handleDelete}
-                  disabled={saving}
-                  className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 disabled:opacity-50"
-                >
+                <span className="text-sm text-destructive">{t('entityModal.confirmDelete')}</span>
+                <Button variant="destructive" size="sm" onClick={handleDelete} disabled={saving}>
                   {t('common.delete')}
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={saving}
-                  className="px-3 py-1.5 text-sm bg-muted rounded-md hover:bg-muted/80 disabled:opacity-50"
-                >
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowDeleteConfirm(false)} disabled={saving}>
                   {t('common.cancel')}
-                </button>
+                </Button>
               </div>
             ) : (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={saving}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
+                className="text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-4 w-4" />
                 {t('common.delete')}
-              </button>
+              </Button>
             )}
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleCancel}
-              disabled={saving}
-              className="px-4 py-2 rounded-md border hover:bg-muted transition-colors disabled:opacity-50"
-            >
+            <Button variant="secondary" onClick={handleCancel} disabled={saving}>
               {t('common.cancel')}
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
               <Save className="h-4 w-4" />
               {saving ? t('common.saving') : t('common.save')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

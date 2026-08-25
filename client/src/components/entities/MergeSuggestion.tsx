@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { Merge, X } from 'lucide-react'
 import type { MergeSuggestion as MergeSuggestionType } from '@/stores/entityStore'
+import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 
 interface MergeSuggestionProps {
   suggestion: MergeSuggestionType
@@ -12,8 +14,8 @@ export default function MergeSuggestion({ suggestion, onMerge, onDismiss }: Merg
   const { t } = useTranslation()
 
   return (
-    <div className="border border-amber-200 bg-amber-50/50 rounded-lg p-3">
-      <p className="text-xs text-amber-700 mb-2">{t('entities.mergeSuggestion')}</p>
+    <Card className="p-3 bg-warning-soft/40 border-warning/20">
+      <p className="text-xs font-semibold text-warning mb-2">{t('entities.mergeSuggestion')}</p>
       <div className="flex items-center gap-3">
         <div className="flex-1 text-sm">
           <span className="font-medium">{suggestion.entityA.name}</span>
@@ -31,23 +33,17 @@ export default function MergeSuggestion({ suggestion, onMerge, onDismiss }: Merg
       </div>
       <p className="text-xs text-muted-foreground mt-1">{suggestion.reason}</p>
       <div className="flex gap-2 mt-2">
-        <button
-          onClick={() => onMerge(suggestion.entityA.id, suggestion.entityB.id)}
-          className="flex items-center gap-1 text-xs px-2 py-1 bg-primary text-primary-foreground rounded hover:bg-primary/90"
-        >
+        <Button size="sm" onClick={() => onMerge(suggestion.entityA.id, suggestion.entityB.id)}>
           <Merge className="h-3 w-3" />
           {t('entities.merge')}
-        </button>
+        </Button>
         {onDismiss && (
-          <button
-            onClick={onDismiss}
-            className="flex items-center gap-1 text-xs px-2 py-1 text-muted-foreground hover:bg-muted rounded"
-          >
+          <Button size="sm" variant="ghost" onClick={onDismiss}>
             <X className="h-3 w-3" />
             {t('entities.keepSeparate')}
-          </button>
+          </Button>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

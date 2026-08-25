@@ -8,6 +8,7 @@ import MergeSuggestionComponent from '@/components/entities/MergeSuggestion'
 import EntityModal from '@/components/entities/EntityModal'
 import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
 import { type EntityType } from '@/lib/entityTypes'
+import { Button } from '@/components/ui/Button'
 
 const TYPE_FILTERS = [
   { value: 'character', label: 'entities.types.character', icon: Users },
@@ -87,28 +88,26 @@ export default function EntityReviewPage() {
     <div className="max-w-4xl mx-auto p-6">
       <ProjectBreadcrumb currentPage="entities" showTabs={false} />
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold">
+          <h2 className="font-display text-xl font-semibold tracking-tight">
             {typeFilter ? t(`entities.types.${typeFilter}`) : t('entities.title')}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             {typeFilter ? t('entities.subtitleByType', { type: t(`entities.types.${typeFilter}`) }) : t('entities.subtitle')}
           </p>
         </div>
-        <button
-          onClick={handleCreateNew}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 transition-colors"
-        >
+        <Button size="sm" onClick={handleCreateNew}>
           <Plus className="h-4 w-4" />
           {t('entityModal.createNew')}
-        </button>
+        </Button>
       </div>
+      <div className="lit-rule mb-5" />
 
       {/* Merge suggestions */}
       {mergeSuggestions.length > 0 && (
         <div className="mb-6 space-y-2">
-          <h3 className="text-sm font-semibold text-amber-700">{t('entities.mergeSuggestions')}</h3>
+          <h3 className="text-sm font-semibold text-warning">{t('entities.mergeSuggestions')}</h3>
           {mergeSuggestions.slice(0, 5).map((suggestion, idx) => (
             <MergeSuggestionComponent
               key={idx}
@@ -125,10 +124,10 @@ export default function EntityReviewPage() {
           <button
             key={filter.value}
             onClick={() => handleTypeFilter(filter.value)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
               typeFilter === filter.value
                 ? 'bg-primary text-primary-foreground'
-                : 'bg-muted hover:bg-muted/80'
+                : 'bg-muted hover:bg-accent'
             }`}
           >
             <filter.icon className="h-3.5 w-3.5" />
@@ -143,9 +142,9 @@ export default function EntityReviewPage() {
           <button
             key={status}
             onClick={() => setStatusFilter(statusFilter === status ? '' : status)}
-            className={`text-xs px-2.5 py-1 rounded transition-colors ${
+            className={`text-xs font-semibold px-2.5 py-1 rounded-full transition-colors ${
               statusFilter === status
-                ? 'bg-secondary text-secondary-foreground'
+                ? 'bg-primary-soft text-primary'
                 : 'text-muted-foreground hover:bg-muted'
             }`}
           >
@@ -154,7 +153,7 @@ export default function EntityReviewPage() {
         ))}
         <Link
           to={`/projects/${projectId}/branches`}
-          className="flex items-center gap-1 text-xs px-2.5 py-1 rounded text-muted-foreground hover:bg-muted transition-colors ms-auto"
+          className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full text-muted-foreground hover:bg-muted transition-colors ms-auto"
         >
           <GitBranch className="h-3 w-3" />
           {t('branch.title')}
@@ -165,7 +164,7 @@ export default function EntityReviewPage() {
       {loading ? (
         <p className="text-center text-muted-foreground py-8">{t('common.loading')}</p>
       ) : entities.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+        <div className="text-center py-12 border-2 border-dashed border-border rounded-lg">
           <Users className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
           <p className="text-muted-foreground">{t('entities.empty')}</p>
         </div>

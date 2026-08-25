@@ -16,6 +16,8 @@ import {
 } from '@/lib/characterSchema'
 import ObjectsPanel from './ObjectsPanel'
 import AbilitiesPanel from './AbilitiesPanel'
+import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 
 interface CharacterDetailModalProps {
   isOpen: boolean
@@ -135,7 +137,7 @@ export default function CharacterDetailModal({
   }
 
   const renderDynamicField = ({ key, value, definition }: { key: string; value: unknown; definition: CharacterFieldDefinition }) => (
-    <div key={key} className="p-3 bg-muted/50 rounded">
+    <div key={key} className="p-3 bg-muted/50 rounded-md">
       <p className="text-xs text-muted-foreground font-medium mb-1">
         {t(`entityFields.dynamic.${key}`, { defaultValue: definition.label || key })}
       </p>
@@ -150,14 +152,14 @@ export default function CharacterDetailModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
-      <div className="bg-background rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-auto">
-        <div className="sticky top-0 bg-background border-b p-6 flex items-start justify-between z-10">
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
+      <div className="bg-card border border-border rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-auto">
+        <div className="sticky top-0 bg-card border-b border-border p-6 flex items-start justify-between z-10">
           <div>
-            <h2 className="text-2xl font-bold">{character.name}</h2>
+            <h2 className="font-display text-2xl font-semibold tracking-tight">{character.name}</h2>
             <p className="text-sm text-muted-foreground mt-1">{t('entities.typesSingular.character')}</p>
           </div>
-          <button onClick={handleClose} className="p-1 rounded-md hover:bg-muted transition-colors" aria-label={t('common.close')}>
+          <button onClick={handleClose} className="p-1 rounded-md hover:bg-accent transition-colors" aria-label={t('common.close')}>
             <X className="h-6 w-6" />
           </button>
         </div>
@@ -182,7 +184,7 @@ export default function CharacterDetailModal({
                     <section key={groupKey}>
                       <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">{t(`entityFields.${groupKey}`)}</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {fields.map(field => <div key={field.key} className="p-3 bg-muted/50 rounded"><p className="text-xs text-muted-foreground font-medium mb-1">{t(`entityFields.${field.key}`)}</p><p className="font-medium">{field.value}</p></div>)}
+                        {fields.map(field => <div key={field.key} className="p-3 bg-muted/50 rounded-md"><p className="text-xs text-muted-foreground font-medium mb-1">{t(`entityFields.${field.key}`)}</p><p className="font-medium">{field.value}</p></div>)}
                       </div>
                     </section>
                   )
@@ -196,21 +198,25 @@ export default function CharacterDetailModal({
                 </section>
               )}
 
-              <div className="pt-4 border-t flex flex-wrap gap-3">
-                <button
+              <div className="pt-4 border-t border-border flex flex-wrap gap-3">
+                <Button
+                  variant="secondary"
                   onClick={() => navigate(`/projects/${projectId}/entities/${character.id}?profile=${modelProfile}${branchId ? `&branch=${branchId}` : ''}`)}
-                  className="flex items-center gap-2 px-4 py-2 border rounded-md hover:bg-muted"
                 >
                   <ExternalLink className="h-4 w-4" />
                   {t('ui.character.openProfile')}
+                </Button>
+                <button onClick={() => setView('objects')} className="flex-1 min-w-32 text-center">
+                  <Card className="p-4 hover:bg-accent transition-colors">
+                    <div className="font-display font-semibold mb-1">{t('entities.types.object')}</div>
+                    <p className="text-xs text-muted-foreground">{t('ui.common.viewDetails')}</p>
+                  </Card>
                 </button>
-                <button onClick={() => setView('objects')} className="flex-1 min-w-32 p-4 border rounded-lg hover:bg-muted transition-colors text-center">
-                  <div className="font-semibold mb-1">{t('entities.types.object')}</div>
-                  <p className="text-xs text-muted-foreground">{t('ui.common.viewDetails')}</p>
-                </button>
-                <button onClick={() => setView('abilities')} className="flex-1 min-w-32 p-4 border rounded-lg hover:bg-muted transition-colors text-center">
-                  <div className="font-semibold mb-1">{t('ui.abilities.title')}</div>
-                  <p className="text-xs text-muted-foreground">{t('ui.common.viewDetails')}</p>
+                <button onClick={() => setView('abilities')} className="flex-1 min-w-32 text-center">
+                  <Card className="p-4 hover:bg-accent transition-colors">
+                    <div className="font-display font-semibold mb-1">{t('ui.abilities.title')}</div>
+                    <p className="text-xs text-muted-foreground">{t('ui.common.viewDetails')}</p>
+                  </Card>
                 </button>
               </div>
             </div>

@@ -100,19 +100,19 @@ export default function DocumentList({ projectId }: DocumentListProps) {
         return (
         <div
           key={doc.id}
-          className={`border rounded-lg p-4 bg-card ${processing ? 'document-tile-processing' : ''}`}
+          className={`border border-border rounded-lg p-4 bg-card ${processing ? 'document-tile-processing' : ''}`}
         >
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <FileText className={`h-5 w-5 flex-shrink-0 ${isReady ? 'text-green-600' : 'text-muted-foreground'}`} />
+              <FileText className={`h-5 w-5 flex-shrink-0 ${isReady ? 'text-success' : 'text-muted-foreground'}`} />
               <div>
-                <h4 className={`font-medium text-sm ${isReady ? 'text-green-600' : ''}`}>{doc.name}</h4>
+                <h4 className={`font-display font-semibold text-sm ${isReady ? 'text-success' : ''}`}>{doc.name}</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  <span className={isReady ? 'text-green-600' : ''}>{doc.file_type.toUpperCase()}</span>
+                  <span className={isReady ? 'text-success' : ''}>{doc.file_type.toUpperCase()}</span>
                   {doc.latest_version?.file_size && (
                     <>
                       {' • '}
-                      <span className={isReady ? 'text-green-600' : ''}>
+                      <span className={isReady ? 'text-success' : ''}>
                         {(doc.latest_version.file_size / 1024 / 1024).toFixed(2)} MB
                       </span>
                     </>
@@ -138,7 +138,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                       setStoredExtractionModelProfile(profile)
                     }}
                     disabled={extractionInProgress || hasPausedExtraction}
-                    className="max-w-36 rounded border bg-background px-2 py-1 text-xs text-foreground disabled:opacity-50"
+                    className="max-w-36 rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground disabled:opacity-50"
                     title={t('ui.documents.modelProfile')}
                   >
                     {EXTRACTION_MODEL_PROFILES.map(profile => (
@@ -150,10 +150,10 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                   <button
                     onClick={() => handleExtractKnowledge(doc)}
                     disabled={extractionInProgress}
-                    className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                    className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-md transition-colors ${
                       extractionInProgress
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : 'bg-green-50 text-green-700 hover:bg-green-100'
+                        ? 'bg-muted text-muted-foreground cursor-not-allowed'
+                        : 'bg-success-soft text-success hover:bg-success-soft/70'
                     }`}
                     title={hasPausedExtraction
                       ? t('documents.extraction.resumeButton')
@@ -169,7 +169,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
               {isReady && !extractionInProgress && (
                 <button
                   onClick={() => handleDelete(doc.id)}
-                  className="relative z-20 p-1.5 text-red-600 hover:text-red-700 rounded transition-colors"
+                  className="relative z-20 p-1.5 text-destructive hover:opacity-80 rounded-md transition-opacity"
                   title={t('common.delete')}
                 >
                   <Trash2 className="h-4 w-4" />

@@ -78,18 +78,18 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
 
   if (pausedExtraction && !isActiveDocument) {
     return (
-      <div className="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-3">
+      <div className="border border-warning/30 bg-warning-soft rounded-lg p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-amber-700">
+          <div className="flex items-center gap-2 text-warning">
             <Pause className="h-5 w-5" />
-            <span className="text-sm font-medium">{t('documents.extraction.paused')}</span>
+            <span className="text-sm font-semibold">{t('documents.extraction.paused')}</span>
           </div>
         </div>
-        <p className="text-xs text-amber-700 ps-7">
+        <p className="text-xs text-warning ps-7">
           {t('documents.extraction.pausedDescription')}
         </p>
         {progress && progress.totalChunks > 0 && (
-          <p className="text-xs text-amber-700 ps-7">
+          <p className="text-xs text-warning ps-7">
             {t('documents.extraction.progress', {
               processed: progress.processedChunks,
               total: progress.totalChunks,
@@ -98,7 +98,7 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
         )}
         <button
           onClick={handleResume}
-          className="flex items-center gap-1 text-xs px-3 py-1.5 text-green-700 border border-green-200 bg-green-50 hover:bg-green-100 rounded transition-colors"
+          className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 text-success border border-success/30 bg-success-soft hover:bg-success-soft/70 rounded-md transition-colors"
         >
           <Play className="h-3.5 w-3.5" />
           {t('documents.extraction.resumeButton')}
@@ -113,15 +113,15 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
     const hasTransientSkips = extractionWarnings.some((warning) => warning.reason === 'transient_failure')
 
     return (
-      <div className="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-2">
+      <div className="border border-warning/30 bg-warning-soft rounded-lg p-4 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-amber-700">
+          <div className="flex items-center gap-2 text-warning">
             <AlertTriangle className="h-5 w-5" />
-            <span className="text-sm font-medium">{t('documents.extraction.completedWithWarnings')}</span>
+            <span className="text-sm font-semibold">{t('documents.extraction.completedWithWarnings')}</span>
           </div>
         </div>
         {progress && (
-          <p className="text-xs text-amber-700 ps-7">
+          <p className="text-xs text-warning ps-7">
             {t('documents.extraction.completedWithWarningsSummary', {
               entities: progress.entitiesSaved,
               events: progress.eventsSaved,
@@ -129,7 +129,7 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
             })}
           </p>
         )}
-        <div className="space-y-1 ps-7 text-xs text-amber-700">
+        <div className="space-y-1 ps-7 text-xs text-warning">
           {hasSafetySkips && <p>{t('documents.extraction.safetySkipped')}</p>}
           {hasTransientSkips && <p>{t('documents.extraction.transientSkipped')}</p>}
         </div>
@@ -140,15 +140,15 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
   // Completed state
   if (extractionDone) {
     return (
-      <div className="border border-green-200 bg-green-50 rounded-lg p-4 space-y-2">
+      <div className="border border-success/30 bg-success-soft rounded-lg p-4 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-green-700">
+          <div className="flex items-center gap-2 text-success">
             <CheckCircle className="h-5 w-5" />
-            <span className="text-sm font-medium">{t('documents.extraction.completed')}</span>
+            <span className="text-sm font-semibold">{t('documents.extraction.completed')}</span>
           </div>
         </div>
         {progress && (
-          <p className="text-xs text-green-600 ps-7">
+          <p className="text-xs text-success ps-7">
             {t('documents.extraction.completedSummary', {
               entities: progress.entitiesSaved,
               events: progress.eventsSaved,
@@ -162,21 +162,21 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
   // Cancelled state
   if (extractionCancelled) {
     return (
-      <div className="border border-amber-200 bg-amber-50 rounded-lg p-4 space-y-2">
+      <div className="border border-warning/30 bg-warning-soft rounded-lg p-4 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-amber-700">
+          <div className="flex items-center gap-2 text-warning">
             <AlertTriangle className="h-5 w-5" />
-            <span className="text-sm font-medium">{t('documents.extraction.cancelled')}</span>
+            <span className="text-sm font-semibold">{t('documents.extraction.cancelled')}</span>
           </div>
           <button
             onClick={handleDismiss}
-            className="p-1 text-amber-600 hover:text-amber-800 rounded transition-colors"
+            className="p-1 text-warning hover:opacity-70 rounded transition-opacity"
             title={t('documents.extraction.dismiss')}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <p className="text-xs text-amber-600 ps-7">
+        <p className="text-xs text-warning ps-7">
           {t('documents.extraction.cancelledDescription')}
         </p>
       </div>
@@ -186,21 +186,21 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
   // Error state
   if (extractionError) {
     return (
-      <div className="border border-red-200 bg-red-50 rounded-lg p-4 space-y-2">
+      <div className="border border-destructive/30 bg-destructive/10 rounded-lg p-4 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-red-700">
+          <div className="flex items-center gap-2 text-destructive">
             <XCircle className="h-5 w-5" />
-            <span className="text-sm font-medium">{t('documents.extraction.error')}</span>
+            <span className="text-sm font-semibold">{t('documents.extraction.error')}</span>
           </div>
           <button
             onClick={handleDismiss}
-            className="p-1 text-red-600 hover:text-red-800 rounded transition-colors"
+            className="p-1 text-destructive hover:opacity-70 rounded transition-opacity"
             title={t('documents.extraction.dismiss')}
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <p className="text-xs text-red-600 ps-7">
+        <p className="text-xs text-destructive ps-7">
           {t(extractionError, { defaultValue: t('ui.documents.extractionError') })}
         </p>
       </div>
@@ -209,14 +209,14 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
 
   // In progress state
   return (
-    <div className="extraction-progress-processing border border-blue-200 bg-blue-50 rounded-lg p-4 space-y-3">
+    <div className="extraction-progress-processing border border-primary/25 bg-primary-soft rounded-lg p-4 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-blue-700">
+        <div className="flex items-center gap-2 text-primary">
           <Brain className="h-5 w-5" />
-          <span className="text-sm font-medium">{t('documents.extraction.inProgress')}</span>
+          <span className="text-sm font-semibold">{t('documents.extraction.inProgress')}</span>
         </div>
-        <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+        <Loader2 className="h-4 w-4 text-primary animate-spin" />
       </div>
 
       {/* Progress bar */}
@@ -224,15 +224,22 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
         <div className="space-y-1.5">
           {themeSettings.extractionProgressStyle === 'sword' ? (
             <SwordProgressBar percentage={percentage} />
-          ) : (
-            <div className="w-full h-2.5 bg-blue-100 rounded-full overflow-hidden">
+          ) : themeSettings.extractionProgressStyle === 'minimal' ? (
+            <div className="w-full h-0.5 bg-border rounded-full overflow-hidden">
               <div
-                className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
+                className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+          ) : (
+            <div className="w-full h-2.5 bg-primary/15 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${percentage}%` }}
               />
             </div>
           )}
-          <div className="flex items-center justify-between text-xs text-blue-600">
+          <div className="flex items-center justify-between text-xs text-primary/80">
             <span>
               {t('documents.extraction.progress', {
                 processed: progress.processedChunks,
@@ -246,7 +253,7 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
 
       {/* Stats */}
       {progress && (progress.entitiesSaved > 0 || progress.eventsSaved > 0) && (
-        <div className="flex gap-3 text-xs text-blue-600 ps-0.5">
+        <div className="flex gap-3 text-xs text-primary/80 ps-0.5">
           {progress.entitiesSaved > 0 && (
             <span>{t('documents.extraction.entitiesFound', { count: progress.entitiesSaved })}</span>
           )}
@@ -258,7 +265,7 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
 
       {/* Estimated time */}
       {estimatedMinutes && estimatedMinutes > 0 && percentage < 90 && (
-        <p className="text-xs text-blue-500 ps-0.5">
+        <p className="text-xs text-primary/70 ps-0.5">
           {t('documents.extraction.estimatedTime', { minutes: estimatedMinutes })}
         </p>
       )}
@@ -268,7 +275,7 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
         <button
           onClick={pauseExtraction}
           disabled={extractionPausing}
-          className="flex items-center gap-1 text-xs px-3 py-1.5 text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 disabled:opacity-50 rounded transition-colors"
+          className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 text-warning border border-warning/30 bg-warning-soft hover:bg-warning-soft/70 disabled:opacity-50 rounded-md transition-colors"
         >
           <Pause className="h-3.5 w-3.5" />
           {extractionPausing
@@ -279,25 +286,25 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
         {!showCancelWarning ? (
           <button
             onClick={handleCancelClick}
-            className="text-xs px-3 py-1.5 text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 rounded transition-colors"
+            className="text-xs font-semibold px-3 py-1.5 text-destructive border border-destructive/30 bg-destructive/10 hover:bg-destructive/15 rounded-md transition-colors"
           >
             {t('documents.extraction.cancelButton')}
           </button>
         ) : (
-          <div className="basis-full p-3 bg-amber-50 border border-amber-200 rounded-md space-y-2">
-            <p className="text-xs text-amber-700">
+          <div className="basis-full p-3 bg-warning-soft border border-warning/30 rounded-md space-y-2">
+            <p className="text-xs text-warning">
               {t('documents.extraction.cancelWarning')}
             </p>
             <div className="flex gap-2">
               <button
                 onClick={handleConfirmCancel}
-                className="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                className="text-xs font-semibold px-3 py-1 bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 transition-colors"
               >
                 {t('common.confirm')}
               </button>
               <button
                 onClick={() => setShowCancelWarning(false)}
-                className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                className="text-xs font-semibold px-3 py-1 border border-border rounded-md hover:bg-muted transition-colors"
               >
                 {t('common.cancel')}
               </button>

@@ -5,6 +5,9 @@ import { CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import { getPendingChanges, approveChange, rejectChange, detectConflicts, type Change } from '@/lib/changeReview'
 import { useBranchStore } from '@/stores/branchStore'
 import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
 
 export default function ReviewChangesPage() {
   const { t } = useTranslation()
@@ -65,18 +68,19 @@ export default function ReviewChangesPage() {
       <ProjectBreadcrumb currentPage="documents" showTabs={false} />
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">{t('review.pendingChanges')}</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-tight mb-2">{t('review.pendingChanges')}</h1>
         <p className="text-muted-foreground">{currentBranch.name}</p>
       </div>
+      <div className="lit-rule mb-6" />
 
       {/* Conflicts */}
       {conflicts.length > 0 && (
-        <div className="mb-6 border border-amber-200 bg-amber-50 rounded-lg p-4">
+        <div className="mb-6 border border-warning/30 bg-warning-soft rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-warning mt-0.5 flex-shrink-0" />
             <div>
-              <h3 className="font-semibold text-amber-900 mb-2">{t('review.potentialConflicts')}</h3>
-              <ul className="space-y-1 text-sm text-amber-800">
+              <h3 className="font-display font-semibold text-warning mb-2">{t('review.potentialConflicts')}</h3>
+              <ul className="space-y-1 text-sm text-warning">
                 {conflicts.map((conflict, i) => (
                   <li key={i}>• {conflict.description}</li>
                 ))}
@@ -90,29 +94,29 @@ export default function ReviewChangesPage() {
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">{t('common.loading')}</div>
       ) : changes.length === 0 ? (
-        <div className="text-center py-12 border rounded-lg bg-muted/30">
+        <div className="text-center py-12 border border-border rounded-lg bg-muted/30">
           <p className="text-muted-foreground">{t('review.noChanges')}</p>
         </div>
       ) : (
         <div className="space-y-3">
           {changes.map(change => (
-            <div key={change.id} className="border rounded-lg p-4 bg-card hover:bg-accent/50 transition-colors">
+            <Card key={change.id} className="p-4 hover:bg-accent/50 transition-colors">
               {/* Change type badge */}
-              <div className="text-xs font-semibold mb-2">
+              <div className="mb-2">
                 {change.type === 'new_entity' && (
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">{t('review.newEntity')}</span>
+                  <Badge variant="info">{t('review.newEntity')}</Badge>
                 )}
                 {change.type === 'field_change' && (
-                  <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded">{t('review.fieldChange')}</span>
+                  <Badge variant="accent">{t('review.fieldChange')}</Badge>
                 )}
                 {change.type === 'new_relationship' && (
-                  <span className="px-2 py-1 bg-green-100 text-green-800 rounded">{t('review.newRelationship')}</span>
+                  <Badge variant="success">{t('review.newRelationship')}</Badge>
                 )}
                 {change.type === 'remove_relationship' && (
-                  <span className="px-2 py-1 bg-red-100 text-red-800 rounded">{t('review.removeRelationship')}</span>
+                  <Badge variant="danger">{t('review.removeRelationship')}</Badge>
                 )}
                 {change.type === 'new_event' && (
-                  <span className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded">{t('review.newEvent')}</span>
+                  <Badge variant="info">{t('review.newEvent')}</Badge>
                 )}
               </div>
 
@@ -120,7 +124,7 @@ export default function ReviewChangesPage() {
               <div className="mb-4">
                 {change.type === 'new_entity' && (
                   <div>
-                    <h4 className="font-semibold">{change.entity_name}</h4>
+                    <h4 className="font-display font-semibold">{change.entity_name}</h4>
                     <p className="text-sm text-muted-foreground">
                       {t('review.newEntityDescription', { type: change.entity_type })}
                     </p>
@@ -129,7 +133,7 @@ export default function ReviewChangesPage() {
 
                 {(change.type === 'new_relationship' || change.type === 'remove_relationship') && (
                   <div>
-                    <h4 className="font-semibold">
+                    <h4 className="font-display font-semibold">
                       {change.entity_name} → {change.relationship_type} → {change.target_entity_name}
                     </h4>
                     <p className="text-sm text-muted-foreground">
@@ -140,14 +144,14 @@ export default function ReviewChangesPage() {
 
                 {change.type === 'new_event' && (
                   <div>
-                    <h4 className="font-semibold">{change.event_name}</h4>
+                    <h4 className="font-display font-semibold">{change.event_name}</h4>
                     <p className="text-sm text-muted-foreground">{t('review.newEventDescription')}</p>
                   </div>
                 )}
 
                 {change.type === 'field_change' && (
                   <div>
-                    <h4 className="font-semibold">{change.entity_name}</h4>
+                    <h4 className="font-display font-semibold">{change.entity_name}</h4>
                     <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                       <div>
                         <p className="font-medium text-muted-foreground">{t('review.main')}</p>
@@ -164,24 +168,16 @@ export default function ReviewChangesPage() {
 
               {/* Action buttons */}
               <div className="flex gap-2">
-                <button
-                  onClick={() => handleApprove(change)}
-                  disabled={processing === change.id}
-                  className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 text-sm"
-                >
+                <Button size="sm" onClick={() => handleApprove(change)} disabled={processing === change.id}>
                   <CheckCircle className="h-4 w-4" />
                   {t('review.approve')}
-                </button>
-                <button
-                  onClick={() => handleReject(change)}
-                  disabled={processing === change.id}
-                  className="flex items-center gap-1 px-3 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50 text-sm"
-                >
+                </Button>
+                <Button size="sm" variant="destructive" onClick={() => handleReject(change)} disabled={processing === change.id}>
                   <XCircle className="h-4 w-4" />
                   {t('review.reject')}
-                </button>
+                </Button>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}

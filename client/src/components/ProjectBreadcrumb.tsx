@@ -57,17 +57,17 @@ export default function ProjectBreadcrumb({ currentPage, showTabs = true }: Proj
 
       {/* Sub-navigation tabs */}
       {showTabs && (
-        <div className="flex flex-wrap gap-1 border-b pb-2">
+        <div className="flex flex-wrap gap-1 border-b border-border pb-2">
           {NAV_ITEMS.map(item => {
             const isActive = item.key === currentPage
             return (
               <Link
                 key={item.key}
                 to={`/projects/${projectId}/${item.path}`}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-md transition-colors ${
                   isActive
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    ? 'bg-primary-soft text-primary'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
                 }`}
               >
                 <item.icon className="h-3.5 w-3.5" />

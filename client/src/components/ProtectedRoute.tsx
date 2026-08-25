@@ -12,8 +12,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!initialized) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-muted-foreground">{t('common.loading')}</div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-sm text-muted-foreground">{t('common.loading')}</div>
       </div>
     )
   }

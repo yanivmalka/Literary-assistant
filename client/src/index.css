@@ -4,47 +4,79 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
+    /* Quillwright literary-editorial theme. Warm paper surfaces, ink-indigo
+       accent by default. --primary/--primary-foreground/--ring/--primary-soft
+       are the accent group and are the only tokens data-accent overrides. */
+    --background: 40 20% 97%;
+    --foreground: 222 20% 15%;
+    --card: 40 25% 99%;
+    --card-foreground: 222 20% 15%;
+    --primary: 245 32% 30%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --primary-soft: 245 45% 93%;
+    --secondary: 40 12% 93%;
+    --secondary-foreground: 222 20% 20%;
+    --muted: 40 12% 93%;
+    --muted-foreground: 222 8% 42%;
+    --accent: 40 12% 93%;
+    --accent-foreground: 222 20% 15%;
+    --destructive: 6 70% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 150 35% 30%;
+    --success-soft: 150 45% 92%;
+    --warning: 32 55% 32%;
+    --warning-soft: 40 65% 90%;
+    --info: 217 45% 40%;
+    --info-soft: 217 55% 93%;
+    --border: 40 12% 87%;
+    --input: 40 12% 87%;
+    --ring: 245 32% 30%;
+    --radius: 0.625rem;
+
+    --font-sans: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Literata', Georgia, 'Times New Roman', serif;
+    --font-sans-he: 'Heebo', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
     color-scheme: light;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 47.4% 11.2%;
-    --card-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --background: 224 24% 11%;
+    --foreground: 210 20% 96%;
+    --card: 224 20% 14%;
+    --card-foreground: 210 20% 96%;
+    --primary: 245 55% 74%;
+    --primary-foreground: 245 30% 14%;
+    --primary-soft: 245 30% 22%;
+    --secondary: 222 16% 20%;
+    --secondary-foreground: 210 20% 96%;
+    --muted: 222 16% 20%;
+    --muted-foreground: 218 12% 68%;
+    --accent: 222 16% 20%;
+    --accent-foreground: 210 20% 96%;
+    --destructive: 6 65% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 150 40% 65%;
+    --success-soft: 150 30% 22%;
+    --warning: 40 55% 65%;
+    --warning-soft: 40 35% 22%;
+    --info: 217 55% 70%;
+    --info-soft: 217 30% 24%;
+    --border: 222 16% 24%;
+    --input: 222 16% 24%;
+    --ring: 245 55% 74%;
     color-scheme: dark;
   }
+
+  /* Accent color options — override only the accent group, in both modes. */
+  [data-accent="forest"] { --primary: 155 35% 28%; --primary-foreground: 150 40% 97%; --primary-soft: 155 40% 91%; --ring: 155 35% 28%; }
+  .dark[data-accent="forest"] { --primary: 155 45% 62%; --primary-foreground: 155 35% 12%; --primary-soft: 155 30% 22%; --ring: 155 45% 62%; }
+
+  [data-accent="ember"] { --primary: 28 60% 36%; --primary-foreground: 30 45% 97%; --primary-soft: 30 60% 90%; --ring: 28 60% 36%; }
+  .dark[data-accent="ember"] { --primary: 30 65% 64%; --primary-foreground: 28 40% 14%; --primary-soft: 30 35% 22%; --ring: 30 65% 64%; }
+
+  [data-accent="rose"] { --primary: 350 45% 42%; --primary-foreground: 350 40% 98%; --primary-soft: 350 55% 93%; --ring: 350 45% 42%; }
+  .dark[data-accent="rose"] { --primary: 350 55% 70%; --primary-foreground: 350 40% 15%; --primary-soft: 350 30% 22%; --ring: 350 55% 70%; }
 
   html {
     background-color: hsl(var(--background));
@@ -56,12 +88,23 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-sans);
   }
 
-  /* RTL-specific font for Hebrew */
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+  }
+
+  /* RTL-specific typography for Hebrew: Literata doesn't cover Hebrew
+     glyphs, so headings fall back to a heavier weight of the UI font
+     rather than silently downgrading to a browser default serif. */
   [dir="rtl"] body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-sans-he);
+  }
+
+  [dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] h3, [dir="rtl"] .font-display {
+    font-family: var(--font-sans-he);
+    font-weight: 700;
   }
 
   /* Animate theme colors without affecting layout, transforms, or opacity. */
@@ -165,7 +208,8 @@
     background: hsl(var(--muted-foreground) / 0.5);
   }
 
-  /* A blue-silver light sweep over the active knowledge extraction panel. */
+  /* An accent-colored light sweep over the active knowledge extraction panel.
+     Uses the accent token so it follows the user's chosen accent color. */
   .extraction-progress-processing {
     position: relative;
     overflow: hidden;
@@ -181,9 +225,9 @@
     background: linear-gradient(
       -110deg,
       transparent 0%,
-      rgba(96, 165, 250, 0.08) 35%,
-      rgba(226, 232, 240, 0.8) 50%,
-      rgba(59, 130, 246, 0.1) 65%,
+      hsl(var(--primary) / 0.08) 35%,
+      hsl(var(--primary) / 0.28) 50%,
+      hsl(var(--primary) / 0.08) 65%,
       transparent 100%
     );
     background-size: 250% 100%;
@@ -216,9 +260,9 @@
     background: linear-gradient(
       110deg,
       transparent 0%,
-      rgba(22, 163, 74, 0.08) 35%,
-      rgba(187, 247, 208, 0.75) 50%,
-      rgba(22, 163, 74, 0.08) 65%,
+      hsl(var(--success) / 0.1) 35%,
+      hsl(var(--success) / 0.35) 50%,
+      hsl(var(--success) / 0.1) 65%,
       transparent 100%
     );
     background-size: 250% 100%;
@@ -237,8 +281,38 @@
 
   @media (prefers-reduced-motion: reduce) {
     .document-tile-processing::after {
-      background: rgba(187, 247, 208, 0.35);
+      background: hsl(var(--success) / 0.18);
       animation: none;
     }
+  }
+
+  /* Editorial pull-quote: a large decorative opening mark set by the
+     logical corner (flips for RTL automatically), for manuscript-excerpt
+     style content blocks. Not used by any production screen yet. */
+  .lit-quote {
+    position: relative;
+  }
+  .lit-quote::before {
+    content: '\201C';
+    position: absolute;
+    top: -0.35em;
+    inset-inline-start: -0.05em;
+    font-family: var(--font-display);
+    font-size: 3.5em;
+    line-height: 1;
+    color: hsl(var(--primary) / 0.18);
+    pointer-events: none;
+  }
+  [dir="rtl"] .lit-quote::before {
+    content: '\201D';
+  }
+
+  /* A slim rule under section headings, in the accent color at low
+     opacity — a quiet editorial marker instead of a boxed container. */
+  .lit-rule {
+    height: 2px;
+    width: 2.5rem;
+    border-radius: 999px;
+    background: hsl(var(--primary) / 0.4);
   }
 }

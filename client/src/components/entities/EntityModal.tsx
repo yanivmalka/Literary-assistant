@@ -12,6 +12,8 @@ import {
 import { useEntityStore, type Entity } from '@/stores/entityStore'
 import { useBranchStore } from '@/stores/branchStore'
 import { supabase } from '@/lib/supabase'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 
 interface EntityModalProps {
   isOpen: boolean
@@ -229,12 +231,12 @@ export default function EntityModal({
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-2xl max-h-[90vh] bg-card border rounded-xl shadow-xl flex flex-col mx-4 overflow-hidden z-10">
+      <div className="relative w-full max-w-2xl max-h-[90vh] bg-card border border-border rounded-lg shadow-xl flex flex-col mx-4 overflow-hidden z-10">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/30 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30 shrink-0">
           <div className="flex items-center gap-3">
             <span className="text-2xl">{meta.icon}</span>
-            <h2 id="entity-modal-title" className="text-lg font-semibold">
+            <h2 id="entity-modal-title" className="text-lg font-display font-semibold">
               {isEditMode
                 ? t('entityModal.editTitle', { type: t(meta.labelKey) })
                 : t('entityModal.createTitle', { type: t(meta.labelKey) })
@@ -253,11 +255,11 @@ export default function EntityModal({
         {/* Body — scrollable */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           {/* Aliases */}
-          <div className="border rounded-lg p-4">
+          <div className="border border-border rounded-lg p-4">
                 <label htmlFor="aliases-input" className="block text-sm font-medium text-muted-foreground mb-1">
               {t('entityFields.aliases')}
             </label>
-            <input
+            <Input
               id="aliases-input"
               name="aliases"
               type="text"
@@ -265,13 +267,12 @@ export default function EntityModal({
               value={aliasesText}
               onChange={e => setAliasesText(e.target.value)}
               placeholder={t('entityFields.aliasesPlaceholder')}
-              className="w-full px-3 py-2 border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
             <p className="text-xs text-muted-foreground mt-1">{t('entityFields.aliasesHint')}</p>
           </div>
 
           {fieldGroups.map(group => (
-            <div key={group.key} className="border rounded-lg overflow-hidden">
+            <div key={group.key} className="border border-border rounded-lg overflow-hidden">
               {/* Group header */}
               <button
                 onClick={() => toggleGroup(group.key)}
@@ -309,52 +310,40 @@ export default function EntityModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/30 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-border bg-muted/30 shrink-0">
           <div>
             {isEditMode && (
               showDeleteConfirm ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-red-600">{t('entityModal.confirmDelete')}</span>
-                  <button
-                    onClick={handleDelete}
-                    disabled={saving}
-                    className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 disabled:opacity-50"
-                  >
+                  <span className="text-sm text-destructive">{t('entityModal.confirmDelete')}</span>
+                  <Button variant="destructive" size="sm" onClick={handleDelete} disabled={saving}>
                     {t('common.delete')}
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteConfirm(false)}
-                    className="px-3 py-1.5 text-sm bg-muted rounded-md hover:bg-muted/80"
-                  >
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => setShowDeleteConfirm(false)}>
                     {t('common.cancel')}
-                  </button>
+                  </Button>
                 </div>
               ) : (
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                  className="text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="h-4 w-4" />
                   {t('common.delete')}
-                </button>
+                </Button>
               )
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm bg-muted rounded-md hover:bg-muted/80 transition-colors"
-            >
+            <Button variant="secondary" onClick={onClose}>
               {t('common.cancel')}
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
               <Save className="h-4 w-4" />
               {saving ? t('common.loading') : t('common.save')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -392,10 +381,10 @@ function FieldInput({ field, value, onChange, isTextarea, t }: FieldInputProps) 
           onChange={e => onChange(field, e.target.value)}
           placeholder={placeholder}
           rows={3}
-          className="w-full px-3 py-2 border rounded-md text-sm bg-background resize-y min-h-[60px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          className="w-full px-3 py-2 border border-input rounded-md text-sm bg-background text-foreground placeholder:text-muted-foreground resize-y min-h-[60px] focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
         />
       ) : (
-        <input
+        <Input
           id={`field-${field}`}
           name={field}
           type="text"
@@ -403,7 +392,6 @@ function FieldInput({ field, value, onChange, isTextarea, t }: FieldInputProps) 
           value={value}
           onChange={e => onChange(field, e.target.value)}
           placeholder={placeholder}
-          className="w-full px-3 py-2 border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
         />
       )}
     </div>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { BookOpen, ChevronDown, ChevronUp } from 'lucide-react'
 import type { QASource } from '@/stores/qaStore'
+import { Card } from '@/components/ui/Card'
 
 interface SourceReferenceProps {
   source: QASource
@@ -21,7 +22,7 @@ export default function SourceReference({ source, index }: SourceReferenceProps)
         : `${t('qa.source')} ${index + 1}`
 
   return (
-    <div className="border rounded-md overflow-hidden">
+    <Card className="overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-muted/50 transition-colors"
@@ -36,12 +37,12 @@ export default function SourceReference({ source, index }: SourceReferenceProps)
         {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </button>
       {expanded && (
-        <div className="px-3 py-2 border-t bg-muted/20">
+        <div className="px-3 py-2 border-t border-border bg-muted/20">
           <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
             {source.content}
           </p>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

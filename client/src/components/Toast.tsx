@@ -56,10 +56,10 @@ function ToastItem({ toast: t, onClose }: { toast: ToastMessage; onClose: () => 
 
   const Icon = t.type === 'success' ? CheckCircle : t.type === 'error' ? XCircle : Info
   const colorClass = t.type === 'success'
-    ? 'border-green-200 bg-green-50 text-green-800'
+    ? 'border-success/30 bg-success-soft text-success'
     : t.type === 'error'
-    ? 'border-red-200 bg-red-50 text-red-800'
-    : 'border-blue-200 bg-blue-50 text-blue-800'
+    ? 'border-destructive/30 bg-destructive/10 text-destructive'
+    : 'border-info/30 bg-info-soft text-info'
 
   return (
     <div

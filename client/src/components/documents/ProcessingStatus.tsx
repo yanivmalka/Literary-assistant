@@ -57,7 +57,7 @@ export default function ProcessingStatus({ status, errorMessage, errorStage, pro
   if (status === 'indexed') {
     return (
       <div className="space-y-2">
-        <div className="flex items-center gap-2 text-green-600">
+        <div className="flex items-center gap-2 text-success">
           <CheckCircle className="h-5 w-5" />
           <span className="text-sm font-medium">{t('documents.status.indexed')}</span>
         </div>
@@ -69,7 +69,7 @@ export default function ProcessingStatus({ status, errorMessage, errorStage, pro
   if (isSkipped) {
     return (
       <div className="space-y-2">
-        <div className="flex items-center gap-2 text-amber-600">
+        <div className="flex items-center gap-2 text-warning">
           <AlertTriangle className="h-5 w-5" />
           <span className="text-sm font-medium">{t('documents.status.skippedNoProvider')}</span>
         </div>
@@ -113,7 +113,7 @@ export default function ProcessingStatus({ status, errorMessage, errorStage, pro
             icon = <XCircle className="h-4 w-4 text-destructive" />
             textClass = 'text-destructive'
           } else if (index < currentIndex || (index === currentIndex && !status.endsWith('ing'))) {
-            icon = <CheckCircle className="h-4 w-4 text-green-600" />
+            icon = <CheckCircle className="h-4 w-4 text-success" />
             textClass = 'text-foreground'
           } else if (index === currentIndex && status.endsWith('ing')) {
             icon = <Loader2 className="h-4 w-4 text-primary animate-spin" />

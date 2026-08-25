@@ -54,16 +54,17 @@ export default function DocumentsPage() {
       <ProjectBreadcrumb currentPage="documents" showTabs={false} />
 
       <div className="mb-6">
-        <h2 className="text-xl font-bold flex items-center gap-2">
+        <h2 className="font-display text-xl font-semibold tracking-tight flex items-center gap-2">
           <FileText className="h-5 w-5" />
           {t('documents.title')}
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
           {t('documents.subtitle')}
         </p>
+        <div className="lit-rule mt-4 mb-4" />
         <Link
           to={`/projects/${projectId}/artifacts`}
-          className="mt-3 inline-flex items-center gap-1.5 rounded border px-3 py-2 text-sm hover:bg-muted"
+          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
         >
           <ClipboardList className="h-4 w-4" />
           {t('artifacts.openReview')}

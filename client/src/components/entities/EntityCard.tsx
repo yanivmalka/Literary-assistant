@@ -41,7 +41,7 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
 
   return (
     <div
-      className={`border rounded-lg p-3 bg-card hover:shadow-sm transition-shadow ${onClick ? 'cursor-pointer' : ''}`}
+      className={`border border-border rounded-lg p-3 bg-card hover:shadow-sm transition-shadow ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
       role={onClick ? 'button' : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -90,14 +90,14 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
             <>
               <button
                 onClick={(e) => { e.stopPropagation(); onConfirm(entity.id) }}
-                className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                className="p-1 text-success hover:bg-success-soft rounded transition-colors"
                 title={t('entities.confirm')}
               >
                 <CheckCircle className="h-4 w-4" />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); onDismiss(entity.id) }}
-                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                className="p-1 text-destructive hover:bg-destructive/10 rounded transition-colors"
                 title={t('entities.dismiss')}
               >
                 <XCircle className="h-4 w-4" />
@@ -119,7 +119,7 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
           )}
 
           {entity.status === 'confirmed' && !onClick && (
-            <span className="text-xs text-green-600 flex items-center gap-1">
+            <span className="text-xs text-success flex items-center gap-1">
               <CheckCircle className="h-3 w-3" />
             </span>
           )}

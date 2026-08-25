@@ -3,6 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { Feather, Plus, FolderOpen, MoreVertical, Trash2 } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
 
 export default function ProjectsPage() {
   const { t, i18n } = useTranslation()
@@ -36,33 +39,31 @@ export default function ProjectsPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold">{t('projects.title')}</h2>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-        >
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="font-display text-2xl font-semibold tracking-tight">{t('projects.title')}</h2>
+        <Button onClick={() => setShowCreateDialog(true)}>
           <Plus className="h-4 w-4" />
           {t('projects.create')}
-        </button>
+        </Button>
       </div>
+      <div className="lit-rule mb-6" />
 
       <Link
         to="/quills"
-        className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/5 p-5 hover:border-primary/40 hover:bg-primary/10 transition-colors"
+        className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary-soft/40 p-5 hover:border-primary/40 hover:bg-primary-soft/70 transition-colors"
       >
         <div className="flex items-center gap-4">
-          <div className="rounded-lg bg-primary/10 p-3 text-primary">
+          <div className="rounded-lg bg-primary-soft p-3 text-primary">
             <Feather className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="font-semibold">{t('quills.storeTitle')}</h3>
+            <h3 className="font-display font-semibold">{t('quills.storeTitle')}</h3>
             <p className="text-sm text-muted-foreground">{t('quills.projectsCardDescription')}</p>
           </div>
         </div>
-        <span className="shrink-0 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground">
+        <Button size="sm" className="shrink-0">
           {t('quills.openStore')}
-        </span>
+        </Button>
       </Link>
 
       {loading ? (
@@ -75,15 +76,15 @@ export default function ProjectsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map((project) => (
-            <div
+            <Card
               key={project.id}
-              className="border rounded-lg p-5 bg-card hover:shadow-md transition-shadow relative group"
+              className="p-5 hover:shadow-md transition-shadow relative group"
             >
               <div
                 className="cursor-pointer"
                 onClick={() => navigate(`/projects/${project.id}`)}
               >
-                <h3 className="font-semibold text-lg mb-1">{project.name}</h3>
+                <h3 className="font-display font-semibold text-lg mb-1">{project.name}</h3>
                 {project.description && (
                   <p className="text-sm text-muted-foreground line-clamp-2">
                     {project.description}
@@ -105,7 +106,7 @@ export default function ProjectsPage() {
                   <MoreVertical className="h-4 w-4" />
                 </button>
                 {menuOpenId === project.id && (
-                  <div className="absolute end-0 top-8 bg-card border rounded-md shadow-lg py-1 z-10 min-w-[140px]">
+                  <div className="absolute end-0 top-8 bg-card border border-border rounded-md shadow-lg py-1 z-10 min-w-[140px]">
                     <button
                       onClick={() => handleDelete(project.id)}
                       className="w-full px-3 py-2 text-sm text-start hover:bg-accent flex items-center gap-2 text-destructive"
@@ -116,7 +117,7 @@ export default function ProjectsPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -124,20 +125,19 @@ export default function ProjectsPage() {
       {/* Create Project Dialog */}
       {showCreateDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card border rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold mb-4">{t('projects.create')}</h3>
+          <Card className="p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-display text-lg font-semibold mb-4">{t('projects.create')}</h3>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label htmlFor="project-name" className="block text-sm font-medium mb-1">
+                <label htmlFor="project-name" className="block text-sm font-semibold mb-1">
                   {t('projects.title')}
                 </label>
-                <input
+                <Input
                   id="project-name"
                   name="project-name"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
                   placeholder={t('ui.projects.namePlaceholder')}
                   autoFocus
                   required
@@ -145,7 +145,7 @@ export default function ProjectsPage() {
                 />
               </div>
               <div>
-                <label htmlFor="project-description" className="block text-sm font-medium mb-1">
+                <label htmlFor="project-description" className="block text-sm font-semibold mb-1">
                   {t('projects.description')}
                 </label>
                 <textarea
@@ -153,29 +153,22 @@ export default function ProjectsPage() {
                   name="project-description"
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                  className="w-full px-3 py-2 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring resize-none"
                   rows={3}
                   placeholder={t('ui.projects.descriptionPlaceholder')}
                   autoComplete="off"
                 />
               </div>
               <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateDialog(false)}
-                  className="px-4 py-2 border rounded-md hover:bg-accent transition-colors"
-                >
+                <Button type="button" variant="secondary" onClick={() => setShowCreateDialog(false)}>
                   {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-                >
+                </Button>
+                <Button type="submit">
                   {t('common.create')}
-                </button>
+                </Button>
               </div>
             </form>
-          </div>
+          </Card>
         </div>
       )}
     </div>

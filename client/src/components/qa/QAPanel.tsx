@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Send, Loader2, Trash2, AlertCircle } from 'lucide-react'
 import { useQAStore } from '@/stores/qaStore'
 import SourceReference from './SourceReference'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 
 interface QAPanelProps {
   projectId: string
@@ -32,8 +34,8 @@ export default function QAPanel({ projectId }: QAPanelProps) {
   return (
     <div className="flex flex-col h-full max-h-[600px]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b">
-        <h3 className="text-sm font-semibold">{t('qa.title')}</h3>
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border">
+        <h3 className="text-sm font-display font-semibold">{t('qa.title')}</h3>
         {messages.length > 0 && (
           <button
             onClick={clearHistory}
@@ -76,15 +78,15 @@ export default function QAPanel({ projectId }: QAPanelProps) {
 
                 {/* Insufficient context state */}
                 {msg.noSufficientContext && !msg.text && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    <p className="text-sm text-amber-900">{t('ui.qa.noResults')}</p>
+                  <div className="bg-warning-soft border border-warning/20 rounded-lg px-3 py-2">
+                    <p className="text-sm text-warning">{t('ui.qa.noResults')}</p>
                   </div>
                 )}
 
                 {/* Insufficient context warning (even with partial answer) */}
                 {msg.noSufficientContext && msg.text && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    <p className="text-xs text-amber-900">{t('ui.qa.partialResults')}</p>
+                  <div className="bg-warning-soft border border-warning/20 rounded-lg px-3 py-2">
+                    <p className="text-xs text-warning">{t('ui.qa.partialResults')}</p>
                   </div>
                 )}
 
@@ -104,7 +106,7 @@ export default function QAPanel({ projectId }: QAPanelProps) {
                     <p className="text-xs text-muted-foreground font-medium">{t('qa.entities')}:</p>
                     <div className="flex flex-wrap gap-1">
                       {msg.entitiesReferenced.map((entity) => (
-                        <span key={entity} className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">
+                        <span key={entity} className="inline-block bg-primary-soft text-primary text-xs px-2 py-1 rounded-full font-medium">
                           {entity}
                         </span>
                       ))}
@@ -127,8 +129,8 @@ export default function QAPanel({ projectId }: QAPanelProps) {
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="p-3 border-t flex gap-2">
-        <input
+      <form onSubmit={handleSubmit} className="p-3 border-t border-border flex gap-2">
+        <Input
           id="qa-input"
           name="qa-input"
           type="text"
@@ -136,16 +138,12 @@ export default function QAPanel({ projectId }: QAPanelProps) {
           autoComplete="off"
           onChange={e => setInput(e.target.value)}
           placeholder={t('qa.inputPlaceholder')}
-          className="flex-1 px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary/50"
+          className="flex-1"
           disabled={loading}
         />
-        <button
-          type="submit"
-          disabled={!input.trim() || loading}
-          className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
+        <Button type="submit" size="icon" disabled={!input.trim() || loading}>
           <Send className="h-4 w-4" />
-        </button>
+        </Button>
       </form>
     </div>
   )

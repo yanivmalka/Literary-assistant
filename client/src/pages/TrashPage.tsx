@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Trash2, RotateCcw, XCircle } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 import { toast } from '@/components/Toast'
+import { Button } from '@/components/ui/Button'
 
 export default function TrashPage() {
   const { t } = useTranslation()
@@ -49,22 +50,24 @@ export default function TrashPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="flex items-center justify-between gap-4 mb-8">
+      <div className="flex items-center justify-between gap-4 mb-1">
         <div className="flex items-center gap-3">
           <Trash2 className="h-6 w-6 text-muted-foreground" />
-          <h2 className="text-2xl font-bold">{t('projects.trash')}</h2>
+          <h2 className="font-display text-2xl font-semibold tracking-tight">{t('projects.trash')}</h2>
         </div>
         {trashedProjects.length > 0 && (
-          <button
+          <Button
+            variant="destructive"
+            size="sm"
             onClick={handleEmptyTrash}
             disabled={emptyingTrash}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" />
             {emptyingTrash ? t('ui.projects.emptyingTrash') : t('ui.projects.emptyTrash')}
-          </button>
+          </Button>
         )}
       </div>
+      <div className="lit-rule mb-6" />
 
       {loading ? (
         <div className="text-center py-12 text-muted-foreground">{t('common.loading')}</div>
@@ -74,37 +77,39 @@ export default function TrashPage() {
           <p className="text-muted-foreground">{t('ui.projects.trashEmpty')}</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="divide-y divide-border border-t border-b border-border">
           {trashedProjects.map((project) => (
             <div
               key={project.id}
-              className="border rounded-lg p-4 bg-card flex items-center justify-between"
+              className="flex items-center justify-between py-3.5"
             >
               <div>
-                <h3 className="font-medium">{project.name}</h3>
+                <h3 className="font-display font-semibold text-sm">{project.name}</h3>
                 <p className="text-xs text-muted-foreground mt-1">
                   {t('projects.daysRemaining', { days: getDaysRemaining(project.deleted_at!) })}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => restoreFromTrash(project.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-md hover:bg-accent transition-colors"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   {t('projects.restore')}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
                   onClick={() => {
                     if (confirm(t('ui.projects.confirmPermanentDelete'))) {
                       deletePermanently(project.id)
                     }
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-destructive/30 text-destructive rounded-md hover:bg-destructive/10 transition-colors"
                 >
                   <XCircle className="h-3.5 w-3.5" />
                   {t('projects.deletePermanently')}
-                </button>
+                </Button>
               </div>
             </div>
           ))}

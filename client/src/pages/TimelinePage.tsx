@@ -5,6 +5,8 @@ import { Calendar } from 'lucide-react'
 import { getTimelineEventsSorted, type TimelineEvent } from '@/lib/eventService'
 import { useBranchStore } from '@/stores/branchStore'
 import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
 
 export default function TimelinePage() {
   const { t } = useTranslation()
@@ -36,13 +38,14 @@ export default function TimelinePage() {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <Calendar className="h-8 w-8 text-indigo-600" />
-          <h1 className="text-3xl font-bold">{t('timeline.title')}</h1>
+          <Calendar className="h-7 w-7 text-primary" />
+          <h1 className="font-display text-3xl font-semibold tracking-tight">{t('timeline.title')}</h1>
         </div>
         <p className="text-muted-foreground">
           {currentBranch ? `${currentBranch.name}` : t('timeline.mainLayer')}
         </p>
       </div>
+      <div className="lit-rule mb-6" />
 
       {/* Timeline */}
       {loading ? (
@@ -50,7 +53,7 @@ export default function TimelinePage() {
           {t('common.loading')}
         </div>
       ) : events.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground border rounded-lg bg-muted/30">
+        <div className="text-center py-12 text-muted-foreground border border-border rounded-lg bg-muted/30">
           <p>{t('timeline.noEvents')}</p>
         </div>
       ) : (
@@ -66,21 +69,21 @@ export default function TimelinePage() {
               <div className="flex gap-4">
                 {/* Timeline dot */}
                 <div className="flex flex-col items-center pt-1">
-                  <div className="w-3 h-3 rounded-full bg-indigo-600 ring-4 ring-background" />
+                  <div className="w-3 h-3 rounded-full bg-primary ring-4 ring-background" />
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 pb-6">
-                  <div className="border rounded-lg p-4 bg-card hover:bg-accent/50 transition-colors">
+                  <Card className="p-4 hover:bg-accent/50 transition-colors">
                     {/* Event time */}
                     {(event.time_label || event.time_start) && (
-                      <div className="text-xs font-semibold text-indigo-600 mb-1">
+                      <div className="text-xs font-bold text-primary uppercase tracking-wide mb-1">
                         {event.time_label || new Date(event.time_start!).toLocaleDateString()}
                       </div>
                     )}
 
                     {/* Event title */}
-                    <h3 className="font-semibold text-lg mb-2">{event.name}</h3>
+                    <h3 className="font-display font-semibold text-lg mb-2">{event.name}</h3>
 
                     {/* Event description */}
                     {event.description && (
@@ -124,11 +127,11 @@ export default function TimelinePage() {
 
                     {/* Branch indicator */}
                     {event.branch_id && (
-                      <div className="mt-3 text-xs text-amber-600 bg-amber-50 rounded px-2 py-1 inline-block">
-                        {t('timeline.branchProposal')}
+                      <div className="mt-3">
+                        <Badge variant="warning">{t('timeline.branchProposal')}</Badge>
                       </div>
                     )}
-                  </div>
+                  </Card>
                 </div>
               </div>
             </div>

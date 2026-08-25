@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash2, Check, X } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
 
 interface Relationship {
   id: string
@@ -100,7 +102,7 @@ export default function RelationshipPanel({
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold text-lg">{t('ui.relationships.title')}</h3>
+      <h3 className="font-display font-semibold text-lg">{t('ui.relationships.title')}</h3>
 
       {/* Existing relationships */}
       <div className="space-y-3">
@@ -108,8 +110,8 @@ export default function RelationshipPanel({
           <p className="text-sm text-muted-foreground">{t('ui.relationships.empty')}</p>
         ) : (
           Object.entries(relationshipsByType).map(([type, rels]) => (
-            <div key={type} className="border rounded-lg p-3 space-y-2">
-              <h4 className="font-medium text-sm capitalize">{relationshipLabel(type, t)}</h4>
+            <Card key={type} className="p-3 space-y-2">
+              <h4 className="font-display font-medium text-sm capitalize">{relationshipLabel(type, t)}</h4>
               {rels.map(rel => {
                 const isIncoming = rel.target_entity_id === entity.id
                 const relatedEntityId = isIncoming ? rel.source_entity_id : rel.target_entity_id
@@ -119,12 +121,12 @@ export default function RelationshipPanel({
                 return (
                   <div
                     key={rel.id}
-                    className={`flex items-center justify-between p-2 rounded text-sm ${
+                    className={`flex items-center justify-between p-2 rounded-md text-sm border ${
                       isPending
-                        ? 'bg-yellow-50 border border-yellow-200'
+                        ? 'bg-warning-soft border-warning/20'
                         : rel.review_status === 'approved'
-                          ? 'bg-green-50 border border-green-200'
-                          : 'bg-red-50 border border-red-200'
+                          ? 'bg-success-soft border-success/20'
+                          : 'bg-destructive/10 border-destructive/20'
                     }`}
                   >
                     <span className="flex-1" title={isIncoming ? 'Incoming relationship' : 'Outgoing relationship'}>
@@ -134,40 +136,40 @@ export default function RelationshipPanel({
                       <div className="flex gap-1">
                         <button
                           onClick={() => onReviewRelationship(rel.id, true)}
-                          className="p-1 hover:bg-green-200 rounded"
+                          className="p-1 hover:bg-success-soft rounded transition-colors"
                           title={t('ui.relationships.approve')}
                         >
-                          <Check className="w-4 h-4 text-green-600" />
+                          <Check className="w-4 h-4 text-success" />
                         </button>
                         <button
                           onClick={() => onReviewRelationship(rel.id, false)}
-                          className="p-1 hover:bg-red-200 rounded"
+                          className="p-1 hover:bg-destructive/10 rounded transition-colors"
                           title={t('ui.relationships.reject')}
                         >
-                          <X className="w-4 h-4 text-red-600" />
+                          <X className="w-4 h-4 text-destructive" />
                         </button>
                       </div>
                     )}
                     {isEditMode && !rel.base_exists && (
                       <button
                         onClick={() => onRemoveRelationship(rel.id)}
-                        className="p-1 hover:bg-red-200 rounded"
+                        className="p-1 hover:bg-destructive/10 rounded transition-colors"
                       >
-                        <Trash2 className="w-4 h-4 text-red-600" />
+                        <Trash2 className="w-4 h-4 text-destructive" />
                       </button>
                     )}
                   </div>
                 )
               })}
-            </div>
+            </Card>
           ))
         )}
       </div>
 
       {/* Add new relationship (edit mode only) */}
       {isEditMode && (
-        <div className="border-t pt-4 space-y-3">
-          <h4 className="font-medium text-sm">{t('ui.relationships.addTitle')}</h4>
+        <div className="border-t border-border pt-4 space-y-3">
+          <h4 className="font-display font-medium text-sm">{t('ui.relationships.addTitle')}</h4>
           <div className="space-y-2">
             <select
               id="relationship-type"
@@ -175,7 +177,7 @@ export default function RelationshipPanel({
               autoComplete="off"
               value={selectedType}
               onChange={e => setSelectedType(e.target.value as typeof RELATIONSHIP_TYPES[number])}
-              className="w-full px-3 py-2 border rounded-md text-sm"
+              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
             >
               {RELATIONSHIP_TYPES.map(type => (
                 <option key={type} value={type}>
@@ -190,7 +192,7 @@ export default function RelationshipPanel({
               autoComplete="off"
               value={selectedTarget}
               onChange={e => setSelectedTarget(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md text-sm"
+              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
             >
               <option value="">{t('ui.relationships.selectTarget')}</option>
               {availableTargets.map(target => (
@@ -200,14 +202,14 @@ export default function RelationshipPanel({
               ))}
             </select>
 
-            <button
+            <Button
               onClick={handleAddRelationship}
               disabled={!selectedTarget || loading}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="w-full"
             >
               <Plus className="w-4 h-4" />
               {t('ui.relationships.add')}
-            </button>
+            </Button>
           </div>
         </div>
       )}

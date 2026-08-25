@@ -26,6 +26,7 @@ import DebugAuthPage from './pages/DebugAuthPage'
 import ReviewChangesPage from './pages/ReviewChangesPage'
 import AccountSettingsPage from './pages/AccountSettingsPage'
 import QuillsStorePage from './pages/QuillsStorePage'
+import DesignPreviewPage from './pages/DesignPreviewPage'
 
 function App() {
   const { i18n } = useTranslation()
@@ -46,6 +47,7 @@ function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignUpPage />} />
       <Route path="/debug-auth" element={<DebugAuthPage />} />
+      <Route path="/design-preview" element={<DesignPreviewPage />} />
       <Route path="/account-settings" element={<ProtectedRoute><AccountSettingsPage /></ProtectedRoute>} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<HomePage />} />

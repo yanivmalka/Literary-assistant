@@ -5,6 +5,12 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fantasy Map Builder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,600;7..72,700&family=Manrope:wght@400;500;600;700;800&family=Heebo:wght@400;500;600;700;800&display=swap"
+    />
     <script>
       (function() {
         var theme = localStorage.getItem('theme');
@@ -13,6 +19,11 @@
         }
         document.documentElement.classList.toggle('dark', theme === 'dark');
         document.documentElement.style.colorScheme = theme;
+
+        var accent = localStorage.getItem('theme-accent');
+        if (accent === 'indigo' || accent === 'forest' || accent === 'ember' || accent === 'rose') {
+          document.documentElement.setAttribute('data-accent', accent);
+        }
       }());
     </script>
     <!-- GitHub Pages SPA redirect handler -->

@@ -31,17 +31,18 @@ export default function ContradictionsPage() {
       <ProjectBreadcrumb currentPage="contradictions" showTabs={false} />
 
       <div className="mb-6">
-        <h2 className="text-xl font-bold flex items-center gap-2">
-          <AlertTriangle className="h-5 w-5" />
+        <h2 className="font-display text-xl font-semibold tracking-tight flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-primary" />
           {t('contradictions.title')}
         </h2>
         <p className="text-sm text-muted-foreground mt-1">{t('contradictions.subtitle')}</p>
       </div>
+      <div className="lit-rule mb-5" />
 
       {loading ? (
         <p className="text-center text-muted-foreground py-8">{t('common.loading')}</p>
       ) : contradictions.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+        <div className="text-center py-12 border-2 border-dashed border-border rounded-lg">
           <AlertTriangle className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
           <p className="text-muted-foreground">
             {available ? t('contradictions.empty') : t('contradictions.unavailable')}
@@ -51,7 +52,7 @@ export default function ContradictionsPage() {
         <div className="space-y-6">
           {openContradictions.length > 0 && (
             <div>
-              <h3 className="text-sm font-semibold text-amber-700 mb-3">
+              <h3 className="text-sm font-semibold text-warning mb-3">
                 {t('contradictions.open')} ({openContradictions.length})
               </h3>
               <div className="space-y-3">

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Upload, FileText, X } from 'lucide-react'
 import { useDocumentStore } from '@/stores/documentStore'
+import { Button } from '@/components/ui/Button'
 
 interface DocumentUploaderProps {
   projectId: string
@@ -72,7 +73,7 @@ export default function DocumentUploader({ projectId, documentId, onUploadComple
         onDrop={handleDrop}
         className={`
           border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer
-          ${dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/30 hover:border-primary/50'}
+          ${dragOver ? 'border-primary bg-primary-soft/40' : 'border-border hover:border-primary/50'}
         `}
         onClick={() => document.getElementById('doc-file-input')?.click()}
       >
@@ -89,14 +90,14 @@ export default function DocumentUploader({ projectId, documentId, onUploadComple
           <div className="flex items-center justify-center gap-3">
             <FileText className="h-8 w-8 text-primary" />
             <div className="text-start">
-              <p className="font-medium">{selectedFile.name}</p>
+              <p className="font-display font-semibold text-sm">{selectedFile.name}</p>
               <p className="text-sm text-muted-foreground">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
             <button
               onClick={(e) => { e.stopPropagation(); setSelectedFile(null) }}
-              className="p-1 hover:bg-muted rounded"
+              className="p-1 hover:bg-muted rounded transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
@@ -104,7 +105,7 @@ export default function DocumentUploader({ projectId, documentId, onUploadComple
         ) : (
           <>
             <Upload className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="text-muted-foreground">{t('documents.upload.dropzone')}</p>
+            <p className="text-muted-foreground text-sm">{t('documents.upload.dropzone')}</p>
             <p className="text-xs text-muted-foreground/70 mt-1">PDF, DOCX • {t('documents.upload.maxSize')}</p>
           </>
         )}
@@ -117,13 +118,9 @@ export default function DocumentUploader({ projectId, documentId, onUploadComple
 
       {/* Upload button */}
       {selectedFile && (
-        <button
-          onClick={handleUpload}
-          disabled={uploading}
-          className="mt-4 w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-        >
+        <Button onClick={handleUpload} disabled={uploading} className="mt-4 w-full">
           {uploading ? t('documents.upload.uploading') : t('documents.upload.confirm')}
-        </button>
+        </Button>
       )}
     </div>
   )

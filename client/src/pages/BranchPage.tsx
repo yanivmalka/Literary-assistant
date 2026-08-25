@@ -4,6 +4,10 @@ import { useParams } from 'react-router-dom'
 import { GitBranch, Plus, ArrowRight, Check, Edit3, X, Save, RefreshCw } from 'lucide-react'
 import { useBranchStore, type BranchEntity, type EntityComparison } from '@/stores/branchStore'
 import ProjectBreadcrumb from '@/components/ProjectBreadcrumb'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import { Input } from '@/components/ui/Input'
 
 type ViewMode = 'main' | 'branch' | 'compare'
 
@@ -158,21 +162,21 @@ export default function BranchPage() {
   const renderMainView = () => (
     <div className="space-y-3">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">{t('branch.mainEntities')}</h3>
+        <h3 className="font-display text-lg font-semibold tracking-tight">{t('branch.mainEntities')}</h3>
         <span className="text-sm text-muted-foreground">{mainEntities.length} {t('branch.entities')}</span>
       </div>
       {mainEntities.length === 0 ? (
-        <div className="text-center py-8 border-2 border-dashed rounded-lg">
+        <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
           <p className="text-muted-foreground">{t('branch.noMainEntities')}</p>
         </div>
       ) : (
         <div className="grid gap-3">
           {mainEntities.map(entity => (
-            <div key={entity.id} className="border rounded-lg p-4 bg-card">
+            <Card key={entity.id} className="p-4">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-lg">{renderEntityTypeIcon(entity.entity_type)}</span>
-                <h4 className="font-medium">{entity.canonical_name}</h4>
-                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded">{t('ui.branch.main')}</span>
+                <h4 className="font-display font-semibold">{entity.canonical_name}</h4>
+                <Badge variant="success">{t('ui.branch.main')}</Badge>
               </div>
               {entity.description && (
                 <p className="text-sm text-muted-foreground mb-2">{entity.description}</p>
@@ -180,13 +184,13 @@ export default function BranchPage() {
               {entity.attributes && Object.keys(entity.attributes).length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(entity.attributes).map(([key, val]) => (
-                    <span key={key} className="text-xs bg-muted px-2 py-1 rounded">
+                    <span key={key} className="text-xs bg-muted px-2 py-1 rounded-md">
                       <span className="font-medium">{key}:</span> {formatValue(val)}
                     </span>
                   ))}
                 </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -200,69 +204,69 @@ export default function BranchPage() {
   const renderBranchView = () => (
     <div className="space-y-3">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">
+        <h3 className="font-display text-lg font-semibold tracking-tight">
           {currentBranch?.name || t('branch.branch')}
         </h3>
         <span className="text-sm text-muted-foreground">{branchEntities.length} {t('branch.entities')}</span>
       </div>
       {branchEntities.length === 0 ? (
-        <div className="text-center py-8 border-2 border-dashed rounded-lg">
+        <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
           <p className="text-muted-foreground">{t('branch.noBranchEntities')}</p>
         </div>
       ) : (
         <div className="grid gap-3">
           {branchEntities.map(entity => (
-            <div key={entity.id} className={`border rounded-lg p-4 bg-card ${entity.is_modified ? 'border-amber-300' : ''}`}>
+            <Card key={entity.id} className={`p-4 ${entity.is_modified ? 'border-warning/40' : ''}`}>
               {editingEntity === entity.id ? (
                 // Edit mode
                 <div className="space-y-3">
                   <div>
-                    <label htmlFor={`edit-canonical-name-${entity.id}`} className="text-xs font-medium text-muted-foreground">{t('branch.fields.name')}</label>
-                    <input
+                    <label htmlFor={`edit-canonical-name-${entity.id}`} className="text-xs font-semibold text-muted-foreground">{t('branch.fields.name')}</label>
+                    <Input
                       id={`edit-canonical-name-${entity.id}`}
                       name={`canonical-name-${entity.id}`}
                       type="text"
                       value={editForm.canonical_name}
                       onChange={e => setEditForm(prev => ({ ...prev, canonical_name: e.target.value }))}
-                      className="w-full mt-1 px-3 py-1.5 border rounded-md text-sm"
+                      className="mt-1 h-9"
                       autoComplete="off"
                     />
                   </div>
                   <div>
-                    <label htmlFor={`edit-description-${entity.id}`} className="text-xs font-medium text-muted-foreground">{t('branch.fields.description')}</label>
+                    <label htmlFor={`edit-description-${entity.id}`} className="text-xs font-semibold text-muted-foreground">{t('branch.fields.description')}</label>
                     <textarea
                       id={`edit-description-${entity.id}`}
                       name={`description-${entity.id}`}
                       value={editForm.description}
                       onChange={e => setEditForm(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full mt-1 px-3 py-1.5 border rounded-md text-sm"
+                      className="w-full mt-1 px-3 py-1.5 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
                       rows={2}
                       autoComplete="off"
                     />
                   </div>
                   {Object.entries(editForm.attributes).map(([key, val]) => (
                     <div key={key}>
-                      <label htmlFor={`edit-attr-${key}`} className="text-xs font-medium text-muted-foreground">{key}</label>
-                      <input
+                      <label htmlFor={`edit-attr-${key}`} className="text-xs font-semibold text-muted-foreground">{key}</label>
+                      <Input
                         id={`edit-attr-${key}`}
                         name={`attribute-${key}`}
                         type="text"
                         value={formatValue(val)}
                         onChange={e => handleAttributeChange(key, e.target.value)}
-                        className="w-full mt-1 px-3 py-1.5 border rounded-md text-sm"
+                        className="mt-1 h-9"
                         autoComplete="off"
                       />
                     </div>
                   ))}
                   <div className="flex gap-2 pt-2">
-                    <button onClick={handleSaveEdit} className="flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90">
+                    <Button size="sm" onClick={handleSaveEdit}>
                       <Save className="h-3.5 w-3.5" />
                       {t('common.save')}
-                    </button>
-                    <button onClick={handleCancelEdit} className="flex items-center gap-1 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80">
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={handleCancelEdit}>
                       <X className="h-3.5 w-3.5" />
                       {t('common.cancel')}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -271,15 +275,15 @@ export default function BranchPage() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{renderEntityTypeIcon(entity.entity_type || '')}</span>
-                      <h4 className="font-medium">{entity.canonical_name || ''}</h4>
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{t('ui.branch.branch')}</span>
+                      <h4 className="font-display font-semibold">{entity.canonical_name || ''}</h4>
+                      <Badge variant="info">{t('ui.branch.branch')}</Badge>
                       {entity.is_modified && (
-                        <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">{t('branch.modified')}</span>
+                        <Badge variant="warning">{t('branch.modified')}</Badge>
                       )}
                     </div>
                     <button
                       onClick={() => handleStartEdit(entity)}
-                      className="p-1.5 rounded hover:bg-muted transition-colors"
+                      className="p-1.5 rounded-md hover:bg-muted transition-colors"
                       title={t('common.edit')}
                     >
                       <Edit3 className="h-4 w-4 text-muted-foreground" />
@@ -291,7 +295,7 @@ export default function BranchPage() {
                   {entity.attributes && Object.keys(entity.attributes).length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {Object.entries(entity.attributes).map(([key, val]) => (
-                        <span key={key} className="text-xs bg-muted px-2 py-1 rounded">
+                        <span key={key} className="text-xs bg-muted px-2 py-1 rounded-md">
                           <span className="font-medium">{key}:</span> {formatValue(val)}
                         </span>
                       ))}
@@ -299,7 +303,7 @@ export default function BranchPage() {
                   )}
                 </>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -313,7 +317,7 @@ export default function BranchPage() {
   const renderCompareView = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">{t('branch.comparison')}</h3>
+        <h3 className="font-display text-lg font-semibold tracking-tight">{t('branch.comparison')}</h3>
         <button
           onClick={handleCompare}
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -324,15 +328,15 @@ export default function BranchPage() {
       </div>
 
       {comparisons.length === 0 ? (
-        <div className="text-center py-8 border-2 border-dashed rounded-lg">
+        <div className="text-center py-8 border-2 border-dashed border-border rounded-lg">
           <p className="text-muted-foreground">{t('branch.noComparisons')}</p>
         </div>
       ) : (
         <div className="space-y-4">
           {comparisons.filter(c => c.hasChanges).length === 0 ? (
-            <div className="text-center py-6 border rounded-lg bg-green-50">
-              <Check className="h-6 w-6 text-green-600 mx-auto mb-2" />
-              <p className="text-sm text-green-700">{t('branch.noChanges')}</p>
+            <div className="text-center py-6 border border-border rounded-lg bg-success-soft">
+              <Check className="h-6 w-6 text-success mx-auto mb-2" />
+              <p className="text-sm text-success">{t('branch.noChanges')}</p>
             </div>
           ) : (
             comparisons.filter(c => c.hasChanges).map(comparison => (
@@ -364,94 +368,82 @@ export default function BranchPage() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 mb-1">
-          <GitBranch className="h-5 w-5" />
-          <h2 className="text-xl font-bold">{t('branch.title')}</h2>
+          <GitBranch className="h-5 w-5 text-primary" />
+          <h2 className="font-display text-xl font-semibold tracking-tight">{t('branch.title')}</h2>
         </div>
         <p className="text-sm text-muted-foreground">{t('branch.subtitle')}</p>
       </div>
+      <div className="lit-rule mb-5" />
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
-          <p className="text-sm text-red-700">{error}</p>
-          <button onClick={clearError} className="text-red-500 hover:text-red-700">
+        <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center justify-between">
+          <p className="text-sm text-destructive">{error}</p>
+          <button onClick={clearError} className="text-destructive hover:opacity-80">
             <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
       {/* Branch status & actions */}
-      <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-muted/30 rounded-lg border">
+      <div className="flex flex-wrap items-center gap-3 mb-6 p-4 bg-muted/30 rounded-lg border border-border">
         {currentBranch ? (
           <>
             <div className="flex items-center gap-2">
-              <GitBranch className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-medium">{currentBranch.name}</span>
-              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{t('branch.active')}</span>
+              <GitBranch className="h-4 w-4 text-info" />
+              <span className="text-sm font-semibold">{currentBranch.name}</span>
+              <Badge variant="info">{t('branch.active')}</Badge>
             </div>
             <div className="flex gap-2 ms-auto">
-              <button
-                onClick={handleNewBranch}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm border rounded-md hover:bg-muted transition-colors"
-              >
+              <Button variant="secondary" size="sm" onClick={handleNewBranch}>
                 <Plus className="h-3.5 w-3.5" />
                 {t('branch.newBranch')}
-              </button>
+              </Button>
             </div>
           </>
         ) : (
           <>
             <p className="text-sm text-muted-foreground">{t('branch.noBranch')}</p>
-            <button
-              onClick={() => setShowCreateDialog(true)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 ms-auto"
-            >
+            <Button size="sm" className="ms-auto" onClick={() => setShowCreateDialog(true)}>
               <Plus className="h-3.5 w-3.5" />
               {t('branch.createBranch')}
-            </button>
+            </Button>
           </>
         )}
       </div>
 
       {/* Create branch dialog */}
       {showCreateDialog && (
-        <div className="mb-6 p-4 border-2 border-primary/20 rounded-lg bg-card">
-          <h4 className="font-medium mb-3">{t('branch.createBranch')}</h4>
-          <input
+        <Card className="mb-6 p-4 border-primary/20">
+          <h4 className="font-display font-semibold mb-3">{t('branch.createBranch')}</h4>
+          <Input
             id="new-branch-name"
             name="branch-name"
             type="text"
             placeholder={t('branch.branchNamePlaceholder')}
             value={newBranchName}
             onChange={e => setNewBranchName(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md text-sm mb-3"
+            className="mb-3"
             autoComplete="off"
             autoFocus
           />
           <div className="flex gap-2">
-            <button
-              onClick={handleCreateBranch}
-              disabled={loading}
-              className="flex items-center gap-1 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90 disabled:opacity-50"
-            >
+            <Button size="sm" onClick={handleCreateBranch} disabled={loading}>
               {loading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               {t('branch.create')}
-            </button>
-            <button
-              onClick={() => setShowCreateDialog(false)}
-              className="px-4 py-2 bg-muted rounded-md text-sm hover:bg-muted/80"
-            >
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowCreateDialog(false)}>
               {t('common.cancel')}
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* View mode tabs */}
-      <div className="flex gap-1 mb-6 border-b">
+      <div className="flex gap-1 mb-6 border-b border-border">
         <button
           onClick={() => setViewMode('main')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
             viewMode === 'main' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -460,7 +452,7 @@ export default function BranchPage() {
         <button
           onClick={() => { setViewMode('branch'); }}
           disabled={!currentBranch}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors disabled:opacity-50 ${
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors disabled:opacity-50 ${
             viewMode === 'branch' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -469,7 +461,7 @@ export default function BranchPage() {
         <button
           onClick={handleCompare}
           disabled={!currentBranch}
-          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors disabled:opacity-50 ${
+          className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors disabled:opacity-50 ${
             viewMode === 'compare' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -520,28 +512,25 @@ function ComparisonCard({
   const changedDiffs = comparison.diffs.filter(d => d.changed)
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <Card className="overflow-hidden">
       {/* Entity header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-muted/50 border-b">
+      <div className="flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border">
         <div className="flex items-center gap-2">
           <span>{renderEntityTypeIcon(comparison.entityType)}</span>
-          <span className="font-medium">{comparison.entityName}</span>
-          <span className="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded">
+          <span className="font-display font-semibold">{comparison.entityName}</span>
+          <Badge variant="warning">
             {changedDiffs.length} {t('branch.changedFields')}
-          </span>
+          </Badge>
         </div>
-        <button
-          onClick={() => onTransferAll(comparison.sourceEntityId)}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-        >
+        <Button size="sm" onClick={() => onTransferAll(comparison.sourceEntityId)}>
           <ArrowRight className="h-3 w-3 rtl:rotate-180" />
           {t('branch.transferAll')}
-        </button>
+        </Button>
       </div>
 
       {/* Field comparison table */}
-      <div className="divide-y">
-        <div className="grid grid-cols-[1fr_2fr_2fr_auto] gap-2 px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground">
+      <div className="divide-y divide-border">
+        <div className="grid grid-cols-[1fr_2fr_2fr_auto] gap-2 px-4 py-2 bg-muted/20 text-xs font-semibold text-muted-foreground">
           <span>{t('branch.field')}</span>
           <span>{t('ui.branch.comparisonMain')}</span>
           <span>{t('ui.branch.comparisonBranch')}</span>
@@ -553,12 +542,12 @@ function ComparisonCard({
             <span className="text-sm text-muted-foreground truncate" title={formatValue(diff.mainValue)}>
               {formatValue(diff.mainValue)}
             </span>
-            <span className="text-sm text-blue-700 truncate" title={formatValue(diff.branchValue)}>
+            <span className="text-sm text-info truncate" title={formatValue(diff.branchValue)}>
               {formatValue(diff.branchValue)}
             </span>
             <button
               onClick={() => onTransferField(comparison.sourceEntityId, diff.field, diff.branchValue)}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100 whitespace-nowrap"
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-success-soft text-success border border-success/20 rounded-md hover:opacity-80 whitespace-nowrap"
               title={t('branch.transferToMain')}
             >
               <ArrowRight className="h-3 w-3 rtl:rotate-180" />
@@ -567,6 +556,6 @@ function ComparisonCard({
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }

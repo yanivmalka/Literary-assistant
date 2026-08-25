@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Calendar } from 'lucide-react'
 import { getTimelineEventsSorted } from '@/lib/eventService'
 import { useBranchStore } from '@/stores/branchStore'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
 
 interface TimelineHubProps {
   projectId: string
@@ -32,8 +34,8 @@ export default function TimelineHub({ projectId }: TimelineHubProps) {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <Calendar className="h-6 w-6 text-indigo-600" />
-          <h1 className="text-2xl font-bold">{t('timeline.title')}</h1>
+          <Calendar className="h-6 w-6 text-primary" />
+          <h1 className="font-display text-2xl font-semibold tracking-tight">{t('timeline.title')}</h1>
         </div>
         <p className="text-sm text-muted-foreground">
           {currentBranch ? currentBranch.name : t('timeline.mainLayer')}
@@ -47,7 +49,7 @@ export default function TimelineHub({ projectId }: TimelineHubProps) {
         </div>
       ) : events.length === 0 ? (
         /* Empty State */
-        <div className="text-center py-12 border rounded-lg bg-muted/30">
+        <div className="text-center py-12 border border-border rounded-lg bg-muted/30">
           <Calendar className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-muted-foreground mb-2">{t('timeline.noEvents')}</p>
           <p className="text-xs text-muted-foreground">
@@ -68,21 +70,21 @@ export default function TimelineHub({ projectId }: TimelineHubProps) {
               <div className="flex gap-4">
                 {/* Timeline dot */}
                 <div className="flex flex-col items-center pt-1">
-                  <div className="w-3 h-3 rounded-full bg-indigo-600 ring-4 ring-background" />
+                  <div className="w-3 h-3 rounded-full bg-primary ring-4 ring-background" />
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 pb-6">
-                  <div className="border rounded-lg p-4 bg-card hover:bg-accent/50 transition-colors">
+                  <Card className="p-4 hover:bg-accent/50 transition-colors">
                     {/* Event time */}
                     {(event.time_label || event.time_start) && (
-                      <div className="text-xs font-semibold text-indigo-600 mb-1">
+                      <div className="text-xs font-semibold text-primary mb-1">
                         {event.time_label || new Date(event.time_start!).toLocaleDateString()}
                       </div>
                     )}
 
                     {/* Event title */}
-                    <h3 className="font-semibold text-lg mb-2">{event.name}</h3>
+                    <h3 className="font-display font-semibold text-lg mb-2">{event.name}</h3>
 
                     {/* Event description */}
                     {event.description && (
@@ -99,11 +101,11 @@ export default function TimelineHub({ projectId }: TimelineHubProps) {
 
                     {/* Branch indicator */}
                     {event.branch_id && (
-                      <div className="mt-3 text-xs text-amber-600 bg-amber-50 rounded px-2 py-1 inline-block">
+                      <Badge variant="warning" className="mt-3">
                         {t('branch.proposal')}
-                      </div>
+                      </Badge>
                     )}
-                  </div>
+                  </Card>
                 </div>
               </div>
             </div>

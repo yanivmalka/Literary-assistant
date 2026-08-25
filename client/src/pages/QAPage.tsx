@@ -16,16 +16,17 @@ export default function QAPage() {
       <ProjectBreadcrumb currentPage="qa" showTabs={false} />
 
       <div className="mb-4">
-        <h2 className="text-xl font-bold flex items-center gap-2">
+        <h2 className="font-display text-xl font-semibold tracking-tight flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
           {t('qa.title')}
         </h2>
         <p className="text-sm text-muted-foreground mt-1">{t('qa.subtitle')}</p>
+        <div className="lit-rule mt-4" />
       </div>
       <div className="mb-3">
         <SourcePicker projectId={projectId} />
       </div>
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border border-border rounded-lg overflow-hidden bg-card">
         <QAPanel projectId={projectId} />
       </div>
     </div>

@@ -2,8 +2,17 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
-import { useTheme, type ThemeTransitionMode, type ExtractionProgressStyle } from '@/components/ThemeProvider'
-import { ArrowLeft, Lock, Mail, Chrome } from 'lucide-react'
+import { useTheme, type ThemeTransitionMode, type ExtractionProgressStyle, type AccentColor } from '@/components/ThemeProvider'
+import { ArrowLeft, Lock, Mail, Chrome, Check } from 'lucide-react'
+import { Badge } from '@/components/ui/Badge'
+
+const ACCENT_OPTIONS: AccentColor[] = ['indigo', 'forest', 'ember', 'rose']
+const ACCENT_SWATCH_CLASSES: Record<AccentColor, string> = {
+  indigo: 'bg-[hsl(245_32%_30%)] dark:bg-[hsl(245_55%_74%)]',
+  forest: 'bg-[hsl(155_35%_28%)] dark:bg-[hsl(155_45%_62%)]',
+  ember: 'bg-[hsl(28_60%_36%)] dark:bg-[hsl(30_65%_64%)]',
+  rose: 'bg-[hsl(350_45%_42%)] dark:bg-[hsl(350_55%_70%)]',
+}
 
 interface Identity {
   provider: string
@@ -149,7 +158,7 @@ export default function AccountSettingsPage() {
           </div>
         )}
         {success && (
-          <div className="bg-green-100 text-green-800 text-sm p-3 rounded-md mb-6">
+          <div className="bg-success-soft text-success text-sm p-3 rounded-md mb-6">
             {success}
           </div>
         )}
@@ -170,7 +179,29 @@ export default function AccountSettingsPage() {
           <p className="mt-1 text-sm text-muted-foreground">{t('ui.theme.appearanceDescription')}</p>
 
           <div className="mt-6 space-y-5">
-            <label className="flex items-start justify-between gap-4 cursor-pointer">
+            <div>
+              <span className="block text-sm font-medium mb-2">{t('ui.theme.accentTitle')}</span>
+              <p className="text-sm text-muted-foreground mb-3">{t('ui.theme.accentDescription')}</p>
+              <div className="flex items-center gap-3">
+                {ACCENT_OPTIONS.map((accent) => (
+                  <button
+                    key={accent}
+                    type="button"
+                    onClick={() => updateThemeSettings({ accent })}
+                    title={t(`ui.theme.accent.${accent}`)}
+                    aria-label={t(`ui.theme.accent.${accent}`)}
+                    aria-pressed={themeSettings.accent === accent}
+                    className={`h-8 w-8 rounded-full flex items-center justify-center transition-shadow ${ACCENT_SWATCH_CLASSES[accent]} ${
+                      themeSettings.accent === accent ? 'ring-2 ring-offset-2 ring-offset-background ring-ring' : ''
+                    }`}
+                  >
+                    {themeSettings.accent === accent && <Check className="h-4 w-4 text-primary-foreground" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <label className="flex items-start justify-between gap-4 cursor-pointer border-t pt-5">
               <span>
                 <span className="block font-medium">{t('ui.theme.transitionEnabled')}</span>
                 <span className="block mt-1 text-sm text-muted-foreground">
@@ -246,6 +277,7 @@ export default function AccountSettingsPage() {
             >
               <option value="bar">{t('ui.extraction.progressStyleBar')}</option>
               <option value="sword">{t('ui.extraction.progressStyleSword')}</option>
+              <option value="minimal">{t('ui.extraction.progressStyleMinimal')}</option>
             </select>
           </div>
         </div>
@@ -268,9 +300,7 @@ export default function AccountSettingsPage() {
                   </div>
                 </div>
                 {hasEmailIdentity && (
-                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                    {t('ui.account.active')}
-                  </span>
+                  <Badge variant="success">{t('ui.account.active')}</Badge>
                 )}
               </div>
 
@@ -350,9 +380,7 @@ export default function AccountSettingsPage() {
                   </div>
                 </div>
                 {hasGoogleIdentity && (
-                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                    {t('ui.account.active')}
-                  </span>
+                  <Badge variant="success">{t('ui.account.active')}</Badge>
                 )}
               </div>
 

@@ -81,19 +81,19 @@ export default function KnowledgeHubPage() {
           >
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </button>
-          <h1 className="text-2xl font-bold">{t('knowledge.title')}</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">{t('knowledge.title')}</h1>
         </div>
 
         {/* Tab Navigation */}
-        <nav className="flex gap-2 mb-8 border-b pb-3">
+        <nav className="flex gap-1 mb-8 p-1 rounded-lg bg-muted w-fit">
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
                 activeTab === tab.id
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <tab.icon className="h-4 w-4" />

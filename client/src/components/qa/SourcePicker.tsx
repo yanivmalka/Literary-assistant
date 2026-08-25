@@ -3,6 +3,7 @@ import { FileText, SlidersHorizontal } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useQAStore } from '@/stores/qaStore'
+import { Badge } from '@/components/ui/Badge'
 
 const SEARCHABLE_STATUSES = new Set(['ready', 'indexed', 'skipped_no_provider'])
 
@@ -37,15 +38,13 @@ export default function SourcePicker({ projectId }: SourcePickerProps) {
   }
 
   return (
-    <details className="border rounded-lg bg-card" open={selectedSourceVersionIds.length > 0}>
+    <details className="border border-border rounded-lg bg-card" open={selectedSourceVersionIds.length > 0}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-medium">
         <span className="flex items-center gap-2">
           <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
           {t('qa.sourcePicker.title')}
           {selectedSourceVersionIds.length > 0 && (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-              {selectedSourceVersionIds.length}
-            </span>
+            <Badge variant="accent">{selectedSourceVersionIds.length}</Badge>
           )}
         </span>
         <span className="text-xs font-normal text-muted-foreground">
@@ -55,7 +54,7 @@ export default function SourcePicker({ projectId }: SourcePickerProps) {
         </span>
       </summary>
 
-      <div className="border-t px-3 py-3 space-y-3">
+      <div className="border-t border-border px-3 py-3 space-y-3">
         <p className="text-xs text-muted-foreground">{t('qa.sourcePicker.description')}</p>
 
         {loading && searchableDocuments.length === 0 ? (

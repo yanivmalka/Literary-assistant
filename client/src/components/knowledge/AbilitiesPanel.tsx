@@ -6,6 +6,7 @@ import { shouldUseProfileBranch } from '@/lib/extractionModels'
 import type { Entity } from '@/stores/entityStore'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import { supabase } from '@/lib/supabase'
+import { Card } from '@/components/ui/Card'
 
 interface AbilitiesPanelProps {
   character: Entity
@@ -235,19 +236,19 @@ export default function AbilitiesPanel({
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={() => setSelectedCategory(null)}
-            className="p-1 rounded-md hover:bg-muted transition-colors"
+            className="p-1 rounded-md hover:bg-accent transition-colors"
           >
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </button>
           <div>
-            <h2 className="text-xl font-bold">{t(`${emptyStateKey}.label`)}</h2>
+            <h2 className="font-display text-xl font-semibold tracking-tight">{t(`${emptyStateKey}.label`)}</h2>
             <p className="text-sm text-muted-foreground mt-1">{character.name}</p>
           </div>
         </div>
 
         {/* Abilities List or Empty State */}
         {abilityList.length === 0 ? (
-          <div className="border-2 border-dashed rounded-lg p-12 text-center">
+          <div className="border-2 border-dashed border-border rounded-lg p-12 text-center">
             <p className="text-muted-foreground mb-2">
               {t(`${emptyStateKey}.title`)}
             </p>
@@ -258,12 +259,12 @@ export default function AbilitiesPanel({
         ) : (
           <div className="space-y-3">
             {abilityList.map(ability => (
-              <div key={ability.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
-                <h3 className="font-semibold">{ability.name}</h3>
+              <Card key={ability.id} className="p-4 hover:bg-accent/50 transition-colors">
+                <h3 className="font-display font-semibold">{ability.name}</h3>
                 {ability.description && (
                   <p className="text-sm text-muted-foreground mt-2">{ability.description}</p>
                 )}
-              </div>
+              </Card>
             ))}
           </div>
         )}
@@ -278,12 +279,12 @@ export default function AbilitiesPanel({
         <div className="flex items-center gap-3 mb-6">
           <button
             onClick={onBack}
-            className="p-1 rounded-md hover:bg-muted transition-colors"
+            className="p-1 rounded-md hover:bg-accent transition-colors"
           >
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </button>
           <div>
-            <h2 className="text-xl font-bold">{t('ui.abilities.title')}</h2>
+            <h2 className="font-display text-xl font-semibold tracking-tight">{t('ui.abilities.title')}</h2>
             <p className="text-sm text-muted-foreground mt-1">{character.name}</p>
           </div>
         </div>
@@ -298,12 +299,12 @@ export default function AbilitiesPanel({
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={onBack}
-          className="p-1 rounded-md hover:bg-muted transition-colors"
+          className="p-1 rounded-md hover:bg-accent transition-colors"
         >
           <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
         </button>
         <div>
-          <h2 className="text-xl font-bold">{t('ui.abilities.title')}</h2>
+          <h2 className="font-display text-xl font-semibold tracking-tight">{t('ui.abilities.title')}</h2>
           <p className="text-sm text-muted-foreground mt-1">{character.name}</p>
         </div>
       </div>
@@ -313,29 +314,33 @@ export default function AbilitiesPanel({
         {/* Life Skills Tile */}
         <button
           onClick={() => setSelectedCategory('life_skills')}
-          className="border rounded-lg p-6 hover:shadow-md transition-all text-left"
+          className="text-start"
         >
-          <div className="flex items-center gap-3 mb-4">
-            <Shield className="h-6 w-6 text-orange-500" />
-            <h3 className="text-lg font-semibold">{t('entities.emptyStates.lifeSkills.label')}</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {t('entities.emptyStates.lifeSkills.categoryDescription')}
-          </p>
+          <Card className="p-6 hover:shadow-md transition-all">
+            <div className="flex items-center gap-3 mb-4">
+              <Shield className="h-6 w-6 text-warning" />
+              <h3 className="font-display text-lg font-semibold">{t('entities.emptyStates.lifeSkills.label')}</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t('entities.emptyStates.lifeSkills.categoryDescription')}
+            </p>
+          </Card>
         </button>
 
         {/* Magic Skills Tile */}
         <button
           onClick={() => setSelectedCategory('magic_skills')}
-          className="border rounded-lg p-6 hover:shadow-md transition-all text-left"
+          className="text-start"
         >
-          <div className="flex items-center gap-3 mb-4">
-            <Sparkles className="h-6 w-6 text-purple-500" />
-            <h3 className="text-lg font-semibold">{t('entities.emptyStates.magicSkills.label')}</h3>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {t('entities.emptyStates.magicSkills.categoryDescription')}
-          </p>
+          <Card className="p-6 hover:shadow-md transition-all">
+            <div className="flex items-center gap-3 mb-4">
+              <Sparkles className="h-6 w-6 text-primary" />
+              <h3 className="font-display text-lg font-semibold">{t('entities.emptyStates.magicSkills.label')}</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t('entities.emptyStates.magicSkills.categoryDescription')}
+            </p>
+          </Card>
         </button>
       </div>
     </div>

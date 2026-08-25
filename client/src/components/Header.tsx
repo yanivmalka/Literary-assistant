@@ -54,32 +54,42 @@ export default function Header() {
   }
 
   return (
-    <header className="border-b bg-card px-6 py-3 flex items-center justify-between">
-      <div className="flex items-center gap-6">
-        <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <Map className="h-6 w-6 text-primary" />
-          <h1 className="text-lg font-semibold">{t('app.title')}</h1>
+    <header className="border-b bg-card px-[2cm] py-3 flex items-center justify-between">
+      <div className="flex items-center gap-9">
+        <Link to="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
+            <Map className="h-4 w-4 text-primary-foreground" />
+          </span>
+          <h1 className="font-display text-lg font-semibold tracking-tight">{t('app.title')}</h1>
         </Link>
 
         {user && (
-          <nav className="flex items-center gap-4">
+          <nav className="flex items-center gap-1">
             <Link
               to="/projects"
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                location.pathname.startsWith('/projects')
+                  ? 'text-primary bg-primary-soft'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              }`}
             >
               <FolderOpen className="h-4 w-4" />
               {t('projects.title')}
             </Link>
             <Link
               to="/trash"
-              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                location.pathname.startsWith('/trash')
+                  ? 'text-primary bg-primary-soft'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+              }`}
             >
               <Trash2 className="h-4 w-4" />
               {t('projects.trash')}
             </Link>
             <Link
               to="/quills"
-              className="flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+              className="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-semibold text-primary hover:bg-primary-soft transition-colors"
               aria-label={t('quills.openStore')}
             >
               <Feather className="h-4 w-4" />

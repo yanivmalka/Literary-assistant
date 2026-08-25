@@ -15,6 +15,8 @@ import {
 } from '@/lib/placeSchema'
 import { getContainerOptions, savePlaceContainers } from '@/lib/placeHierarchy'
 import type { Entity } from '@/stores/entityStore'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
 
 interface LocationEditModalProps {
   isOpen: boolean
@@ -294,21 +296,21 @@ export default function LocationEditModal({
     return (
       <div key={field.field_key}>
         <label className="text-sm font-medium" htmlFor={field.field_key}>
-          {placeFieldLabel(field, t)} {field.is_required && <span className="text-red-600">*</span>}
+          {placeFieldLabel(field, t)} {field.is_required && <span className="text-destructive">*</span>}
         </label>
         {field.field_type === 'boolean' ? (
-          <select id={field.field_key} name={field.field_key} autoComplete="off" value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full px-3 py-2 border rounded-md bg-background">
+          <select id={field.field_key} name={field.field_key} autoComplete="off" value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring">
             <option value="">{t('ui.location.unknown')}</option><option value="true">{t('ui.location.yes')}</option><option value="false">{t('ui.location.no')}</option>
           </select>
         ) : field.field_type === 'select' ? (
-          <select id={field.field_key} name={field.field_key} autoComplete="off" value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full px-3 py-2 border rounded-md bg-background">
+          <select id={field.field_key} name={field.field_key} autoComplete="off" value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring">
             <option value="">{t('ui.location.select')}</option>{field.options.map(option => <option key={option} value={option}>{option}</option>)}
           </select>
         ) : field.field_type === 'multi_select' ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {field.options.map(option => {
               const selected = parseMultiSelectValue(value).includes(option)
-              return <label key={option} className="flex items-center gap-2 border rounded px-2 py-1 text-sm"><input id={`location-${field.field_key}-${option}`} name={field.field_key} type="checkbox" checked={selected} onChange={e => {
+              return <label key={option} className="flex items-center gap-2 border border-input rounded px-2 py-1 text-sm"><input id={`location-${field.field_key}-${option}`} name={field.field_key} type="checkbox" checked={selected} onChange={e => {
                 const next = new Set(parseMultiSelectValue(value))
                 e.target.checked ? next.add(option) : next.delete(option)
                 setValue(JSON.stringify([...next]))
@@ -316,45 +318,73 @@ export default function LocationEditModal({
             })}
           </div>
         ) : isLong ? (
-          <textarea id={field.field_key} name={field.field_key} autoComplete="off" value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full px-3 py-2 border rounded-md bg-background resize-none" rows={3} />
+          <textarea id={field.field_key} name={field.field_key} autoComplete="off" value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full px-3 py-2 rounded-md border border-input bg-background text-sm text-foreground resize-none focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring" rows={3} />
         ) : (
-          <input id={field.field_key} name={field.field_key} type={field.field_type === 'number' ? 'number' : 'text'} autoComplete="off" value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full px-3 py-2 border rounded-md bg-background" />
+          <input id={field.field_key} name={field.field_key} type={field.field_type === 'number' ? 'number' : 'text'} autoComplete="off" value={value} onChange={e => setValue(e.target.value)} className="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring" />
         )}
       </div>
     )
   }
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-background rounded-lg shadow-lg max-w-4xl w-full max-h-[92vh] overflow-auto">
-        <div className="sticky top-0 bg-background border-b p-6 flex items-start justify-between z-10">
-          <div><h2 className="text-2xl font-bold">{isNewLocation ? t('ui.location.newTitle') : t('ui.location.editTitle')}</h2><p className="text-sm text-muted-foreground mt-1">{location?.name || t('ui.location.place')}</p></div>
-          <button onClick={onClose} className="p-1 rounded-md hover:bg-muted"><X className="h-6 w-6" /></button>
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-card border border-border rounded-lg shadow-lg max-w-4xl w-full max-h-[92vh] overflow-auto">
+        <div className="sticky top-0 bg-card border-b border-border p-6 flex items-start justify-between z-10">
+          <div><h2 className="font-display text-2xl font-semibold tracking-tight">{isNewLocation ? t('ui.location.newTitle') : t('ui.location.editTitle')}</h2><p className="text-sm text-muted-foreground mt-1">{location?.name || t('ui.location.place')}</p></div>
+          <button onClick={onClose} className="p-1 rounded-md hover:bg-accent transition-colors"><X className="h-6 w-6" /></button>
         </div>
 
         <div className="p-6 space-y-6">
           {loadingSchema ? <p className="text-sm text-muted-foreground">{t('ui.location.loadingSchema')}</p> : null}
-          <section className="border rounded-lg p-4 space-y-4">
-            <h3 className="font-semibold">{t('ui.location.identity')}</h3>
+          <section className="rounded-lg border border-border bg-card p-4 space-y-4">
+            <h3 className="font-display font-semibold">{t('ui.location.identity')}</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div><label htmlFor="location-name" className="text-sm font-medium">{t('ui.location.name')} *</label><input id="location-name" name="location-name" autoComplete="off" value={formData.name || ''} onChange={e => setFormData(current => ({ ...current, name: e.target.value || null }))} className="mt-1 w-full px-3 py-2 border rounded-md bg-background" /></div>
-              <div><label htmlFor="location-place-type" className="text-sm font-medium">{t('ui.location.type')}</label><select id="location-place-type" name="location-place-type" autoComplete="off" value={selectedPlaceType} onChange={e => setSelectedPlaceType(e.target.value)} className="mt-1 w-full px-3 py-2 border rounded-md bg-background"><option value="">{t('ui.location.selectType')}</option>{schema.types.map(item => <option key={item.type_key} value={item.type_key}>{placeTypeLabel(item.type_key, item.label, t)}</option>)}<option value="other">{t('ui.location.customType')}</option></select></div>
+              <div><label htmlFor="location-name" className="text-sm font-medium">{t('ui.location.name')} *</label><input id="location-name" name="location-name" autoComplete="off" value={formData.name || ''} onChange={e => setFormData(current => ({ ...current, name: e.target.value || null }))} className="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring" /></div>
+              <div><label htmlFor="location-place-type" className="text-sm font-medium">{t('ui.location.type')}</label><select id="location-place-type" name="location-place-type" autoComplete="off" value={selectedPlaceType} onChange={e => setSelectedPlaceType(e.target.value)} className="mt-1 w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"><option value="">{t('ui.location.selectType')}</option>{schema.types.map(item => <option key={item.type_key} value={item.type_key}>{placeTypeLabel(item.type_key, item.label, t)}</option>)}<option value="other">{t('ui.location.customType')}</option></select></div>
             </div>
-            {selectedPlaceType === 'other' && <input id="location-custom-type" name="location-custom-type" autoComplete="off" value={customTypeLabel} onChange={e => setCustomTypeLabel(e.target.value)} placeholder={t('ui.location.customTypePlaceholder')} className="w-full px-3 py-2 border rounded-md bg-background" />}
+            {selectedPlaceType === 'other' && <input id="location-custom-type" name="location-custom-type" autoComplete="off" value={customTypeLabel} onChange={e => setCustomTypeLabel(e.target.value)} placeholder={t('ui.location.customTypePlaceholder')} className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring" />}
           </section>
 
-          <section className="border rounded-lg p-4 space-y-3">
-            <div><h3 className="font-semibold">{t('ui.location.containedIn')}</h3><p className="text-xs text-muted-foreground">{t('ui.location.containedInHint')}</p></div>
-            <div className="flex flex-wrap gap-2">{containerOptions.map(option => <label key={option.id} className="flex items-center gap-2 border rounded px-3 py-2 text-sm"><input id={`location-container-${option.id}`} name="location-containers" type="checkbox" checked={containerIds.includes(option.id)} onChange={e => setContainerIds(current => e.target.checked ? [...current, option.id] : current.filter(id => id !== option.id))} />{option.name}</label>)}</div>
+          <section className="rounded-lg border border-border bg-card p-4 space-y-3">
+            <div><h3 className="font-display font-semibold">{t('ui.location.containedIn')}</h3><p className="text-xs text-muted-foreground">{t('ui.location.containedInHint')}</p></div>
+            <div className="flex flex-wrap gap-2">{containerOptions.map(option => <label key={option.id} className="flex items-center gap-2 border border-input rounded px-3 py-2 text-sm"><input id={`location-container-${option.id}`} name="location-containers" type="checkbox" checked={containerIds.includes(option.id)} onChange={e => setContainerIds(current => e.target.checked ? [...current, option.id] : current.filter(id => id !== option.id))} />{option.name}</label>)}</div>
             {containerOptions.length === 0 && <p className="text-xs text-muted-foreground">{t('ui.location.noOtherLocations')}</p>}
           </section>
 
-          {groupedFields.map(([groupKey, groupFields]) => <section key={groupKey} className="border rounded-lg"><button onClick={() => toggleGroup(groupKey)} className="w-full flex items-center justify-between p-4 hover:bg-muted/50"><h3 className="font-semibold">{placeGroupLabel(groupKey, t)}</h3>{expandedGroups.has(groupKey) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>{expandedGroups.has(groupKey) && <div className="border-t p-4 grid grid-cols-1 md:grid-cols-2 gap-5">{groupFields.map(renderField)}</div>}</section>)}
+          {groupedFields.map(([groupKey, groupFields]) => <section key={groupKey} className="rounded-lg border border-border bg-card"><button onClick={() => toggleGroup(groupKey)} className="w-full flex items-center justify-between p-4 hover:bg-muted/50"><h3 className="font-display font-semibold">{placeGroupLabel(groupKey, t)}</h3>{expandedGroups.has(groupKey) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>{expandedGroups.has(groupKey) && <div className="border-t p-4 grid grid-cols-1 md:grid-cols-2 gap-5">{groupFields.map(renderField)}</div>}</section>)}
 
-          <section className="border border-dashed rounded-lg p-4 space-y-3"><div><h3 className="font-semibold">{t('ui.location.customField')}</h3><p className="text-xs text-muted-foreground">{t('ui.location.customFieldHint')}</p></div><div className="flex gap-2"><input id="location-custom-field-label" name="location-custom-field-label" autoComplete="off" value={newFieldLabel} onChange={e => setNewFieldLabel(e.target.value)} placeholder={t('ui.location.fieldNamePlaceholder')} className="flex-1 px-3 py-2 border rounded-md bg-background" /><button onClick={addCustomField} disabled={!newFieldLabel.trim()} className="flex items-center gap-1 px-3 py-2 border rounded-md disabled:opacity-50"><Plus className="h-4 w-4" />{t('ui.location.addField')}</button></div></section>
+          <section className="rounded-lg border border-dashed border-border p-4 space-y-3"><div><h3 className="font-display font-semibold">{t('ui.location.customField')}</h3><p className="text-xs text-muted-foreground">{t('ui.location.customFieldHint')}</p></div><div className="flex gap-2"><Input id="location-custom-field-label" name="location-custom-field-label" autoComplete="off" value={newFieldLabel} onChange={e => setNewFieldLabel(e.target.value)} placeholder={t('ui.location.fieldNamePlaceholder')} className="flex-1" /><Button variant="secondary" onClick={addCustomField} disabled={!newFieldLabel.trim()}><Plus className="h-4 w-4" />{t('ui.location.addField')}</Button></div></section>
         </div>
 
-        <div className="sticky bottom-0 bg-background border-t p-6 flex items-center justify-between gap-3"><div>{!isNewLocation && (showDeleteConfirm ? <div className="flex items-center gap-2"><span className="text-sm text-red-600">{t('ui.location.deleteConfirm')}</span><button onClick={handleDelete} disabled={saving} className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-md">{t('ui.location.yes')}</button><button onClick={() => setShowDeleteConfirm(false)} className="px-3 py-1.5 text-sm bg-muted rounded-md">{t('ui.location.no')}</button></div> : <button onClick={() => setShowDeleteConfirm(true)} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md"><Trash2 className="h-4 w-4" />{t('common.delete')}</button>)}</div><div className="flex items-center gap-3"><button onClick={() => { setFormData(originalFormData); onClose() }} disabled={saving} className="px-4 py-2 rounded-md border">{t('ui.location.cancel')}</button><button onClick={handleSave} disabled={saving || loadingSchema} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md disabled:opacity-50"><Save className="h-4 w-4" />{saving ? t('ui.location.saving') : t('ui.location.save')}</button></div></div>
+        <div className="sticky bottom-0 bg-card border-t border-border p-6 flex items-center justify-between gap-3">
+          <div>
+            {!isNewLocation && (showDeleteConfirm ? (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-destructive">{t('ui.location.deleteConfirm')}</span>
+                <Button variant="destructive" size="sm" onClick={handleDelete} disabled={saving}>{t('ui.location.yes')}</Button>
+                <Button variant="secondary" size="sm" onClick={() => setShowDeleteConfirm(false)}>{t('ui.location.no')}</Button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={saving}
+                className="text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" />
+                {t('common.delete')}
+              </Button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" onClick={() => { setFormData(originalFormData); onClose() }} disabled={saving}>{t('ui.location.cancel')}</Button>
+            <Button onClick={handleSave} disabled={saving || loadingSchema}>
+              <Save className="h-4 w-4" />
+              {saving ? t('ui.location.saving') : t('ui.location.save')}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>, mountNode,
   )

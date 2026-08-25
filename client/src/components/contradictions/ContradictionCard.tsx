@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle } from 'lucide-react'
 import type { Contradiction } from '@/stores/contradictionStore'
+import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
 
 interface ContradictionCardProps {
   contradiction: Contradiction
@@ -23,12 +25,12 @@ export default function ContradictionCard({ contradiction, onResolve }: Contradi
   const attributeValueB = contradiction.attribute_b?.attribute_value || contradiction.attribute_b_id?.slice(0, 8) || 'N/A'
 
   return (
-    <div className={`border rounded-lg p-4 ${isOpen ? 'border-amber-200 bg-amber-50/30' : 'opacity-60'}`}>
+    <Card className={`p-4 ${isOpen ? 'bg-warning-soft/40 border-warning/20' : 'opacity-60'}`}>
       {/* Header */}
       <div className="flex items-start gap-2 mb-3">
-        <AlertTriangle className={`h-4 w-4 flex-shrink-0 mt-0.5 ${isOpen ? 'text-amber-600' : 'text-muted-foreground'}`} />
+        <AlertTriangle className={`h-4 w-4 flex-shrink-0 mt-0.5 ${isOpen ? 'text-warning' : 'text-muted-foreground'}`} />
         <div>
-          <p className="text-sm font-medium">
+          <p className="text-sm font-display font-semibold">
             {entityName}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -42,43 +44,31 @@ export default function ContradictionCard({ contradiction, onResolve }: Contradi
 
       {/* Values */}
       <div className="grid grid-cols-2 gap-3 mb-3">
-        <div className="bg-red-50 border border-red-100 rounded p-2">
+        <div className="bg-destructive/5 border border-destructive/15 rounded-md p-2">
           <p className="text-xs text-muted-foreground">{t('contradictions.valueA')}</p>
-          <p className="text-sm font-medium text-red-800 truncate">{attributeValueA}</p>
+          <p className="text-sm font-medium text-destructive truncate">{attributeValueA}</p>
         </div>
-        <div className="bg-blue-50 border border-blue-100 rounded p-2">
+        <div className="bg-info-soft border border-info/15 rounded-md p-2">
           <p className="text-xs text-muted-foreground">{t('contradictions.valueB')}</p>
-          <p className="text-sm font-medium text-blue-800 truncate">{attributeValueB}</p>
+          <p className="text-sm font-medium text-info truncate">{attributeValueB}</p>
         </div>
       </div>
 
       {/* Resolution buttons */}
       {isOpen && (
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => onResolve(contradiction.id, 'resolved_fix_profile')}
-            className="text-xs px-2 py-1 border rounded hover:bg-muted transition-colors"
-          >
+          <Button size="sm" variant="secondary" onClick={() => onResolve(contradiction.id, 'resolved_fix_profile')}>
             {t('contradictions.fixProfile')}
-          </button>
-          <button
-            onClick={() => onResolve(contradiction.id, 'resolved_fix_text')}
-            className="text-xs px-2 py-1 border rounded hover:bg-muted transition-colors"
-          >
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => onResolve(contradiction.id, 'resolved_fix_text')}>
             {t('contradictions.fixText')}
-          </button>
-          <button
-            onClick={() => onResolve(contradiction.id, 'resolved_intentional')}
-            className="text-xs px-2 py-1 border rounded hover:bg-muted transition-colors"
-          >
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => onResolve(contradiction.id, 'resolved_intentional')}>
             {t('contradictions.intentional')}
-          </button>
-          <button
-            onClick={() => onResolve(contradiction.id, 'ignored')}
-            className="text-xs px-2 py-1 text-muted-foreground hover:bg-muted rounded transition-colors"
-          >
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onResolve(contradiction.id, 'ignored')}>
             {t('contradictions.ignore')}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -86,6 +76,6 @@ export default function ContradictionCard({ contradiction, onResolve }: Contradi
       {!isOpen && contradiction.resolution_note && (
         <p className="text-xs text-muted-foreground italic mt-1">{contradiction.resolution_note}</p>
       )}
-    </div>
+    </Card>
   )
 }

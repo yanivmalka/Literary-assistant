@@ -2,22 +2,28 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 
 export type Theme = 'light' | 'dark'
 export type ThemeTransitionMode = 'immediate' | 'gradual'
-export type ExtractionProgressStyle = 'bar' | 'sword'
+export type ExtractionProgressStyle = 'bar' | 'sword' | 'minimal'
+export type AccentColor = 'indigo' | 'forest' | 'ember' | 'rose'
 
 export type ThemeSettings = {
   transitionEnabled: boolean
   transitionMode: ThemeTransitionMode
   durationMs: number
   extractionProgressStyle: ExtractionProgressStyle
+  accent: AccentColor
 }
 
 const THEME_STORAGE_KEY = 'theme'
+const THEME_ACCENT_STORAGE_KEY = 'theme-accent'
 const THEME_SETTINGS_STORAGE_KEY = 'theme-settings'
+const ACCENT_COLORS: AccentColor[] = ['indigo', 'forest', 'ember', 'rose']
+const PROGRESS_STYLES: ExtractionProgressStyle[] = ['bar', 'sword', 'minimal']
 const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   transitionEnabled: true,
   transitionMode: 'gradual',
   durationMs: 10000,
   extractionProgressStyle: 'bar',
+  accent: 'indigo',
 }
 const MIN_DURATION_MS = 500
 const MAX_DURATION_MS = 10000
@@ -50,7 +56,12 @@ function normalizeThemeSettings(value: Partial<ThemeSettings>): ThemeSettings {
     durationMs: Number.isFinite(durationMs)
       ? Math.min(MAX_DURATION_MS, Math.max(MIN_DURATION_MS, durationMs))
       : DEFAULT_THEME_SETTINGS.durationMs,
-    extractionProgressStyle: value.extractionProgressStyle === 'sword' ? 'sword' : 'bar',
+    extractionProgressStyle: PROGRESS_STYLES.includes(value.extractionProgressStyle as ExtractionProgressStyle)
+      ? (value.extractionProgressStyle as ExtractionProgressStyle)
+      : 'bar',
+    accent: ACCENT_COLORS.includes(value.accent as AccentColor)
+      ? (value.accent as AccentColor)
+      : 'indigo',
   }
 }
 
@@ -128,6 +139,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     window.localStorage.setItem(THEME_SETTINGS_STORAGE_KEY, JSON.stringify(themeSettings))
+    window.localStorage.setItem(THEME_ACCENT_STORAGE_KEY, themeSettings.accent)
+    document.documentElement.setAttribute('data-accent', themeSettings.accent)
 
     if (!themeSettings.transitionEnabled || themeSettings.transitionMode === 'immediate') {
       clearThemeTransition()
