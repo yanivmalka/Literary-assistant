@@ -8,18 +8,22 @@ interface SwordProgressBarProps {
 // Sword silhouette in a fixed left-to-right (hilt -> tip) local coordinate space.
 // RTL locales mirror the whole <svg> instead of re-deriving coordinates, so the
 // glow always animates hilt -> tip regardless of reading direction.
-const POMMEL_OUTER = { cx: 18, cy: 35, r: 15 }
-const POMMEL_INNER = { cx: 18, cy: 35, r: 6 }
-const GRIP_WRAPS = [42, 50, 58]
+const POMMEL = { cx: 16, cy: 30, r: 13 }
+const POMMEL_STAR_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315]
 
-const HILT_PATH =
-  'M34 25 L66 25 Q71 25 71 30 L71 40 Q71 45 66 45 L34 45 Q29 45 29 40 L29 30 Q29 25 34 25 Z'
-const GUARD_BAR = 'M68 12 L76 12 Q79 12 79 15 L79 55 Q79 58 76 58 L68 58 Z'
-const GUARD_QUILLON_TOP = 'M76 14 C96 5 110 12 101 19 C91 15 81 17 76 22 Z'
-const GUARD_QUILLON_BOTTOM = 'M76 56 C96 65 110 58 101 51 C91 55 81 53 76 48 Z'
-const BLADE_PATH = 'M78 26 L210 29.5 L340 33 L396 35 L340 37 L210 40.5 L78 44 Z'
-const BLADE_CENTERLINE_START = 92
-const BLADE_CENTERLINE_END = 382
+const GRIP_PATH = 'M30 21 Q30 18 34 18 L58 18 Q62 18 62 21 L62 39 Q62 42 58 42 L34 42 Q30 42 30 39 Z'
+const GRIP_WRAPS = [36, 42, 48, 54]
+
+const GUARD_BAR = 'M60 10 Q68 10 68 15 L68 45 Q68 50 60 50 Q56 50 56 45 L56 15 Q56 10 60 10 Z'
+const GUARD_HORN_TOP = 'M64 18 C80 6 100 2 97 12 C94 20 80 18 68 23 Z'
+const GUARD_HORN_BOTTOM = 'M64 42 C80 54 100 58 97 48 C94 40 80 42 68 37 Z'
+
+const BLADE_PATH = 'M66 24 L200 27.5 L400 29.5 L488 30 L400 30.5 L200 32.5 L66 36 Z'
+const BLADE_HIGHLIGHT = 'M80 26 L400 29.2 L470 29.7'
+const BLADE_CENTERLINE_START = 84
+const BLADE_CENTERLINE_END = 472
+
+const SPARKLE_POSITIONS = [130, 220, 310, 400]
 
 export default function SwordProgressBar({ percentage }: SwordProgressBarProps) {
   const { i18n } = useTranslation()
@@ -35,7 +39,7 @@ export default function SwordProgressBar({ percentage }: SwordProgressBarProps) 
 
   return (
     <svg
-      viewBox="0 0 400 70"
+      viewBox="0 0 500 60"
       className="w-full h-7"
       preserveAspectRatio="none"
       style={{ transform: isRtl ? 'scaleX(-1)' : undefined }}
@@ -44,22 +48,22 @@ export default function SwordProgressBar({ percentage }: SwordProgressBarProps) 
     >
       <defs>
         <linearGradient id={steelGradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#64748b" />
-          <stop offset="45%" stopColor="#1e293b" />
-          <stop offset="100%" stopColor="#0f172a" />
+          <stop offset="0%" stopColor="#94a3b8" />
+          <stop offset="40%" stopColor="#1e293b" />
+          <stop offset="100%" stopColor="#0b1220" />
         </linearGradient>
         <linearGradient id={hiltGradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#334155" />
+          <stop offset="0%" stopColor="#475569" />
           <stop offset="55%" stopColor="#1e1b4b" />
-          <stop offset="100%" stopColor="#0f172a" />
+          <stop offset="100%" stopColor="#0b1220" />
         </linearGradient>
         <linearGradient id={glowGradientId} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#3b82f6" />
-          <stop offset="55%" stopColor="#93c5fd" />
-          <stop offset="100%" stopColor="#a855f7" />
+          <stop offset="0%" stopColor="#2563eb" />
+          <stop offset="50%" stopColor="#bfdbfe" />
+          <stop offset="100%" stopColor="#7c3aed" />
         </linearGradient>
-        <filter id={glowFilterId} x="-50%" y="-200%" width="200%" height="500%">
-          <feGaussianBlur stdDeviation="3.2" result="blur" />
+        <filter id={glowFilterId} x="-50%" y="-300%" width="200%" height="700%">
+          <feGaussianBlur stdDeviation="3.5" result="blur" />
           <feMerge>
             <feMergeNode in="blur" />
             <feMergeNode in="SourceGraphic" />
@@ -69,45 +73,57 @@ export default function SwordProgressBar({ percentage }: SwordProgressBarProps) 
           <rect
             x={BLADE_CENTERLINE_START}
             y="0"
-            height="70"
+            height="60"
             style={{ width: `${filledLength}px`, transition: 'width 500ms ease-out' }}
           />
         </clipPath>
       </defs>
 
       {/* Pommel */}
-      <circle {...POMMEL_OUTER} fill={`url(#${hiltGradientId})`} stroke="#475569" strokeWidth="1" />
-      <circle {...POMMEL_INNER} fill="none" stroke="#94a3b8" strokeWidth="1" opacity="0.6" />
+      <circle {...POMMEL} fill={`url(#${hiltGradientId})`} stroke="#64748b" strokeWidth="1" />
+      <circle cx={POMMEL.cx} cy={POMMEL.cy} r={5} fill="none" stroke="#94a3b8" strokeWidth="1" opacity="0.7" />
+      {POMMEL_STAR_ANGLES.map((angle) => {
+        const rad = (angle * Math.PI) / 180
+        const x1 = POMMEL.cx + Math.cos(rad) * 3
+        const y1 = POMMEL.cy + Math.sin(rad) * 3
+        const x2 = POMMEL.cx + Math.cos(rad) * 8
+        const y2 = POMMEL.cy + Math.sin(rad) * 8
+        return <line key={angle} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#cbd5e1" strokeWidth="0.75" opacity="0.6" />
+      })}
 
       {/* Grip */}
-      <path d={HILT_PATH} fill={`url(#${hiltGradientId})`} stroke="#475569" strokeWidth="1" />
+      <path d={GRIP_PATH} fill={`url(#${hiltGradientId})`} stroke="#64748b" strokeWidth="1" />
       {GRIP_WRAPS.map((x) => (
-        <line key={x} x1={x} y1="27" x2={x} y2="43" stroke="#94a3b8" strokeWidth="1" opacity="0.4" />
+        <line key={x} x1={x - 3} y1="42" x2={x + 3} y2="18" stroke="#94a3b8" strokeWidth="1" opacity="0.45" />
       ))}
 
       {/* Guard */}
-      <path d={GUARD_QUILLON_TOP} fill={`url(#${hiltGradientId})`} stroke="#475569" strokeWidth="0.75" />
-      <path d={GUARD_QUILLON_BOTTOM} fill={`url(#${hiltGradientId})`} stroke="#475569" strokeWidth="0.75" />
-      <path d={GUARD_BAR} fill={`url(#${hiltGradientId})`} stroke="#475569" strokeWidth="1" />
+      <path d={GUARD_HORN_TOP} fill={`url(#${hiltGradientId})`} stroke="#64748b" strokeWidth="0.75" />
+      <path d={GUARD_HORN_BOTTOM} fill={`url(#${hiltGradientId})`} stroke="#64748b" strokeWidth="0.75" />
+      <path d={GUARD_BAR} fill={`url(#${hiltGradientId})`} stroke="#64748b" strokeWidth="1" />
 
       {/* Blade */}
-      <path d={BLADE_PATH} fill={`url(#${steelGradientId})`} stroke="#0f172a" strokeWidth="1" strokeLinejoin="round" />
+      <path d={BLADE_PATH} fill={`url(#${steelGradientId})`} stroke="#0b1220" strokeWidth="1" strokeLinejoin="round" />
+      <path d={BLADE_HIGHLIGHT} stroke="#94a3b8" strokeWidth="0.75" opacity="0.5" fill="none" />
       <path
-        d={`M${BLADE_CENTERLINE_START} 35 L${BLADE_CENTERLINE_END} 35`}
-        stroke="#0f172a"
+        d={`M${BLADE_CENTERLINE_START} 30 L${BLADE_CENTERLINE_END} 30`}
+        stroke="#0b1220"
         strokeWidth="4"
         strokeLinecap="round"
-        opacity="0.6"
+        opacity="0.65"
       />
 
       {/* Glowing progress fill, clipped to the current percentage */}
       <g clipPath={`url(#${clipId})`} filter={`url(#${glowFilterId})`}>
         <path
-          d={`M${BLADE_CENTERLINE_START} 35 L${BLADE_CENTERLINE_END} 35`}
+          d={`M${BLADE_CENTERLINE_START} 30 L${BLADE_CENTERLINE_END} 30`}
           stroke={`url(#${glowGradientId})`}
           strokeWidth="4.5"
           strokeLinecap="round"
         />
+        {SPARKLE_POSITIONS.map((x) => (
+          <circle key={x} cx={x} cy={30 + (x % 3 === 0 ? -1.5 : 1.5)} r="0.9" fill="#eff6ff" opacity="0.9" />
+        ))}
       </g>
     </svg>
   )
