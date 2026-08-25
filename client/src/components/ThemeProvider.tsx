@@ -2,11 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 
 export type Theme = 'light' | 'dark'
 export type ThemeTransitionMode = 'immediate' | 'gradual'
+export type ExtractionProgressStyle = 'bar' | 'sword'
 
 export type ThemeSettings = {
   transitionEnabled: boolean
   transitionMode: ThemeTransitionMode
   durationMs: number
+  extractionProgressStyle: ExtractionProgressStyle
 }
 
 const THEME_STORAGE_KEY = 'theme'
@@ -15,6 +17,7 @@ const DEFAULT_THEME_SETTINGS: ThemeSettings = {
   transitionEnabled: true,
   transitionMode: 'gradual',
   durationMs: 10000,
+  extractionProgressStyle: 'bar',
 }
 const MIN_DURATION_MS = 500
 const MAX_DURATION_MS = 10000
@@ -47,6 +50,7 @@ function normalizeThemeSettings(value: Partial<ThemeSettings>): ThemeSettings {
     durationMs: Number.isFinite(durationMs)
       ? Math.min(MAX_DURATION_MS, Math.max(MIN_DURATION_MS, durationMs))
       : DEFAULT_THEME_SETTINGS.durationMs,
+    extractionProgressStyle: value.extractionProgressStyle === 'sword' ? 'sword' : 'bar',
   }
 }
 

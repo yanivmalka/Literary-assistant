@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
-import { useTheme, type ThemeTransitionMode } from '@/components/ThemeProvider'
+import { useTheme, type ThemeTransitionMode, type ExtractionProgressStyle } from '@/components/ThemeProvider'
 import { ArrowLeft, Lock, Mail, Chrome } from 'lucide-react'
 
 interface Identity {
@@ -224,6 +224,29 @@ export default function AccountSettingsPage() {
               <p className="mt-1 text-xs text-muted-foreground">{t('ui.theme.durationDescription')}</p>
               <p className="mt-2 text-xs text-muted-foreground">{t('ui.theme.reducedMotionHint')}</p>
             </div>
+          </div>
+        </div>
+
+        {/* Extraction Progress Style */}
+        <div className="border rounded-lg p-6 bg-card mb-6">
+          <h2 className="text-xl font-semibold">{t('ui.extraction.progressStyleTitle')}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t('ui.extraction.progressStyleDescription')}</p>
+
+          <div className="mt-6">
+            <label htmlFor="extraction-progress-style" className="block text-sm font-medium mb-2">
+              {t('ui.extraction.progressStyleLabel')}
+            </label>
+            <select
+              id="extraction-progress-style"
+              value={themeSettings.extractionProgressStyle}
+              onChange={(event) =>
+                updateThemeSettings({ extractionProgressStyle: event.target.value as ExtractionProgressStyle })
+              }
+              className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+            >
+              <option value="bar">{t('ui.extraction.progressStyleBar')}</option>
+              <option value="sword">{t('ui.extraction.progressStyleSword')}</option>
+            </select>
           </div>
         </div>
 

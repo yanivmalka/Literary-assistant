@@ -786,6 +786,13 @@
       "seconds": "{{value}} seconds",
       "reducedMotionHint": "Gradual transitions are disabled when your system prefers reduced motion."
     },
+    "extraction": {
+      "progressStyleTitle": "Extraction progress style",
+      "progressStyleDescription": "Choose how the character extraction loading progress is displayed.",
+      "progressStyleLabel": "Progress indicator",
+      "progressStyleBar": "Progress bar",
+      "progressStyleSword": "Sword"
+    },
     "documents": {
       "extractKnowledge": "Extract",
       "extractKnowledgeTitle": "Extract knowledge from this document",

@@ -786,6 +786,13 @@
       "seconds": "{{value}} שניות",
       "reducedMotionHint": "מעברים הדרגתיים מושבתים כאשר הגדרות המערכת מעדיפות הפחתת תנועה."
     },
+    "extraction": {
+      "progressStyleTitle": "סגנון סרגל התקדמות החילוץ",
+      "progressStyleDescription": "בחר כיצד יוצג סרגל ההתקדמות של חילוץ הדמויות.",
+      "progressStyleLabel": "מחוון התקדמות",
+      "progressStyleBar": "סרגל התקדמות",
+      "progressStyleSword": "חרב"
+    },
     "documents": {
       "extractKnowledge": "חלץ",
       "extractKnowledgeTitle": "חלץ ידע מהמסמך",
