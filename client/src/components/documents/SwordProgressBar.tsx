@@ -19,8 +19,8 @@ export default function SwordProgressBar({ percentage }: SwordProgressBarProps) 
   return (
     <svg
       viewBox="0 0 200 40"
-      className="w-full h-6"
-      preserveAspectRatio="xMinYMid meet"
+      className="w-full h-4"
+      preserveAspectRatio="none"
       role="img"
       aria-hidden="true"
     >
@@ -35,8 +35,8 @@ export default function SwordProgressBar({ percentage }: SwordProgressBarProps) 
         </clipPath>
       </defs>
 
-      {/* Track: the full sword outline, dimmed */}
-      <path d={SWORD_PATH} className="fill-blue-100" />
+      {/* Unfilled sword: blends into the extraction panel's own background, not a separate track color */}
+      <path d={SWORD_PATH} className="fill-blue-50" />
 
       {/* Fill: the same sword, clipped to the current progress */}
       <g clipPath={`url(#${clipId})`}>
