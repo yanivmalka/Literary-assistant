@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Brain, CheckCircle, XCircle, AlertTriangle, X, Loader2, Pause, Play, Sword } from 'lucide-react'
+import { Brain, CheckCircle, XCircle, AlertTriangle, X, Loader2, Pause, Play } from 'lucide-react'
 import { useDocumentStore } from '@/stores/documentStore'
 import { useTheme } from '@/components/ThemeProvider'
+import SwordProgressBar from './SwordProgressBar'
 
 interface ExtractionProgressProps {
   documentId: string
@@ -222,19 +223,7 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
       {progress && progress.totalChunks > 0 && (
         <div className="space-y-1.5">
           {themeSettings.extractionProgressStyle === 'sword' ? (
-            <div className="relative w-full h-5 flex items-center">
-              <div className="w-full h-1.5 bg-blue-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-              <Sword
-                className="absolute h-5 w-5 text-blue-600 -translate-x-1/2 transition-all duration-500 ease-out drop-shadow-sm"
-                style={{ left: `${percentage}%` }}
-                aria-hidden="true"
-              />
-            </div>
+            <SwordProgressBar percentage={percentage} />
           ) : (
             <div className="w-full h-2.5 bg-blue-100 rounded-full overflow-hidden">
               <div
