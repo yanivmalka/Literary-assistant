@@ -367,6 +367,7 @@
     "source": "Source",
     "thinking": "Searching and thinking...",
     "clearHistory": "Clear history",
+    "confirmClearHistory": "Delete this conversation permanently? This cannot be undone.",
     "noAnswer": "No answer could be generated. Relevant passages are shown below.",
     "authRequired": "Please log in to ask questions.",
     "partialResults": "Some results may be incomplete.",

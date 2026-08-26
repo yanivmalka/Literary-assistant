@@ -36,9 +36,9 @@ interface QAState {
 
   ask: (projectId: string, question: string) => Promise<void>
   loadConversation: (projectId: string) => Promise<void>
+  deleteConversation: () => Promise<void>
   setSelectedSourceVersionIds: (versionIds: string[]) => void
   setIncludeAdjacent: (includeAdjacent: boolean) => void
-  clearHistory: () => void
 }
 
 interface QuillResponse {
@@ -266,7 +266,9 @@ export const useQAStore = create<QAState>((set, get) => ({
             id: message.id,
             type: message.role === 'user' ? 'question' : 'answer',
             text: message.role === 'assistant' && !message.content
-              ? i18n.t('ui.qa.staticModeAnswer')
+              ? (metadata.no_sufficient_context === true
+                  ? i18n.t('ui.qa.noResults')
+                  : i18n.t('ui.qa.staticModeAnswer'))
               : message.content,
             sources,
             noSufficientContext: metadata.no_sufficient_context === true,
@@ -281,11 +283,37 @@ export const useQAStore = create<QAState>((set, get) => ({
     }
   },
 
+  deleteConversation: async () => {
+    const conversationId = get().conversationId
+    if (!conversationId) {
+      set({ messages: [], conversationId: null, error: null })
+      return
+    }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      set({ error: 'Not authenticated' })
+      return
+    }
+
+    const { error } = await supabase
+      .from('notebook_conversations')
+      .delete()
+      .eq('id', conversationId)
+      .eq('user_id', user.id)
+
+    if (error) {
+      console.error('Failed to delete Notebook conversation:', error)
+      set({ error: error.message })
+      return
+    }
+
+    set({ messages: [], conversationId: null, error: null })
+  },
+
   setSelectedSourceVersionIds: (versionIds) => {
     set({ selectedSourceVersionIds: [...new Set(versionIds)] })
   },
 
   setIncludeAdjacent: (includeAdjacent) => set({ includeAdjacent }),
-
-  clearHistory: () => set({ messages: [], conversationId: null, error: null }),
 }))

@@ -12,7 +12,7 @@ interface QAPanelProps {
 
 export default function QAPanel({ projectId }: QAPanelProps) {
   const { t } = useTranslation()
-  const { messages, loading, ask, loadConversation, clearHistory } = useQAStore()
+  const { messages, loading, ask, loadConversation, deleteConversation } = useQAStore()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -31,6 +31,12 @@ export default function QAPanel({ projectId }: QAPanelProps) {
     setInput('')
   }
 
+  const handleClearHistory = () => {
+    if (window.confirm(t('qa.confirmClearHistory'))) {
+      void deleteConversation()
+    }
+  }
+
   return (
     <div className="flex flex-col h-full max-h-[600px]">
       {/* Header */}
@@ -38,7 +44,7 @@ export default function QAPanel({ projectId }: QAPanelProps) {
         <h3 className="text-sm font-display font-semibold">{t('qa.title')}</h3>
         {messages.length > 0 && (
           <button
-            onClick={clearHistory}
+            onClick={handleClearHistory}
             className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
             title={t('qa.clearHistory')}
           >
