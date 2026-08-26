@@ -138,6 +138,26 @@ function getPromptBlockReason(data: Record<string, unknown>): string | null {
   return typeof reason === "string" && reason.trim().length > 0 ? reason : null;
 }
 
+/**
+ * Finish reasons that indicate the candidate itself was withheld by Gemini's
+ * safety system, not merely empty. A prompt-level block (promptFeedback.blockReason)
+ * happens before generation starts; these candidate-level finishReasons are the
+ * equivalent signal *after* generation was attempted on a specific candidate —
+ * both are genuine, request-deterministic safety blocks, not transient failures.
+ */
+const CANDIDATE_SAFETY_FINISH_REASONS = new Set(["PROHIBITED_CONTENT", "SAFETY"]);
+
+export function getCandidateSafetyBlockReason(data: Record<string, unknown>): string | null {
+  const candidates = Array.isArray(data.candidates)
+    ? data.candidates as GeminiResponseCandidate[]
+    : [];
+  const firstCandidate = candidates[0];
+  const finishReason = firstCandidate?.finishReason;
+  return typeof finishReason === "string" && CANDIDATE_SAFETY_FINISH_REASONS.has(finishReason)
+    ? finishReason
+    : null;
+}
+
 // ============================================
 // In-Memory Cooldown Tracker
 // Simple per-isolate cooldown. Each Deno edge function isolate
@@ -326,8 +346,9 @@ export async function callGeminiWithFallback(
           const reason = "Model returned no text candidate";
           const diagnostics = summarizeEmptyGeminiResponse(data);
           const blockReason = getPromptBlockReason(data);
+          const candidateSafetyReason = getCandidateSafetyBlockReason(data);
           const safetyBlocked = Boolean(
-            blockReason && blockReason !== "BLOCK_REASON_UNSPECIFIED",
+            (blockReason && blockReason !== "BLOCK_REASON_UNSPECIFIED") || candidateSafetyReason,
           );
           console.warn(`[Gemini Fallback] ${reason}: ${modelId}`, diagnostics);
           fallbackChain.push({
@@ -341,7 +362,12 @@ export async function callGeminiWithFallback(
           // A prompt/content safety block is deterministic for this request;
           // trying the same prompt with other models cannot make it safe. Stop
           // here, do not mark the model unavailable, and preserve the provider
-          // reason for a clear user-facing diagnostic.
+          // reason for a clear user-facing diagnostic. This applies equally to a
+          // prompt-level block (blockReason) and a candidate-level block (a
+          // finishReason of PROHIBITED_CONTENT/SAFETY on the generated candidate) —
+          // previously only the former was detected, so a candidate-level block was
+          // misclassified as a generic "empty model response" and silently retried
+          // against the next fallback model instead of failing fast with a clear reason.
           if (safetyBlocked) {
             return {
               success: false,

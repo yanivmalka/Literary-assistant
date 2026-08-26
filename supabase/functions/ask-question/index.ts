@@ -870,6 +870,23 @@ Deno.serve(async (req) => {
         generationConfig: {
           temperature: 0.2, // Lower temperature for factual answers
           maxOutputTokens: 2048,
+          // Gemini's "thinking" tokens are drawn from the same maxOutputTokens
+          // pool as the visible answer. Left unset, the model applies its own
+          // default thinking level, which was observed consuming most/all of
+          // maxOutputTokens on real QA prompts and truncating the answer before
+          // it finished (finishReason: MAX_TOKENS) even after raising the cap
+          // from 1024 to 2048. Every model in GEMINI_MODELS (gemini-3.5-flash,
+          // gemini-3.5-flash-lite, gemini-3.6-flash) is Gemini 3.x, which is
+          // controlled via thinkingConfig.thinkingLevel, not the Gemini
+          // 2.5-series thinkingBudget (a token count) — thinkingBudget is only
+          // accepted on these models for backwards compatibility and is not
+          // guaranteed to actually bound thinking-token consumption. "low"
+          // reserves ample room for the answer itself while still allowing some
+          // reasoning, consistent with this prompt's own "Keep your answer
+          // concise and focused" instruction.
+          thinkingConfig: {
+            thinkingLevel: "low",
+          },
         },
       },
       apiKey,

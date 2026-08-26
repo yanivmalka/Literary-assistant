@@ -78,3 +78,31 @@ Deno.test("parseGeminiCandidate: an empty candidates array yields an empty, non-
   assertEquals(result.finishReason, null);
   assertEquals(result.truncated, false);
 });
+
+// Golden-string regression: confirms the QA generationConfig actually bounds
+// Gemini's thinking via thinkingConfig.thinkingLevel rather than only raising
+// maxOutputTokens again — a live E2E run showed 2048 alone was not enough to
+// stop MAX_TOKENS truncation, because unset thinkingConfig lets the model
+// apply its own default thinking level out of the same maxOutputTokens pool
+// as the visible answer. Every model in the fallback chain (gemini-3.5-flash,
+// gemini-3.5-flash-lite, gemini-3.6-flash) is Gemini 3.x, which is controlled
+// via thinkingLevel, not the Gemini 2.5-series thinkingBudget (a token count) —
+// per Google's docs, thinkingBudget is only accepted on Gemini 3.x for
+// backwards compatibility and isn't guaranteed to bound thinking-token use.
+Deno.test("ask-question's QA generationConfig sets maxOutputTokens: 2048 and thinkingConfig.thinkingLevel (not the Gemini 2.5-only thinkingBudget)", async () => {
+  const source = await Deno.readTextFile(new URL("./index.ts", import.meta.url));
+
+  const configBlockMatch = source.match(
+    /generationConfig:\s*\{[\s\S]*?thinkingConfig:\s*\{[\s\S]*?\},\s*\},/,
+  );
+  if (!configBlockMatch) {
+    throw new Error("Could not locate the QA generationConfig block in index.ts");
+  }
+  const configBlock = configBlockMatch[0];
+
+  assertEquals(configBlock.includes("maxOutputTokens: 2048"), true);
+  assertEquals(configBlock.includes('thinkingLevel: "low"'), true);
+  // The surrounding comment legitimately mentions "thinkingBudget" by name to
+  // explain why it isn't used; only the actual field key must be absent.
+  assertEquals(configBlock.includes("thinkingBudget:"), false);
+});

@@ -1,16 +1,35 @@
 import { assertEquals, assert } from "https://deno.land/std@0.208.0/assert/mod.ts";
-import { callGeminiWithFallback, resetCooldowns } from "./gemini-client.ts";
+import { callGeminiWithFallback, getCandidateSafetyBlockReason, resetCooldowns } from "./gemini-client.ts";
 import { GEMINI_MODELS, DEFAULT_MODEL } from "./gemini-config.ts";
 
 const MODEL_1 = "gemini-3.5-flash";
 const MODEL_2 = "gemini-3.5-flash-lite";
-const MODEL_3 = "gemini-2.5-flash";
+const MODEL_3 = "gemini-3.6-flash";
 
 function mockSuccess(text = "ok"): Response {
   return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }], usageMetadata: { totalTokenCount: 10 } }), { status: 200 });
 }
 function mockError(status: number, body = ""): Response {
   return new Response(body || `Error ${status}`, { status });
+}
+// A 2xx response whose only candidate carries a given finishReason and no text
+// parts — the shape Gemini returns for a candidate-level safety block (e.g.
+// PROHIBITED_CONTENT) or an unfinished MAX_TOKENS cutoff with zero output so far.
+function mockCandidateFinish(finishReason: string): Response {
+  return new Response(
+    JSON.stringify({ candidates: [{ content: { parts: [] }, finishReason }], usageMetadata: { totalTokenCount: 10 } }),
+    { status: 200 },
+  );
+}
+// A 2xx response with a MAX_TOKENS finish that still carries partial answer
+// text — this must be treated as a normal (if truncated) success, not a safety
+// block: getGeminiResponseText finds real text, so the fallback loop never
+// reaches the safety-block check at all.
+function mockMaxTokensWithText(text: string): Response {
+  return new Response(
+    JSON.stringify({ candidates: [{ content: { parts: [{ text }] }, finishReason: "MAX_TOKENS" }], usageMetadata: { totalTokenCount: 500 } }),
+    { status: 200 },
+  );
 }
 
 let originalFetch: typeof globalThis.fetch;
@@ -140,9 +159,109 @@ Deno.test("Test 9: 404 model not found -> fallback", async () => {
   } finally { restore(); }
 });
 
+// ---------------------------------------------------------------------------
+// Candidate-level safety block (PROHIBITED_CONTENT / SAFETY) detection
+// ---------------------------------------------------------------------------
+
+Deno.test("Test 10: candidate-level PROHIBITED_CONTENT stops the fallback chain immediately", async () => {
+  resetCooldowns();
+  mockFetch((model) => {
+    if (model === MODEL_1) return mockCandidateFinish("PROHIBITED_CONTENT");
+    // MODEL_2 would succeed if reached — asserting it is never called is the point.
+    return mockSuccess();
+  });
+  try {
+    const r = await callGeminiWithFallback(PAYLOAD, KEY);
+    assert(!r.success);
+    if (!r.success) {
+      assertEquals(r.status, 422);
+      assertEquals(r.modelUsed, MODEL_1);
+      assertEquals(r.isRetriable, false);
+    }
+    // Must not fall back to a second model: a candidate-level safety block is
+    // just as deterministic for this request as a prompt-level block.
+    assertEquals(fetchCalls.length, 1);
+  } finally { restore(); }
+});
+
+Deno.test("Test 11: candidate-level SAFETY finish is also treated as a safety block", async () => {
+  resetCooldowns();
+  mockFetch((model) => model === MODEL_1 ? mockCandidateFinish("SAFETY") : mockSuccess());
+  try {
+    const r = await callGeminiWithFallback(PAYLOAD, KEY);
+    assert(!r.success);
+    if (!r.success) assertEquals(r.status, 422);
+    assertEquals(fetchCalls.length, 1);
+  } finally { restore(); }
+});
+
+Deno.test("Test 12: a MAX_TOKENS finish with real text is a normal success, not a safety block", async () => {
+  resetCooldowns();
+  mockFetch((model) => model === MODEL_1 ? mockMaxTokensWithText("partial answer text") : mockSuccess());
+  try {
+    const r = await callGeminiWithFallback(PAYLOAD, KEY);
+    assert(r.success);
+    if (r.success) {
+      assertEquals(r.modelUsed, MODEL_1);
+      const candidates = (r.data as { candidates?: Array<{ finishReason?: string }> }).candidates;
+      assertEquals(candidates?.[0]?.finishReason, "MAX_TOKENS");
+    }
+    // Real (even truncated) text means the fallback loop never treats this as
+    // an unusable response, so it never reaches the safety-block check.
+    assertEquals(fetchCalls.length, 1);
+  } finally { restore(); }
+});
+
+Deno.test("Test 13: existing 429/5xx/404 fallback behavior is unaffected by safety-block detection", async () => {
+  // Re-assert the pre-existing transient-error fallback scenarios (Tests 2/3/8/9)
+  // still hold now that the empty-response branch also checks candidate-level
+  // finish reasons — a plain retriable HTTP error never reaches that check at all.
+  resetCooldowns();
+  mockFetch((model) => {
+    if (model === MODEL_1) return mockError(429);
+    if (model === MODEL_2) return mockSuccess();
+    return mockError(500);
+  });
+  try {
+    const r = await callGeminiWithFallback(PAYLOAD, KEY);
+    assert(r.success); if (r.success) assertEquals(r.modelUsed, MODEL_2);
+    assertEquals(fetchCalls.length, 2);
+  } finally { restore(); }
+});
+
+Deno.test("getCandidateSafetyBlockReason: detects PROHIBITED_CONTENT on the first candidate", () => {
+  const data = { candidates: [{ finishReason: "PROHIBITED_CONTENT" }] };
+  assertEquals(getCandidateSafetyBlockReason(data), "PROHIBITED_CONTENT");
+});
+
+Deno.test("getCandidateSafetyBlockReason: detects SAFETY on the first candidate", () => {
+  const data = { candidates: [{ finishReason: "SAFETY" }] };
+  assertEquals(getCandidateSafetyBlockReason(data), "SAFETY");
+});
+
+Deno.test("getCandidateSafetyBlockReason: returns null for STOP", () => {
+  const data = { candidates: [{ finishReason: "STOP" }] };
+  assertEquals(getCandidateSafetyBlockReason(data), null);
+});
+
+Deno.test("getCandidateSafetyBlockReason: returns null for MAX_TOKENS", () => {
+  const data = { candidates: [{ finishReason: "MAX_TOKENS" }] };
+  assertEquals(getCandidateSafetyBlockReason(data), null);
+});
+
+Deno.test("getCandidateSafetyBlockReason: returns null with no candidates", () => {
+  assertEquals(getCandidateSafetyBlockReason({ candidates: [] }), null);
+  assertEquals(getCandidateSafetyBlockReason({}), null);
+});
+
 Deno.test("Config: correct model order", () => {
   assertEquals(DEFAULT_MODEL, "gemini-3.5-flash");
   assertEquals(GEMINI_MODELS[0].id, "gemini-3.5-flash");
   assertEquals(GEMINI_MODELS[1].id, "gemini-3.5-flash-lite");
-  assertEquals(GEMINI_MODELS[2].id, "gemini-2.5-flash");
+  assertEquals(GEMINI_MODELS[2].id, "gemini-3.6-flash");
+});
+
+Deno.test("Config: the dead gemini-2.5-flash model is no longer in the fallback chain", () => {
+  const ids = GEMINI_MODELS.map((m) => m.id);
+  assert(!ids.includes("gemini-2.5-flash"));
 });

@@ -23,7 +23,7 @@ export type GeminiModelProfile =
 export const GEMINI_MODELS: GeminiModelConfig[] = [
   { id: "gemini-3.5-flash", priority: 1 },
   { id: "gemini-3.5-flash-lite", priority: 2 },
-  { id: "gemini-2.5-flash", priority: 3 },
+  { id: "gemini-3.6-flash", priority: 3 },
 ];
 
 /**
@@ -36,12 +36,12 @@ export const GEMINI_MODEL_PROFILES: Record<GeminiModelProfile, GeminiModelConfig
   "sub-base-2": [
     { id: "gemini-3.5-flash", priority: 1 },
     { id: "gemini-3.5-flash-lite", priority: 2 },
-    { id: "gemini-2.5-flash", priority: 3 },
+    { id: "gemini-3.6-flash", priority: 3 },
   ],
   "sub-base-locations": [
     { id: "gemini-3.5-flash", priority: 1 },
     { id: "gemini-3.5-flash-lite", priority: 2 },
-    { id: "gemini-2.5-flash", priority: 3 },
+    { id: "gemini-3.6-flash", priority: 3 },
   ],
   // Model A is intentionally isolated from the legacy profiles. "gemini-2.5-flash-lite"
   // is not a real Gemini model ID (it 404s) and was never used anywhere else in this
