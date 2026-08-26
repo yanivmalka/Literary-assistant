@@ -5,6 +5,7 @@ import { useQAStore } from '@/stores/qaStore'
 import SourceReference from './SourceReference'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { AlertDialog } from '@/components/ui/AlertDialog'
 
 interface QAPanelProps {
   projectId: string
@@ -14,6 +15,7 @@ export default function QAPanel({ projectId }: QAPanelProps) {
   const { t } = useTranslation()
   const { messages, loading, ask, loadConversation, deleteConversation } = useQAStore()
   const [input, setInput] = useState('')
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -32,13 +34,31 @@ export default function QAPanel({ projectId }: QAPanelProps) {
   }
 
   const handleClearHistory = () => {
-    if (window.confirm(t('qa.confirmClearHistory'))) {
-      void deleteConversation()
-    }
+    setConfirmDeleteOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    setConfirmDeleteOpen(false)
+    void deleteConversation()
+  }
+
+  const handleCancelDelete = () => {
+    setConfirmDeleteOpen(false)
   }
 
   return (
     <div className="flex flex-col h-full max-h-[600px]">
+      <AlertDialog
+        open={confirmDeleteOpen}
+        title={t('qa.clearHistory')}
+        description={t('qa.confirmClearHistory')}
+        confirmLabel={t('qa.deleteConversationConfirm')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        variant="destructive"
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border">
         <h3 className="text-sm font-display font-semibold">{t('qa.title')}</h3>

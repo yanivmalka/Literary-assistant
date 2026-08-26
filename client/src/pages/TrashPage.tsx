@@ -4,6 +4,7 @@ import { Trash2, RotateCcw, XCircle } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 import { toast } from '@/components/Toast'
 import { Button } from '@/components/ui/Button'
+import { AlertDialog } from '@/components/ui/AlertDialog'
 
 export default function TrashPage() {
   const { t } = useTranslation()
@@ -16,15 +17,20 @@ export default function TrashPage() {
     emptyTrash,
   } = useProjectStore()
   const [emptyingTrash, setEmptyingTrash] = useState(false)
+  const [confirmEmptyTrashOpen, setConfirmEmptyTrashOpen] = useState(false)
+  const [pendingDeleteProjectId, setPendingDeleteProjectId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchTrashedProjects()
   }, [fetchTrashedProjects])
 
-  const handleEmptyTrash = async () => {
+  const handleEmptyTrash = () => {
     if (trashedProjects.length === 0 || emptyingTrash) return
-    if (!window.confirm(t('ui.projects.confirmEmptyTrash'))) return
+    setConfirmEmptyTrashOpen(true)
+  }
 
+  const handleConfirmEmptyTrash = async () => {
+    setConfirmEmptyTrashOpen(false)
     setEmptyingTrash(true)
     try {
       const result = await emptyTrash()
@@ -40,6 +46,12 @@ export default function TrashPage() {
     }
   }
 
+  const handleConfirmDeletePermanently = () => {
+    if (!pendingDeleteProjectId) return
+    deletePermanently(pendingDeleteProjectId)
+    setPendingDeleteProjectId(null)
+  }
+
   const getDaysRemaining = (deletedAt: string) => {
     const deleted = new Date(deletedAt)
     const expiry = new Date(deleted.getTime() + 30 * 24 * 60 * 60 * 1000)
@@ -50,6 +62,26 @@ export default function TrashPage() {
 
   return (
     <div className="max-w-6xl mx-auto p-6">
+      <AlertDialog
+        open={confirmEmptyTrashOpen}
+        title={t('ui.projects.emptyTrash')}
+        description={t('ui.projects.confirmEmptyTrash')}
+        confirmLabel={t('ui.projects.emptyTrash')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleConfirmEmptyTrash}
+        onCancel={() => setConfirmEmptyTrashOpen(false)}
+        variant="destructive"
+      />
+      <AlertDialog
+        open={pendingDeleteProjectId !== null}
+        title={t('projects.deletePermanently')}
+        description={t('ui.projects.confirmPermanentDelete')}
+        confirmLabel={t('projects.deletePermanently')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleConfirmDeletePermanently}
+        onCancel={() => setPendingDeleteProjectId(null)}
+        variant="destructive"
+      />
       <div className="flex items-center justify-between gap-4 mb-1">
         <div className="flex items-center gap-3">
           <Trash2 className="h-6 w-6 text-muted-foreground" />
@@ -101,11 +133,7 @@ export default function TrashPage() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={() => {
-                    if (confirm(t('ui.projects.confirmPermanentDelete'))) {
-                      deletePermanently(project.id)
-                    }
-                  }}
+                  onClick={() => setPendingDeleteProjectId(project.id)}
                 >
                   <XCircle className="h-3.5 w-3.5" />
                   {t('projects.deletePermanently')}

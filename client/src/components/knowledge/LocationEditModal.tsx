@@ -17,6 +17,7 @@ import { getContainerOptions, savePlaceContainers } from '@/lib/placeHierarchy'
 import type { Entity } from '@/stores/entityStore'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { AlertDialog } from '@/components/ui/AlertDialog'
 
 interface LocationEditModalProps {
   isOpen: boolean
@@ -86,6 +87,7 @@ export default function LocationEditModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [newFieldLabel, setNewFieldLabel] = useState('')
+  const [alertMessage, setAlertMessage] = useState<string | null>(null)
 
   const isNewLocation = location === null
   const fields = useMemo(() => getPlaceFields(selectedPlaceType, schema), [selectedPlaceType, schema])
@@ -154,7 +156,7 @@ export default function LocationEditModal({
 
       if (selectedPlaceType === 'other') {
         if (!customTypeLabel.trim()) {
-          alert(t('ui.location.requiredType'))
+          setAlertMessage(t('ui.location.requiredType'))
           return
         }
         const customType = await createCustomPlaceType(projectId, customTypeLabel, user.id)
@@ -181,12 +183,12 @@ export default function LocationEditModal({
         }
       }
       if (requiredMissing.length > 0) {
-        alert(t('ui.location.requiredFields', { fields: requiredMissing.join(', ') }))
+        setAlertMessage(t('ui.location.requiredFields', { fields: requiredMissing.join(', ') }))
         return
       }
       const locationName = String(structuredFields.name || '').trim()
       if (!locationName) {
-        alert(t('entityModal.nameRequired'))
+        setAlertMessage(t('entityModal.nameRequired'))
         return
       }
       structuredFields.name = locationName
@@ -226,7 +228,7 @@ export default function LocationEditModal({
       onClose()
     } catch (error) {
       console.error('Failed to save dynamic location:', error)
-      alert(t('ui.location.deleteFailed'))
+      setAlertMessage(t('ui.location.deleteFailed'))
     } finally {
       setSaving(false)
     }
@@ -240,7 +242,7 @@ export default function LocationEditModal({
       let placeTypeKey = selectedPlaceType
       if (placeTypeKey === 'other') {
         if (!customTypeLabel.trim()) {
-          alert(t('ui.location.requiredTypeBeforeField'))
+          setAlertMessage(t('ui.location.requiredTypeBeforeField'))
           return
         }
         const customType = await createCustomPlaceType(projectId, customTypeLabel, authData.user.id)
@@ -327,6 +329,15 @@ export default function LocationEditModal({
   }
 
   return createPortal(
+    <>
+    <AlertDialog
+      open={alertMessage !== null}
+      title={t('common.notice')}
+      description={alertMessage ?? ''}
+      confirmLabel={t('common.ok')}
+      onConfirm={() => setAlertMessage(null)}
+      variant="default"
+    />
     <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="bg-card border border-border rounded-lg shadow-lg max-w-4xl w-full max-h-[92vh] overflow-auto">
         <div className="sticky top-0 bg-card border-b border-border p-6 flex items-start justify-between z-10">
@@ -386,6 +397,7 @@ export default function LocationEditModal({
           </div>
         </div>
       </div>
-    </div>, mountNode,
+    </div>
+    </>, mountNode,
   )
 }

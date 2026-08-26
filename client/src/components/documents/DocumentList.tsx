@@ -4,6 +4,7 @@ import { FileText, Trash2, Brain } from 'lucide-react'
 import { useDocumentStore, type Document } from '@/stores/documentStore'
 import ProcessingStatus from './ProcessingStatus'
 import ExtractionProgress from './ExtractionProgress'
+import { AlertDialog } from '@/components/ui/AlertDialog'
 import {
   EXTRACTION_MODEL_PROFILES,
   getStoredExtractionModelProfile,
@@ -31,6 +32,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
   const [selectedModelProfile, setSelectedModelProfile] = useState<ExtractionModelProfile>(
     getStoredExtractionModelProfile,
   )
+  const [pendingDeleteDocId, setPendingDeleteDocId] = useState<string | null>(null)
   const {
     documents,
     deleteDocument,
@@ -59,10 +61,15 @@ export default function DocumentList({ projectId }: DocumentListProps) {
     return Boolean(status && PROCESSING_STATUSES.has(status) && !isDocStuck(doc))
   }
 
-  const handleDelete = async (docId: string) => {
-    if (window.confirm(t('documents.confirmDelete'))) {
-      await deleteDocument(projectId, docId)
-    }
+  const handleDelete = (docId: string) => {
+    setPendingDeleteDocId(docId)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteDocId) return
+    const docId = pendingDeleteDocId
+    setPendingDeleteDocId(null)
+    await deleteDocument(projectId, docId)
   }
 
   const handleRetry = async (doc: Document) => {
@@ -92,6 +99,17 @@ export default function DocumentList({ projectId }: DocumentListProps) {
 
   return (
     <div className="space-y-3">
+      <AlertDialog
+        open={pendingDeleteDocId !== null}
+        title={t('common.delete')}
+        description={t('documents.confirmDelete')}
+        confirmLabel={t('common.delete')}
+        cancelLabel={t('common.cancel')}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDeleteDocId(null)}
+        variant="destructive"
+      />
+
       {documents.map(doc => {
         const isReady = doc.latest_version?.status === 'ready'
         const processing = isProcessing(doc)

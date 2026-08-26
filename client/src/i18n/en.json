@@ -20,7 +20,10 @@
     "back": "Back",
     "next": "Next",
     "notFound": "The requested item was not found",
-    "goToLogin": "Go to login"
+    "goToLogin": "Go to login",
+    "delete": "Delete",
+    "ok": "OK",
+    "notice": "Notice"
   },
   "nav": {
     "breadcrumb": "Breadcrumb navigation"
@@ -368,6 +371,7 @@
     "thinking": "Searching and thinking...",
     "clearHistory": "Clear history",
     "confirmClearHistory": "Delete this conversation permanently? This cannot be undone.",
+    "deleteConversationConfirm": "Delete conversation",
     "noAnswer": "No answer could be generated. Relevant passages are shown below.",
     "authRequired": "Please log in to ask questions.",
     "partialResults": "Some results may be incomplete.",

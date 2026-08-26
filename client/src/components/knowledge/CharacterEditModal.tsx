@@ -21,6 +21,7 @@ import {
 import type { Entity } from '@/stores/entityStore'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { AlertDialog } from '@/components/ui/AlertDialog'
 
 interface CharacterEditModalProps {
   isOpen: boolean
@@ -79,6 +80,7 @@ export default function CharacterEditModal({
   const [originalFormData, setOriginalFormData] = useState<FormData>({})
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [dynamicFields, setDynamicFields] = useState<CharacterFieldDefinition[]>([])
   const [dynamicSchemaLoading, setDynamicSchemaLoading] = useState(false)
@@ -247,7 +249,7 @@ export default function CharacterEditModal({
       const lastName = String(structuredFields.last_name || '').trim()
       const canonicalName = String(structuredFields.name || '').trim() || [firstName, lastName].filter(Boolean).join(' ')
       if (!canonicalName) {
-        alert(t('entityModal.nameRequired'))
+        setAlertMessage(t('entityModal.nameRequired'))
         return
       }
       structuredFields.name = canonicalName
@@ -366,6 +368,15 @@ export default function CharacterEditModal({
   }
 
   return createPortal(
+    <>
+    <AlertDialog
+      open={alertMessage !== null}
+      title={t('common.notice')}
+      description={alertMessage ?? ''}
+      confirmLabel={t('common.ok')}
+      onConfirm={() => setAlertMessage(null)}
+      variant="default"
+    />
     <div
       className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4"
       onClick={handleBackdropClick}
@@ -535,7 +546,8 @@ export default function CharacterEditModal({
           </div>
         </div>
       </div>
-    </div>,
+    </div>
+    </>,
     mountNode
   )
 }
