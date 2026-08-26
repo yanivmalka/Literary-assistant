@@ -26,6 +26,29 @@ export function buildRetrievalTerms(question: string): string[] {
 }
 
 /**
+ * Builds a raw Postgres tsquery string that OR-matches any of the given
+ * terms (must be passed to `.textSearch()` with `type: undefined` — passing
+ * `type: "plain"` would route through `plainto_tsquery`, which ignores
+ * operators and always ANDs terms regardless of how they're joined here).
+ *
+ * Each term is quoted as its own tsquery lexeme literal so that characters
+ * with special meaning in tsquery syntax (`&`, `|`, `!`, `(`, `)`, `:`, `<`,
+ * `*`) can't be interpreted as operators; a literal `'` inside a term is
+ * escaped by doubling it, per tsquery quoted-lexeme syntax.
+ *
+ * Returns an empty string when there are no usable terms — callers must
+ * treat that as "no fallback query to run".
+ */
+export function buildOrTsQuery(terms: string[]): string {
+  const quoted = terms
+    .map((term) => term.trim())
+    .filter((term) => term.length > 0)
+    .map((term) => `'${term.replace(/'/g, "''")}'`);
+
+  return quoted.join(" | ");
+}
+
+/**
  * Keep primary hits first, then add nearby passages without allowing nearby
  * passages to displace an explicitly retrieved hit. This makes the enhanced
  * mode predictable and easy to disable.

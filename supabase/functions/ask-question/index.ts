@@ -14,6 +14,7 @@ import { assertQuillsAvailable, consumeGeminiUsage } from "../_shared/quills.ts"
 import { DEFAULT_MODEL } from "../_shared/gemini-config.ts";
 import {
   adjacentPositions,
+  buildOrTsQuery,
   buildRetrievalTerms,
   mergeAdjacentRetrievalChunks,
   type RetrievalChunk,
@@ -144,7 +145,7 @@ function notebookResponseFields(
 // Retrieval rollout: legacy full-text by default; enhanced scoped retrieval is opt-in.
 // ============================================
 
-async function legacyHybridSearch(
+export async function legacyHybridSearch(
   supabase: any,
   projectId: string,
   question: string,
@@ -176,12 +177,12 @@ async function legacyHybridSearch(
 
   // Full-text search on chunks
   // Build a proper full-text query from the question
-  const queryTerms = question
+  const queryTermList = question
     .trim()
     .split(/\s+/)
     .map((term) => term.replace(/[.,!?;:()[\]{}]/g, ""))
-    .filter((term) => term.length > 1)
-    .join(" & ");
+    .filter((term) => term.length > 1);
+  const queryTerms = queryTermList.join(" & ");
 
   if (!queryTerms) {
     // No valid search terms
@@ -200,7 +201,7 @@ async function legacyHybridSearch(
 
   let chunks = null;
   let chunksError = null;
-  
+
   try {
     const result = await query;
     chunks = result.data;
@@ -223,6 +224,29 @@ async function legacyHybridSearch(
     chunksError = fallbackResult.error;
 
     if (chunksError) throw new Error(`Fallback search failed: ${chunksError}`);
+  } else if (!chunks || chunks.length === 0) {
+    // The strict AND full-text query found nothing (common for natural-
+    // language questions where functional words never co-occur with the
+    // relevant content word in the same chunk). Retry with an OR-based raw
+    // tsquery before giving up — this only runs when the primary query
+    // yielded zero rows, so already-successful AND queries are unaffected.
+    const orQuery = buildOrTsQuery(queryTermList);
+    if (orQuery) {
+      const orResult = await supabase
+        .from("document_chunks")
+        .select("id, content, chapter_number, chapter_title, page, position, version_id")
+        .in("version_id", versionIds)
+        .textSearch("content", orQuery, {
+          config: "simple",
+        })
+        .limit(topK);
+
+      if (orResult.error) {
+        console.warn(`OR fallback full-text search failed: ${orResult.error.message}`);
+      } else {
+        chunks = orResult.data;
+      }
+    }
   }
 
   // Convert chunks to sources with scoring
@@ -292,7 +316,7 @@ function normalizeRetrievalScope(scope?: RetrievalScope): {
   };
 }
 
-async function enhancedHybridSearch(
+export async function enhancedHybridSearch(
   supabase: any,
   projectId: string,
   question: string,
@@ -359,6 +383,26 @@ async function enhancedHybridSearch(
     chunks = fallbackResult.data as DocumentChunk[] | null;
     if (fallbackResult.error) {
       throw new Error(`Fallback search failed: ${fallbackResult.error.message}`);
+    }
+  } else if (!chunks || chunks.length === 0) {
+    // Strict AND query found nothing; retry with an OR-based raw tsquery
+    // before falling through to the (unchanged) ilike fallback path above.
+    // Only runs on a zero-row result, so successful AND queries are unaffected.
+    const orQuery = buildOrTsQuery(terms);
+    if (orQuery) {
+      const orResult = await applyChunkScope(
+        supabase.from("document_chunks").select(selectFields),
+        versionIds,
+        scope,
+      )
+        .textSearch("content", orQuery, { config: "simple" })
+        .limit(safeTopK);
+
+      if (orResult.error) {
+        console.warn(`[ask-question] Enhanced OR fallback search failed: ${orResult.error.message}`);
+      } else {
+        chunks = orResult.data as DocumentChunk[] | null;
+      }
     }
   }
 
