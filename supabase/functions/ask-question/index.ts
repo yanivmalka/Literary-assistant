@@ -76,6 +76,8 @@ interface QAResult {
   citationIds?: string[];
   modelUsed?: string;
   latencyMs?: number;
+  /** True when Gemini stopped at maxOutputTokens (finishReason "MAX_TOKENS") before completing the answer. */
+  truncated?: boolean;
 }
 
 // ============================================
@@ -554,6 +556,35 @@ async function findRelevantEntities(
 // QA Prompt Builder
 // ============================================
 
+/**
+ * Parses the first Gemini candidate's answer text and inspects its
+ * `finishReason`. A finishReason of "MAX_TOKENS" means Gemini stopped
+ * because it hit `generationConfig.maxOutputTokens`, not because it
+ * finished the answer (normal completion is "STOP") — the returned text
+ * is a mid-answer fragment, not a complete response, so callers must
+ * treat `truncated: true` explicitly rather than persisting/returning it
+ * as an ordinary successful answer.
+ */
+export function parseGeminiCandidate(
+  geminiData: Record<string, unknown>,
+): { answer: string; finishReason: string | null; truncated: boolean } {
+  const candidates = (geminiData.candidates as Array<Record<string, unknown>>) || [];
+  const firstCandidate = candidates[0];
+  const content = firstCandidate?.content as Record<string, unknown> | undefined;
+  const parts = (content?.parts as Array<Record<string, unknown>>) || [];
+  const firstPart = parts[0];
+  const responseText = (firstPart?.text as string) || "";
+  const finishReason = typeof firstCandidate?.finishReason === "string"
+    ? firstCandidate.finishReason
+    : null;
+
+  return {
+    answer: responseText.trim(),
+    finishReason,
+    truncated: finishReason === "MAX_TOKENS",
+  };
+}
+
 function buildQAPrompt(
   question: string,
   context: string,
@@ -838,7 +869,7 @@ Deno.serve(async (req) => {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.2, // Lower temperature for factual answers
-          maxOutputTokens: 1024,
+          maxOutputTokens: 2048,
         },
       },
       apiKey,
@@ -903,14 +934,7 @@ Deno.serve(async (req) => {
     };
 
     // --- Step 7: Parse LLM response ---
-    const candidates = (geminiData.candidates as Array<Record<string, unknown>>) || [];
-    const firstCandidate = candidates[0];
-    const content = firstCandidate?.content as Record<string, unknown> | undefined;
-    const parts = (content?.parts as Array<Record<string, unknown>>) || [];
-    const firstPart = parts[0];
-    const responseText = (firstPart?.text as string) || "";
-
-    const answer = responseText.trim();
+    const { answer, finishReason, truncated } = parseGeminiCandidate(geminiData);
 
     // Check if LLM indicates insufficient context
     const noSufficientContext =
@@ -918,14 +942,25 @@ Deno.serve(async (req) => {
       answer.includes("לא נמצא מספיק מידע") ||
       answer.toLowerCase().includes("insufficient information");
 
-    console.log(
-      `[ask-question] Generated answer (${latencyMs}ms, model: ${geminiResult.modelUsed})`
-    );
+    if (truncated) {
+      // Gemini stopped at generationConfig.maxOutputTokens before finishing
+      // the answer. The text is a genuine mid-answer fragment, not a normal
+      // completion — surface that explicitly instead of persisting/returning
+      // it indistinguishably from a STOP response.
+      console.warn(
+        `[ask-question] Gemini answer truncated at maxOutputTokens (${latencyMs}ms, model: ${geminiResult.modelUsed}, finishReason: ${finishReason})`
+      );
+    } else {
+      console.log(
+        `[ask-question] Generated answer (${latencyMs}ms, model: ${geminiResult.modelUsed})`
+      );
+    }
 
     const persisted = await persistTurn(answer, sources, noSufficientContext, {
-      mode: "generated",
+      mode: truncated ? "generated-truncated" : "generated",
       model_used: geminiResult.modelUsed,
       latency_ms: latencyMs,
+      finish_reason: finishReason,
     });
 
     return new Response(
@@ -936,6 +971,7 @@ Deno.serve(async (req) => {
           sources,
           entitiesReferenced: entityNames,
           noSufficientContext,
+          truncated,
           ...notebookResponseFields(persisted),
           modelUsed: geminiResult.modelUsed,
           latencyMs,
