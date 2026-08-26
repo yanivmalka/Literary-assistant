@@ -26,6 +26,9 @@ import {
   type NotebookTurnResult,
 } from "../_shared/notebook-persistence.ts";
 import type { QASource } from "../_shared/notebook-types.ts";
+import { runUnifiedRetrieval } from "../_shared/unified-retrieval.ts";
+import { selectCandidates } from "../_shared/selection.ts";
+import { appendStructuredKnowledgeContext, formatStructuredKnowledgeContext } from "../_shared/structured-context.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -675,6 +678,51 @@ Deno.serve(async (req) => {
       !explicitSourceScope,
     );
 
+    // --- Step 2b: Unified structured retrieval (Phase 5 + 5.1 + 5.2) ---
+    // Computes the ranked Phase 1-4 candidate set (chunks + effective
+    // entities/values/relationships/events, federated with evidence), then
+    // selects (Phase 5.1's `selectCandidates`, no re-ranking) the structured
+    // (non-chunk) candidates that will be appended to the QA context below.
+    // Wrapped defensively so any failure here can never affect the existing
+    // chunk retrieval / entityInfo / answer-generation path — on failure,
+    // `structuredKnowledgeBlock` simply stays "" and QA proceeds exactly as
+    // it did before this integration.
+    let structuredKnowledgeBlock = "";
+    try {
+      const unified = await runUnifiedRetrieval({
+        supabase,
+        projectId,
+        branchId,
+        chunks: sources,
+        rawScope: {
+          projectId,
+          branchId,
+          sourceVersionIds: body.source_version_ids,
+          chapterNumbers: body.chapter_numbers,
+          chunkIds: body.chunk_ids,
+          includeAdjacent: body.include_adjacent,
+        },
+      });
+      const structuredRanked = unified.ranked.filter((entry) => entry.candidate.kind !== "chunk");
+      const selectedStructured = selectCandidates(structuredRanked, { maxTotal: 25 });
+      structuredKnowledgeBlock = formatStructuredKnowledgeContext(selectedStructured);
+      console.log(
+        `[ask-question] Unified retrieval: ${unified.ranked.length} ranked candidates, ` +
+          `${selectedStructured.length} structured candidates selected ` +
+          `(${unified.candidates.filter((c) => c.kind === "entity").length} entity, ` +
+          `${unified.candidates.filter((c) => c.kind === "value").length} value, ` +
+          `${unified.candidates.filter((c) => c.kind === "relationship").length} relationship, ` +
+          `${unified.candidates.filter((c) => c.kind === "event").length} event, ` +
+          `${unified.candidates.filter((c) => c.kind === "chunk").length} chunk)`,
+      );
+    } catch (unifiedError) {
+      console.warn(
+        "[ask-question] Unified retrieval failed; falling back to the existing chunk-only QA context",
+        unifiedError instanceof Error ? unifiedError.message : unifiedError,
+      );
+      structuredKnowledgeBlock = "";
+    }
+
     // --- No results: insufficient context ---
     if (sources.length === 0) {
       const persisted = await persistTurn("", [], true, { mode: "no-context" });
@@ -735,7 +783,7 @@ Deno.serve(async (req) => {
             : `[Source ${i + 1}]`;
       return `${ref}\n${s.content}`;
     });
-    const context = contextParts.join("\n\n---\n\n");
+    const context = appendStructuredKnowledgeContext(contextParts.join("\n\n---\n\n"), structuredKnowledgeBlock);
 
     // --- Step 5: Generate answer with Gemini ---
     const prompt = buildQAPrompt(question, context, entityInfo);
