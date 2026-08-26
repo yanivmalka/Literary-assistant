@@ -80,6 +80,9 @@ async function extractDocxText(buffer: ArrayBuffer): Promise<{
   fullText: string;
 }> {
   const mammoth = await import("npm:mammoth");
+  // Deno resolves npm:mammoth's "browser" package.json field (no Node `fs`),
+  // whose openZip() only recognizes options.arrayBuffer — the Node build's
+  // options.buffer branch does not exist here.
   const result = await mammoth.extractRawText({ arrayBuffer: buffer });
   const fullText: string = result.value || "";
 

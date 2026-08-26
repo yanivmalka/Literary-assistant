@@ -194,7 +194,7 @@ export default function CharacterDetailModal({
               {character.aliases?.length > 0 && (
                 <section>
                   <h3 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">{t('entityFields.aliases')}</h3>
-                  <div className="flex flex-wrap gap-2">{character.aliases.map(alias => <span key={alias} className="px-3 py-1 bg-muted text-sm rounded-full text-muted-foreground">{alias}</span>)}</div>
+                  <div className="flex flex-wrap gap-2">{Array.from(new Set(character.aliases)).map(alias => <span key={alias} className="px-3 py-1 bg-muted text-sm rounded-full text-muted-foreground">{alias}</span>)}</div>
                 </section>
               )}
 

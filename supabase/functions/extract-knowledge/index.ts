@@ -833,16 +833,17 @@ async function findExistingMainEntity(
   supabase: any,
   projectId: string,
   userId: string,
-  versionId: string,
   entity: NormalizedEntity,
 ): Promise<ExtractionEntityCandidate | null> {
+  // Scoped by project (not version_id) so entities extracted from one document
+  // resolve against entities already extracted from other documents in the
+  // same project, instead of creating duplicates per document version.
   const entitySelect = "id, canonical_name, entity_type, entity_types, structured_fields, attributes, source, description, layer, branch_id, created_at";
   const { data, error } = await supabase
     .from("knowledge_entities")
     .select(entitySelect)
     .eq("project_id", projectId)
     .eq("user_id", userId)
-    .eq("version_id", versionId)
     .eq("layer", "main")
     .is("branch_id", null)
     .eq("canonical_name", entity.canonical_name)
@@ -1699,7 +1700,6 @@ Deno.serve(async (req) => {
           supabase,
           body.project_id,
           body.user_id,
-          body.version_id,
           entity,
         );
       }
@@ -1738,7 +1738,6 @@ Deno.serve(async (req) => {
           })
           .eq("id", existing.id)
           .eq("project_id", body.project_id)
-          .eq("version_id", body.version_id)
           .eq("layer", "main")
           .is("branch_id", null);
 
@@ -1887,7 +1886,6 @@ Deno.serve(async (req) => {
               supabase,
               body.project_id,
               body.user_id,
-              body.version_id,
               entity,
             );
             if (racedEntity) {
