@@ -419,6 +419,15 @@ export function validateExtractionMode(request: ExtractionModeRequest): Extracti
  * under attributes, or under a `fields` object. C persistence needs the
  * stable attributes.character_field_observations map so field provenance,
  * inference flags, and first/last names survive normalization.
+ *
+ * Relationships are also normalized here regardless of whether the top-level
+ * payload is schema_version=2 (unified entities array) or the legacy bucketed
+ * format: the sub-base-c-characters prompt asks the model for
+ * source/target/type on relationships, but validateExtractionPayload only
+ * accepts character_a/character_b/relationship_type. normalizeCanonicalPayload
+ * performs that same rename, but only runs when the whole payload satisfies
+ * isCanonicalExtractionPayload, so legacy-bucketed payloads (permitted for
+ * this profile) would otherwise skip it and fail validation.
  */
 export function adaptSubBaseCSerialExtraction(payload: unknown): Record<string, unknown[]> | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
@@ -493,5 +502,12 @@ export function adaptSubBaseCSerialExtraction(payload: unknown): Record<string, 
       };
     });
 
-  return { ...record, characters };
+  const rawRelationships = Array.isArray(record.relationships) ? record.relationships : [];
+  const relationships = rawRelationships.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+    const relationship = item as Record<string, unknown>;
+    return canonicalRelationshipToLegacy(relationship) ?? relationship;
+  });
+
+  return { ...record, characters, ...(rawRelationships.length > 0 ? { relationships } : {}) };
 }

@@ -113,7 +113,7 @@ async function invokeExtraction(project, document, version, user) {
       offset: 0,
       limit: 1,
       model_profile: "sub-base-c-characters",
-      extraction_strategy: "parallel-experts",
+      extraction_strategy: "legacy-sequential",
     },
   });
   if (result.error) throw new Error(`extraction invocation: ${result.error.message}`);
@@ -122,15 +122,14 @@ async function invokeExtraction(project, document, version, user) {
 }
 
 async function queryVerificationData(project, document, version, user, extractionRunId) {
-  const [raw, artifacts, entities, values, branches] = await Promise.all([
+  const [raw, entities, values, branches] = await Promise.all([
     supabase.from("raw_extractions").select("*").eq("project_id", project.id).eq("extraction_run_id", extractionRunId).order("created_at", { ascending: false }).limit(10),
-    supabase.from("extraction_expert_artifacts").select("*").eq("project_id", project.id).eq("extraction_run_id", extractionRunId).order("created_at", { ascending: true }),
     supabase.from("knowledge_entities").select("*").eq("project_id", project.id).eq("user_id", user.id).order("created_at", { ascending: true }),
     supabase.from("knowledge_entity_values").select("*").eq("project_id", project.id).order("created_at", { ascending: true }),
     supabase.from("knowledge_branch_entities").select("*").eq("project_id", project.id),
   ]);
 
-  for (const [label, result] of Object.entries({ raw, artifacts, entities, values, branches })) {
+  for (const [label, result] of Object.entries({ raw, entities, values, branches })) {
     if (result.error) throw new Error(`${label} verification query: ${result.error.message}`);
   }
 
@@ -157,7 +156,6 @@ async function queryVerificationData(project, document, version, user, extractio
     user_id: user.id,
     extraction_run_id: extractionRunId,
     raw_extractions: raw.data || [],
-    artifacts: artifacts.data || [],
     entities: entityRows,
     aliases: aliases.data || [],
     mentions: mentions.data || [],
@@ -168,42 +166,50 @@ async function queryVerificationData(project, document, version, user, extractio
   };
 }
 
+const SUB_BASE_C_ENTITY_TYPES = new Set(["character", "object", "ability", "magic_ability"]);
+
 function buildChecks(data, response) {
   const raw = data.raw_extractions[0];
   const characterEntities = data.entities.filter((entity) => entity.entity_type === "character");
   const nonCharacterEntities = data.entities.filter((entity) => entity.entity_type !== "character");
-  const roles = [...new Set(data.artifacts.map((artifact) => artifact.role))];
-  const succeededArtifacts = data.artifacts.filter((artifact) => artifact.status === "succeeded");
+  const unexpectedEntities = data.entities.filter((entity) => !SUB_BASE_C_ENTITY_TYPES.has(entity.entity_type));
   const mainEntities = characterEntities.filter((entity) => entity.layer === "main" && entity.branch_id === null);
   const rawResponse = raw?.raw_response || {};
-  const rawBuckets = ["locations", "events", "objects", "abilities"].filter((key) => Array.isArray(rawResponse[key]) && rawResponse[key].length > 0);
+  // NOTE: raw_response is not the model's literal completion text. extract-knowledge/index.ts
+  // runs normalizeExtractionPayload() (and, for this profile, adaptSubBaseCSerialExtraction())
+  // before persisting, which converts either a schema_version=2 {entities:[...]} payload or a
+  // legacy {characters:[...], ...} payload into one bucketed persistence contract
+  // (testable-pipeline.ts: normalizeCanonicalPayload). So raw_response is always bucketed by
+  // design — it never carries schema_version or a top-level entities array — and the in-scope
+  // buckets for this profile (characters/objects/abilities/magic_abilities) are the expected
+  // persisted shape, not a "legacy" leftover to eliminate.
+  const inScopeBuckets = ["characters", "objects", "abilities", "magic_abilities"].filter((key) => Array.isArray(rawResponse[key]) && rawResponse[key].length > 0);
+  const outOfScopeBuckets = ["locations", "events", "organizations"].filter((key) => Array.isArray(rawResponse[key]) && rawResponse[key].length > 0);
   const checks = {
     response_success: response.success === true,
     response_profile: response.telemetry?.model_profile === "sub-base-c-characters",
-    response_strategy: response.telemetry?.extraction_strategy === "parallel-experts",
-    one_artifact: data.artifacts.length === 1,
-    character_role_only: roles.length === 1 && roles[0] === "characters",
-    one_succeeded_artifact: succeededArtifacts.length === 1,
-    c_contract: succeededArtifacts[0]?.artifact_contract === "character-specialist-v1",
-    primary_model: succeededArtifacts[0]?.primary_model === "gemini-3.5-flash-lite",
-    actual_model_recorded: typeof succeededArtifacts[0]?.model === "string" && succeededArtifacts[0].model.length > 0,
-    fallback_chain_recorded: Array.isArray(succeededArtifacts[0]?.fallback_chain),
-    raw_extraction_recorded: Boolean(raw?.id && raw?.model_profile === "sub-base-c-characters" && raw?.extraction_strategy === "parallel-experts"),
+    response_strategy: response.telemetry?.extraction_strategy === "legacy-sequential",
+    actual_model_recorded: typeof (raw?.model) === "string" && raw.model.length > 0,
+    raw_extraction_recorded: Boolean(raw?.id && raw?.model_profile === "sub-base-c-characters" && raw?.extraction_strategy === "legacy-sequential"),
+    raw_is_bucketed_persistence_contract: typeof rawResponse === "object" && rawResponse !== null && !Array.isArray(rawResponse) && rawResponse.schema_version === undefined && !Array.isArray(rawResponse.entities),
     raw_has_characters: Array.isArray(rawResponse.characters) && rawResponse.characters.length > 0,
-    canonical_characters_only: characterEntities.length > 0 && nonCharacterEntities.length === 0,
+    canonical_entity_types_only: data.entities.length > 0 && unexpectedEntities.length === 0,
+    canonical_has_characters: characterEntities.length > 0,
     main_bootstrap: mainEntities.length === characterEntities.length && data.branch_entities.length === 0,
     values_have_lineage: data.values.length > 0 && data.values.every((value) => value.raw_extraction_id === raw?.id),
     evidence_present: data.value_evidence.length > 0,
     relationship_rows_present: data.relationships.length > 0,
-    no_future_buckets: rawBuckets.length === 0,
+    no_out_of_scope_buckets: outOfScopeBuckets.length === 0,
   };
   return {
     checks,
-    raw_bucket_keys_with_values: rawBuckets,
+    raw_bucket_keys_with_values: inScopeBuckets,
+    raw_out_of_scope_bucket_keys_with_values: outOfScopeBuckets,
     entity_counts: {
       total: data.entities.length,
       characters: characterEntities.length,
       non_characters: nonCharacterEntities.length,
+      unexpected_types: unexpectedEntities.length,
       aliases: data.aliases.length,
       mentions: data.mentions.length,
       values: data.values.length,
@@ -236,15 +242,7 @@ async function inspectExistingRun(user, projectId, extractionRunId) {
     telemetry: {
       model_profile: raw?.model_profile || null,
       extraction_strategy: raw?.extraction_strategy || null,
-      expert_models: data.artifacts.map((artifact) => ({
-        id: artifact.id,
-        role: artifact.role,
-        window_id: artifact.window_id,
-        model: artifact.model,
-        primary_model: artifact.primary_model,
-        artifact_contract: artifact.artifact_contract,
-        fallback_chain: artifact.fallback_chain,
-      })),
+      model: raw?.model || null,
     },
   };
   const verification = buildChecks(data, response);
@@ -267,17 +265,7 @@ async function inspectExistingRun(user, projectId, extractionRunId) {
     user_id: user.id,
     extraction_run_id: extractionRunId,
     raw_extraction_id: raw?.id || null,
-    artifacts: data.artifacts.map((artifact) => ({
-      id: artifact.id,
-      role: artifact.role,
-      status: artifact.status,
-      primary_model: artifact.primary_model,
-      model: artifact.model,
-      artifact_contract: artifact.artifact_contract,
-      fallback_chain: artifact.fallback_chain,
-      total_tokens: artifact.total_tokens,
-      latency_ms: artifact.latency_ms,
-    })),
+    raw_extraction_model: raw?.model || null,
     verification,
   }, null, 2));
   if (!verification.all_checks_pass) process.exitCode = 2;

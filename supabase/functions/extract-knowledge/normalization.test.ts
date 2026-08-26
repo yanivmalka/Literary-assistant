@@ -136,6 +136,90 @@ Deno.test("C adapter keeps age evidence separate and rejects compound age values
   assertEquals((observations.age[0].evidence as Array<Record<string, unknown>>)[0].quote, "אליה, נערה בת שבע־עשרה, מהכפר רינור");
 });
 
+Deno.test("C adapter normalizes source/target/type relationships to character_a/character_b/relationship_type in a legacy-bucketed payload", () => {
+  const adapted = adaptSubBaseCSerialExtraction({
+    characters: [
+      { name: "Mira Stonewell", attributes: { first_name: "Mira", last_name: "Stonewell" } },
+      { name: "Dorian Vale", attributes: { first_name: "Dorian", last_name: "Vale" } },
+    ],
+    relationships: [{
+      source: { name: "Mira Stonewell", type: "character" },
+      target: { name: "Dorian Vale", type: "character" },
+      type: "alliance",
+      description: "Trusted allies.",
+      evidence: ["Mira and Dorian are trusted allies."],
+      source_references: [{ chunk_position: 0, quote: "Mira and Dorian are trusted allies." }],
+      chunk_positions: [0],
+    }],
+  });
+
+  const relationship = (adapted?.relationships as Array<Record<string, unknown>>)[0];
+  assertEquals(relationship.character_a, "Mira Stonewell");
+  assertEquals(relationship.character_b, "Dorian Vale");
+  assertEquals(relationship.relationship_type, "alliance");
+  assertEquals(relationship.source_type, "character");
+  assertEquals(relationship.target_type, "character");
+  assertEquals(relationship.evidence, ["Mira and Dorian are trusted allies."]);
+  assertEquals(relationship.chunk_positions, [0]);
+  // source/target/type remain present (canonicalRelationshipToLegacy spreads the original fields).
+  assertEquals((relationship.source as Record<string, unknown>).name, "Mira Stonewell");
+});
+
+Deno.test("C adapter leaves already-legacy character_a/character_b relationships unchanged", () => {
+  const adapted = adaptSubBaseCSerialExtraction({
+    characters: [{ name: "Mira Stonewell", attributes: { first_name: "Mira" } }],
+    relationships: [{
+      character_a: "Mira Stonewell",
+      character_b: "Dorian Vale",
+      relationship_type: "alliance",
+      evidence: ["Mira and Dorian are trusted allies."],
+    }],
+  });
+
+  const relationship = (adapted?.relationships as Array<Record<string, unknown>>)[0];
+  assertEquals(relationship.character_a, "Mira Stonewell");
+  assertEquals(relationship.character_b, "Dorian Vale");
+  assertEquals(relationship.relationship_type, "alliance");
+});
+
+Deno.test("C adapter normalizes relationships when the top-level payload is schema_version=2 with a unified entities array", () => {
+  const adapted = adaptSubBaseCSerialExtraction({
+    schema_version: "2",
+    entities: [
+      { name: "Mira Stonewell", type: "character", attributes: { first_name: "Mira" } },
+      { name: "Dorian Vale", type: "character", attributes: { first_name: "Dorian" } },
+    ],
+    relationships: [{
+      source: { name: "Mira Stonewell", type: "character" },
+      target: { name: "Dorian Vale", type: "character" },
+      type: "alliance",
+    }],
+  });
+
+  // adaptSubBaseCSerialExtraction only reads record.characters; a schema_version=2 payload's
+  // entities live under `entities`, not `characters`, so normalizeCanonicalPayload (called
+  // separately, before this adapter, in extract-knowledge/index.ts) is what groups entities
+  // into characters for this shape. Here we confirm the adapter's own relationship handling
+  // is shape-agnostic: it still normalizes source/target/type regardless of how characters
+  // arrived.
+  const relationship = (adapted?.relationships as Array<Record<string, unknown>>)[0];
+  assertEquals(relationship.character_a, "Mira Stonewell");
+  assertEquals(relationship.character_b, "Dorian Vale");
+  assertEquals(relationship.relationship_type, "alliance");
+});
+
+Deno.test("C adapter leaves a relationship missing source/target/type untouched for the shared validator to reject", () => {
+  const adapted = adaptSubBaseCSerialExtraction({
+    characters: [{ name: "Mira Stonewell", attributes: { first_name: "Mira" } }],
+    relationships: [{ description: "no identifiable parties" }],
+  });
+
+  const relationship = (adapted?.relationships as Array<Record<string, unknown>>)[0];
+  assertEquals(relationship.character_a, undefined);
+  assertEquals(relationship.character_b, undefined);
+  assertEquals(relationship.relationship_type, undefined);
+});
+
 Deno.test("C normalization aligns canonical age with the strongest explicit observation", () => {
   const extraction = {
     characters: [character({
