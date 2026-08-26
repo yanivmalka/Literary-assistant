@@ -5,7 +5,7 @@
 **מזהה פנימי מתוכנן:** `sub-base-c-characters`  
 **מודל ראשון:** Model A — מומחה חילוץ דמויות  
 **מודל ראשי:** `gemini-3.5-flash-lite`  
-**Fallback מתוכנן:** `gemini-2.5-flash-lite`  
+**Fallback מתוכנן:** `gemini-3.5-flash` (עודכן — `gemini-2.5-flash-lite` אינו מזהה מודל תקין ב-Gemini וגרם ל-HTTP 404; ראו תיקון בקוד)  
 **בעלות על נתונים:** Knowledge Layer הקיים; אין ליצור טבלת `characters` קנונית חדשה.
 
 ## 1. מטרת המפרט
@@ -36,7 +36,7 @@
 
 ```text
 characters / Model A → gemini-3.5-flash-lite
-fallback               → gemini-2.5-flash-lite
+fallback               → gemini-3.5-flash
 ```
 
 אין להפעיל בשלב זה את `gemini-2.5-flash`, מאחר שהוא אינו זמין בפרויקט לפי לוגי Gemini. אין להשתמש במזהי Preview ישנים שאינם זמינים.

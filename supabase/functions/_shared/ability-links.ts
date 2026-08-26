@@ -163,3 +163,66 @@ export function buildAbilityLinks(entries: AbilityLinkEntity[]): AbilityLink[] {
 
   return links
 }
+
+export interface ObjectLink {
+  characterId: string
+  objectId: string
+  objectName: string
+  ownerName: string
+  relationshipType: 'owns'
+}
+
+/**
+ * Build character -> object ownership links from normalized extraction
+ * entities, mirroring buildAbilityLinks. Gemini returns character names in
+ * the top-level object.owners field, persisted as attributes.owners during
+ * normalization.
+ */
+export function buildObjectLinks(entries: AbilityLinkEntity[]): ObjectLink[] {
+  const links: ObjectLink[] = []
+  const linkKeys = new Set<string>()
+
+  const addLink = (character: AbilityLinkEntity, object: AbilityLinkEntity, ownerName: string) => {
+    const key = `${character.id}:${object.id}:owns`
+    if (linkKeys.has(key)) return
+    linkKeys.add(key)
+    links.push({
+      characterId: character.id,
+      objectId: object.id,
+      objectName: object.canonical_name,
+      ownerName,
+      relationshipType: 'owns',
+    })
+  }
+
+  const characters = entries.filter((entry) => entry.entity_type === 'character')
+  const objects = entries.filter((entry) => entry.entity_type === 'object')
+
+  const findCharacter = (ownerName: string): AbilityLinkEntity | null => {
+    const ownerKey = normalizeKey(stripNikud(ownerName.trim()))
+    if (!ownerKey) return null
+    const matches = characters.filter((character) =>
+      normalizeKey(character.canonical_name) === ownerKey ||
+      character.aliases.some((alias) => normalizeKey(alias) === ownerKey),
+    )
+    return [...new Set(matches.map((character) => character.id))].length === 1
+      ? matches[0]
+      : null
+  }
+
+  for (const object of objects) {
+    const rawOwners = object.attributes.owners
+    const ownerNames = Array.isArray(rawOwners)
+      ? rawOwners.filter((owner): owner is string => typeof owner === 'string')
+      : typeof rawOwners === 'string'
+        ? rawOwners.split(',').map((owner) => owner.trim()).filter(Boolean)
+        : []
+
+    for (const ownerName of ownerNames) {
+      const character = findCharacter(ownerName)
+      if (character) addLink(character, object, ownerName)
+    }
+  }
+
+  return links
+}

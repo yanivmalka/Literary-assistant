@@ -68,7 +68,7 @@ export interface ExtractedEntity {
   special_properties?: string | null;
   origin?: string | null;
   current_location?: string | null;
-  owners?: string | null;
+  owners?: string | string[] | null;
   ability_type?: string | null;
   mechanism?: string | null;
   activation_conditions?: string | null;
@@ -277,7 +277,8 @@ export function buildStructuredFields(
     fields.special_properties = entity.special_properties || null;
     fields.origin = entity.origin || null;
     fields.current_location = entity.current_location || null;
-    fields.owners = entity.owners || null;
+    const owners = normalizeStringList(entity.owners)
+    fields.owners = owners.length > 0 ? owners.join(", ") : null;
     fields.narrative_importance = entity.narrative_importance || null;
     fields.narrative_impact = null;
     fields.related_characters = entity.related_characters || null;
@@ -489,18 +490,18 @@ export function normalizeEntities(
         chunk_positions: entity.chunk_positions || [],
         chunk_ids: chunkIds.length > 0 ? chunkIds : undefined,
         page_numbers: pageNumbers.length > 0 ? pageNumbers : undefined,
-        field_evidence: profile === "sub-base-c-characters"
+        field_evidence: profile === "sub-base-c-characters" && type === "character"
           ? incomingProvenance.field_evidence
           : entity.field_evidence
             ? normalizeLegacyFieldEvidence(entity.field_evidence)
             : undefined,
-        field_confidence: profile === "sub-base-c-characters"
+        field_confidence: profile === "sub-base-c-characters" && type === "character"
           ? incomingProvenance.field_confidence
           : entity.field_evidence
             ? computeFieldConfidence(entity.field_evidence, incomingStructuredFields)
             : undefined,
-        field_inferred: profile === "sub-base-c-characters" ? incomingProvenance.field_inferred : undefined,
-        field_inference_notes: profile === "sub-base-c-characters" ? incomingProvenance.field_inference_notes : undefined,
+        field_inferred: profile === "sub-base-c-characters" && type === "character" ? incomingProvenance.field_inferred : undefined,
+        field_inference_notes: profile === "sub-base-c-characters" && type === "character" ? incomingProvenance.field_inference_notes : undefined,
         field_observations: Object.keys(incomingObservations).length > 0 ? incomingObservations : undefined,
       });
     }
@@ -539,12 +540,21 @@ export function normalizeEntities(
     }
   }
 
+  // Sub-base C extracts only characters, objects, and abilities. Locations,
+  // organizations, and events are out of scope for this profile even if the
+  // model returns them despite the prompt's instructions.
+  const isSubBaseC = profile === "sub-base-c-characters";
+
   for (const character of extraction.characters || []) addEntity(character.name, "character", character);
-  for (const location of extraction.locations || []) addEntity(location.name, "location", location);
+  if (!isSubBaseC) {
+    for (const location of extraction.locations || []) addEntity(location.name, "location", location);
+  }
   for (const object of extraction.objects || []) addEntity(object.name, "object", object);
   for (const ability of physicalAbilities) addEntity(ability.name, "ability", ability);
   for (const magicAbility of magicAbilities) addEntity(magicAbility.name, "magic_ability", magicAbility);
-  for (const organization of extraction.organizations || []) addEntity(organization.name, "organization", organization);
+  if (!isSubBaseC) {
+    for (const organization of extraction.organizations || []) addEntity(organization.name, "organization", organization);
+  }
 
   const entries = Array.from(entityMap.entries());
   const consolidationCandidates: Array<{ keyA: string; keyB: string; score: number }> = [];

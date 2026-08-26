@@ -221,7 +221,15 @@ export default function CharacterDetailModal({
               </div>
             </div>
           )}
-          {view === 'objects' && <ObjectsPanel character={character} onBack={() => setView('detail')} />}
+          {view === 'objects' && (
+            <ObjectsPanel
+              character={character}
+              projectId={projectId}
+              modelProfile={modelProfile}
+              branchId={branchId}
+              onBack={() => setView('detail')}
+            />
+          )}
           {view === 'abilities' && <AbilitiesPanel character={character} projectId={projectId} modelProfile={modelProfile} branchId={branchId} onBack={() => setView('detail')} />}
         </div>
       </div>

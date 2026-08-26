@@ -1,6 +1,7 @@
-import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals, assertFalse } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { normalizeCharacterAge } from "../_shared/character-age.ts";
-import { buildSubBaseCCharactersInstructions } from "../_shared/rules/prompt.ts";
+import { buildExtractionPromptForProfile, buildSubBaseCCharactersInstructions } from "../_shared/rules/prompt.ts";
+import { buildAbilityLinks, buildObjectLinks, type AbilityLinkEntity } from "../_shared/ability-links.ts";
 import { adaptSubBaseCSerialExtraction } from "./testable-pipeline.ts";
 import {
   buildStructuredFields,
@@ -174,4 +175,201 @@ Deno.test("C prompt requires a canonical age value and evidence separation", () 
   assert(prompt.includes("canonical ASCII decimal string"));
   assert(prompt.includes("Keep the original wording only in that observation's evidence"));
   assert(prompt.includes("Keep description independent from age and evidence"));
+});
+
+// ============================================
+// Active legacy-sequential C path: characters + objects + abilities
+// ============================================
+
+Deno.test("C path prompt requests characters, objects, and abilities together, and excludes locations/events", () => {
+  const prompt = buildExtractionPromptForProfile([{ position: 0, content: "טקסט לדוגמה" }], "sub-base-c-characters");
+  assert(prompt.includes("=== OBJECTS ==="));
+  assert(prompt.includes("=== ABILITIES ==="));
+  assert(prompt.includes("=== CHARACTERS ==="));
+  assert(prompt.includes("Do NOT return locations, organizations, or events as entities."));
+  assertFalse(/=== LOCATIONS ===/.test(prompt));
+});
+
+Deno.test("C normalization extracts an object entity from the unified entities bucket", () => {
+  const extraction = {
+    characters: [character()],
+    objects: [{
+      name: "חרב הזהב",
+      type: "object",
+      attributes: { owners: ["Leah Frost"] },
+      special_properties: "זוהרת בחושך",
+      owners: ["Leah Frost"],
+      evidence: ["חרב הזהב זהרה בידיה"],
+      chunk_positions: [2],
+    }],
+  } as unknown as GeminiExtraction;
+
+  const entities = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  const sword = entities.find((entity) => entity.entity_type === "object");
+  assert(sword);
+  assertEquals(sword?.canonical_name, "חרב הזהב");
+  assertEquals(sword?.structured_fields.special_properties, "זוהרת בחושך");
+  assertEquals(sword?.structured_fields.owners, "Leah Frost");
+});
+
+Deno.test("C normalization extracts ability and magic_ability entities from the unified entities bucket", () => {
+  const extraction = {
+    characters: [character()],
+    abilities: [{
+      name: "לחימה בשתי חרבות",
+      type: "ability",
+      users: ["Leah Frost"],
+      mechanism: "אימון שנים",
+      chunk_positions: [2],
+    }],
+    magic_abilities: [{
+      name: "טלקינזיס",
+      type: "magic_ability",
+      users: ["Leah Frost"],
+      power_level: "בינוני",
+      chunk_positions: [2],
+    }],
+  } as unknown as GeminiExtraction;
+
+  const entities = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  const ability = entities.find((entity) => entity.entity_type === "ability");
+  const magicAbility = entities.find((entity) => entity.entity_type === "magic_ability");
+  assert(ability);
+  assert(magicAbility);
+  assertEquals(ability?.structured_fields.mechanism, "אימון שנים");
+  assertEquals(magicAbility?.structured_fields.power_level, "בינוני");
+});
+
+Deno.test("C normalization does not persist locations or organizations even if the model returns them", () => {
+  const extraction = {
+    characters: [character()],
+    locations: [{ name: "טירת הצפון", type: "location", chunk_positions: [2] }],
+    organizations: [{ name: "מסדר האור", type: "organization", chunk_positions: [2] }],
+  } as unknown as GeminiExtraction;
+
+  const entities = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  assertFalse(entities.some((entity) => entity.entity_type === "location"));
+  assertFalse(entities.some((entity) => entity.entity_type === "organization"));
+});
+
+Deno.test("C path: character-to-object link is built from the object's owners attribute", () => {
+  const extraction = {
+    characters: [character()],
+    objects: [{
+      name: "חרב הזהב",
+      type: "object",
+      attributes: { owners: ["Leah Frost"] },
+      owners: ["Leah Frost"],
+      chunk_positions: [2],
+    }],
+  } as unknown as GeminiExtraction;
+
+  const entities = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  const linkEntries: AbilityLinkEntity[] = entities.map((entity, index) => ({
+    id: `entity-${index}`,
+    canonical_name: entity.canonical_name,
+    entity_type: entity.entity_type,
+    aliases: entity.aliases,
+    attributes: entity.attributes,
+  }));
+
+  const links = buildObjectLinks(linkEntries);
+  assertEquals(links.length, 1);
+  assertEquals(links[0].objectName, "חרב הזהב");
+  assertEquals(links[0].relationshipType, "owns");
+});
+
+Deno.test("C path: character-to-ability link is built from the ability's users attribute", () => {
+  const extraction = {
+    characters: [character()],
+    magic_abilities: [{
+      name: "טלקינזיס",
+      type: "magic_ability",
+      attributes: { users: ["Leah Frost"] },
+      users: ["Leah Frost"],
+      chunk_positions: [2],
+    }],
+  } as unknown as GeminiExtraction;
+
+  const entities = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  const linkEntries: AbilityLinkEntity[] = entities.map((entity, index) => ({
+    id: `entity-${index}`,
+    canonical_name: entity.canonical_name,
+    entity_type: entity.entity_type,
+    aliases: entity.aliases,
+    attributes: entity.attributes,
+  }));
+
+  const links = buildAbilityLinks(linkEntries);
+  assertEquals(links.length, 1);
+  assertEquals(links[0].abilityName, "טלקינזיס");
+  assertEquals(links[0].relationshipType, "has_ability");
+});
+
+Deno.test("C path: an object arriving in a later batch still links to a character normalized in an earlier batch", () => {
+  const earlierBatch = normalizeEntities(
+    { characters: [character()] } as unknown as GeminiExtraction,
+    chunkLookup,
+    "sub-base-c-characters",
+  );
+  const laterBatch = normalizeEntities(
+    {
+      objects: [{
+        name: "חרב הזהב",
+        type: "object",
+        attributes: { owners: ["Leah Frost"] },
+        owners: ["Leah Frost"],
+        chunk_positions: [2],
+      }],
+    } as unknown as GeminiExtraction,
+    chunkLookup,
+    "sub-base-c-characters",
+  );
+
+  const persisted: AbilityLinkEntity[] = earlierBatch.map((entity, index) => ({
+    id: `persisted-${index}`,
+    canonical_name: entity.canonical_name,
+    entity_type: entity.entity_type,
+    aliases: entity.aliases,
+    attributes: entity.attributes,
+  }));
+  const current: AbilityLinkEntity[] = laterBatch.map((entity, index) => ({
+    id: `current-${index}`,
+    canonical_name: entity.canonical_name,
+    entity_type: entity.entity_type,
+    aliases: entity.aliases,
+    attributes: entity.attributes,
+  }));
+
+  const links = buildObjectLinks([...persisted, ...current]);
+  assertEquals(links.length, 1);
+  assertEquals(links[0].characterId, "persisted-0");
+  assertEquals(links[0].objectId, "current-0");
+});
+
+Deno.test("C path: two objects with the same name but conflicting field values are kept as separate entities", () => {
+  const extraction = {
+    objects: [
+      {
+        name: "חרב הזהב",
+        type: "object",
+        description: "חרב עתיקה מהמלחמה הראשונה",
+        special_properties: "קרה כקרח",
+        chunk_positions: [2],
+      },
+      {
+        name: "חרב הזהב",
+        type: "object",
+        description: "חרב חדשה שנוצרה על ידי הנפח",
+        special_properties: "בוערת באש",
+        chunk_positions: [2],
+      },
+    ],
+  } as unknown as GeminiExtraction;
+
+  const entities = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  const swords = entities.filter((entity) => entity.entity_type === "object");
+  assertEquals(swords.length, 2);
+  const properties = swords.map((sword) => sword.structured_fields.special_properties).sort();
+  assertEquals(properties, ["בוערת באש", "קרה כקרח"]);
 });

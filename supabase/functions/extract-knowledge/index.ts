@@ -62,7 +62,7 @@ import {
   type ExtractionStrategy,
 } from "./testable-pipeline.ts";
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
-import { buildAbilityLinks, mergeAbilityLinkEntries } from "../_shared/ability-links.ts";
+import { buildAbilityLinks, buildObjectLinks, mergeAbilityLinkEntries } from "../_shared/ability-links.ts";
 import type { AbilityLinkEntity } from "../_shared/ability-links.ts";
 import { buildSkippedBatchResponse, getExtractionSkipReason } from "./skip-policy.ts";
 import {
@@ -2115,6 +2115,48 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Create character → object ownership relationships the same way as
+    // ability links above: using both the current batch and persisted
+    // Main/Branch entities, so a character and its object can arrive in
+    // different requests.
+    const objectLinks = buildObjectLinks(allAbilityLinkEntries)
+      .filter((link) => currentEntityIds.has(link.characterId) || currentEntityIds.has(link.objectId));
+    let objectRelationshipsSaved = 0;
+    const objectRelationshipErrors: string[] = [];
+
+    for (const link of objectLinks) {
+      const objectEntity = entityIdEntries.find(({ id }) => id === link.objectId)?.entity;
+
+      const { error: relError } = await supabase
+        .from("knowledge_entity_relationships")
+        .upsert(
+          {
+            project_id: body.project_id,
+            document_id: body.document_id,
+            version_id: body.version_id,
+            source_entity_id: link.characterId,
+            target_entity_id: link.objectId,
+            relationship_type: link.relationshipType,
+            evidence: null,
+            chunk_position: objectEntity?.chunk_positions?.[0] || null,
+            raw_extraction_id: rawExtractionId,
+            branch_id: targetBranchId || null,
+            operation: "add",
+            review_status: targetLayer === "main" ? "approved" : "pending",
+            base_exists: false,
+          },
+          { onConflict: "version_id,source_entity_id,target_entity_id,relationship_type,branch_id" },
+        );
+
+      if (relError) {
+        const message = `Failed to create object relationship '${link.ownerName}' → '${link.objectName}': ${relError.message}`;
+        console.warn(message);
+        objectRelationshipErrors.push(message);
+      } else {
+        objectRelationshipsSaved++;
+      }
+    }
+
     // ==============================
     // Step 6: Save relationships in the target layer
     // ==============================
@@ -2234,7 +2276,10 @@ Deno.serve(async (req) => {
     let eventsSaved = 0;
     let eventMentionsSaved = 0;
     let eventParticipantsSaved = 0;
-    for (const event of extraction.events || []) {
+    // Sub-base C never extracts events/timeline entries; skip persisting them
+    // even if the model returns some despite the prompt's instructions.
+    const subBaseCEvents = modelProfile === "sub-base-c-characters" ? [] : (extraction.events || []);
+    for (const event of subBaseCEvents) {
       const eventName = (event.name || event.description || event.what_happened || "unnamed event").trim().slice(0, 200);
       const eventDescription = event.what_happened || event.description || event.name || null;
       const eventBranchId = targetBranchId;
@@ -2312,7 +2357,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const persistedItemCount = entitiesSaved + abilityRelationshipsSaved + relationshipsSaved + eventsSaved;
+    const persistedItemCount = entitiesSaved + abilityRelationshipsSaved + objectRelationshipsSaved + relationshipsSaved + eventsSaved;
     if (persistedItemCount === 0) {
       const message = "Extraction produced no persistable entities, relationships, or events.";
       const details = [
@@ -2414,6 +2459,8 @@ Deno.serve(async (req) => {
           relationships_saved: relationshipsSaved,
           ability_relationships_saved: abilityRelationshipsSaved,
           ability_relationship_errors: abilityRelationshipErrors.length > 0 ? abilityRelationshipErrors : undefined,
+          object_relationships_saved: objectRelationshipsSaved,
+          object_relationship_errors: objectRelationshipErrors.length > 0 ? objectRelationshipErrors : undefined,
           events_saved: eventsSaved,
           event_mentions_saved: eventMentionsSaved,
           event_participants_saved: eventParticipantsSaved,

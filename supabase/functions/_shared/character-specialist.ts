@@ -11,7 +11,7 @@ export const CHARACTER_SPECIALIST_CONTRACT_VERSION = 1 as const;
 
 /** Model A's isolated model chain for the explicit Sub-base C rollout. */
 export const CHARACTER_SPECIALIST_PRIMARY_MODEL = "gemini-3.5-flash-lite" as const;
-export const CHARACTER_SPECIALIST_FALLBACK_MODEL = "gemini-2.5-flash-lite" as const;
+export const CHARACTER_SPECIALIST_FALLBACK_MODEL = "gemini-3.5-flash" as const;
 
 export const CHARACTER_FIELD_KEYS = [
   "first_name",

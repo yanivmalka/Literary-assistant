@@ -43,11 +43,13 @@ export const GEMINI_MODEL_PROFILES: Record<GeminiModelProfile, GeminiModelConfig
     { id: "gemini-3.5-flash-lite", priority: 2 },
     { id: "gemini-2.5-flash", priority: 3 },
   ],
-  // Model A is intentionally isolated from the legacy profiles. Its primary
-  // and fallback IDs are both lite models so C can be evaluated independently.
+  // Model A is intentionally isolated from the legacy profiles. "gemini-2.5-flash-lite"
+  // is not a real Gemini model ID (it 404s) and was never used anywhere else in this
+  // codebase; every other profile falls back to "gemini-3.5-flash", a model that is
+  // already proven to work, so Model A does the same instead of inventing a new ID.
   "sub-base-c-characters": [
     { id: "gemini-3.5-flash-lite", priority: 1 },
-    { id: "gemini-2.5-flash-lite", priority: 2 },
+    { id: "gemini-3.5-flash", priority: 2 },
   ],
 };
 

@@ -234,6 +234,217 @@ ${chunksText}`;
 
 export type ExtractionPromptProfile = "sub-base" | "sub-base-2" | "sub-base-locations" | "sub-base-c-characters";
 
+// ============================================
+// Sub-base C (characters + objects + abilities) — dedicated reduced base prompt
+// ============================================
+// buildExtractionPrompt() above is the shared legacy base prompt used by the
+// other profiles; it also carries location/event extraction rules that this
+// profile must never see. This function is a standalone base prompt for the
+// "sub-base-c-characters" profile only: one serial extraction call per chunk
+// window that returns characters, objects, and abilities together (plus
+// character-to-character relationships and character-to-object/ability links
+// via owners/users), while still excluding locations, organizations, and
+// events. It must never be reused by, or merged back into,
+// buildExtractionPrompt().
+function buildSubBaseCCharactersBasePrompt(chunks: { position: number; content: string }[]): string {
+  const chunksText = chunks
+    .map((c) => `[chunk ${c.position}]: ${c.content}`)
+    .join("\n\n");
+
+  return `You are a literary entity extractor for Hebrew fiction. Extract only characters, objects, and abilities (with their fields and relationships) from these text chunks.
+
+=== OUTPUT FORMAT ===
+Return exactly one JSON object and nothing else. Do not return Markdown, code fences, commentary, or a second object.
+Use schema_version "2" and one unified entities array. Omit an empty relationships array, but always include entities.
+
+{
+  "schema_version": "2",
+  "entities": [
+    {
+      "name": "exact name from the text",
+      "type": "character | object | ability | magic_ability",
+      "description": "short description grounded in the text",
+      "aliases": [],
+      "attributes": {},
+      "name_uncertainty": {
+        "is_uncertain": false,
+        "confidence": 0.0,
+        "reason": null
+      },
+      "evidence": [],
+      "source_references": [
+        {
+          "chunk_position": 0,
+          "quote": "short exact quote supporting the extraction",
+          "position_start": null,
+          "position_end": null
+        }
+      ],
+      "chunk_positions": [],
+      "field_evidence": { "field_name": ["exact supporting quote"] }
+    }
+  ],
+  "relationships": [
+    {
+      "source": { "name": "entity name", "type": "character" },
+      "target": { "name": "entity name", "type": "character" },
+      "type": "acquaintance",
+      "description": "short grounded explanation",
+      "evidence": [],
+      "source_references": [],
+      "chunk_positions": []
+    }
+  ]
+}
+
+Every entity MUST have a non-empty name and type. Every relationship MUST have source, target, and type; the relationships array is for character-to-character relationships only. Use name_uncertainty when a nickname, title, or partial name may not be the canonical identity; do not invent a full name. Confidence is a number from 0 to 1 and represents model certainty, not a fact from the text.
+
+A character's link to an object or ability is NOT a relationship-array edge. Put the character's name in the object's/ability's own "owners"/"users" attribute instead (see the OBJECTS and ABILITIES sections below).
+
+Do NOT return locations, organizations, or events as entities. Do NOT invent a top-level "characters"/"objects"/"abilities" array; use the unified entities array above.
+
+=== FIELD-SPECIFIC EVIDENCE REQUIREMENT ===
+**CRITICAL: For important fields, you MUST provide supporting evidence from the text.**
+
+For each field you extract, if the field is one of these key fields, include the exact quote that supports it in field_evidence:
+
+CHARACTERS - key fields requiring evidence:
+- name: The exact textual mention of the character's name
+- age: If mentioned (e.g., "בן 18", "בת 25"), include the quote
+- gender: If explicitly stated OR unambiguously indicated by consistent grammatical pronouns/adjectives/verb forms referring to the named character, include the supporting quote; never infer it from a name, role, appearance, or stereotype
+- physical attributes (hair_color, hair_type, eye_color, eye_shape, eye_size, height, scars, tattoos): Include the exact description and keep each supported field separate
+- narrative_role: The quote showing the character's role or importance
+- relationships: Who they're connected to and how
+
+OBJECTS - key fields requiring evidence:
+- name: Exact textual reference
+- owners: Who owns/carries the object, with quote
+- special_properties: Any magical or unique characteristics with supporting quote
+- narrative_importance: Why it matters in the story
+
+ABILITIES - key fields requiring evidence:
+- name: The ability name as mentioned
+- users: Who uses it, with quote
+- mechanism: How it works, with quote
+- power_level: If mentioned, with quote
+
+Example - CHARACTER with field_evidence:
+{
+  "name": "ליאו פרוסט",
+  "aliases": ["ליאו"],
+  "age": 25,
+  "hair_color": "שחור",
+  "eye_color": "כחול",
+  "description": "A brooding sorcerer...",
+  "evidence": ["...מחשבותיו על הזעם הקדום..."],
+  "chunk_positions": [5, 17, 42],
+  "field_evidence": {
+    "name": ["אני ליאו פרוסט, הקוסם החקור של אירויין"],
+    "age": ["ליאו הציע את יד ימינו לבת עשרים וחמש, זעום אל עצמו שהוא בן חמש ועשרים"],
+    "hair_color": ["שערו השחור נפל על עיניו"],
+    "eye_color": ["על עיניו הכחולות"],
+    "narrative_role": ["ליאו היה הקוסם היחיד שיכול לעצור את קללתה"]
+  }
+}
+
+=== GENERAL RULES ===
+- Return names in Hebrew exactly as written, WITHOUT nikud (vocalization marks).
+- Do NOT invent information. Only extract what appears in the text.
+- Fields without information = null or omit entirely.
+- Keep evidence SHORT (max 10 words each, max 2 per entity).
+- field_evidence quotes can be longer (max 15 words) if needed for clarity.
+- An alias is NOT a new entity. If the same entity has multiple names/references, use ONE entity with aliases[].
+- If you cannot find supporting evidence for a field, do NOT include it in field_evidence (it's optional for fields with null values).
+
+=== CHARACTERS ===
+
+**CRITICAL RULE: ONLY extract characters that have a PROPER NAME (first name, surname, or both).**
+
+NEVER EXTRACT (these WILL be FILTERED OUT):
+- Role-based references: אבא, אמא, אמו, אביו, אביה, אימא, אימו, אחי, אחיו, אחות, אחותו, סבא, סבו, סבתא, סבתו, בן, בת, דוד, דודו, דודה, דודתו
+- Relationship descriptors: "אמא של הולי", "אביו של הרך", "אחיו של ליאו" (unless the related person is a character entity)
+- Generic descriptions (NEVER extract as standalone characters): הנער, הנערה, הבחור, הבחורה, האיש, האישה, הזקן, הזקנה, הקוסם, הקוסמת, החייל, המורה, המדריך, המנחה, המלך, המלכה, הנסיך, הנסיכה, השומר, העבד, הסוחר, הכומר, הרופא, הגנב, הלוחם, הילד, הילדה, השוטר
+- ABBREVIATIONS OR INITIALS: ל.ש., א.ב., etc.
+
+DO EXTRACT (characters with proper names):
+- "ליאו" — proper first name
+- "ליאו פרוסט" — full name (first + surname)
+- "אליהו הנביא" — where "אליהו" is the proper name (first name takes priority)
+- Any clearly named character, even if they also have a description
+
+NAME CONSOLIDATION (duplicate prevention):
+- If a character appears as "קיל" and also as "קיילאמר", these are the SAME character.
+  → canonical name = "קיילאמר" (the longer/fuller name), aliases = ["קיל"]
+- If a character appears as "ליאו" and "ליאו סייג'", these are the SAME character.
+  → canonical name = "ליאו סייג'" (full name), aliases = ["ליאו"]
+- Hebrew nikud differences = same character. "אָרון" = "ארון" → use "ארון" (without nikud)
+- **ONLY consolidate if same first name + additional surname, OR within same document/context showing both names for the same entity**
+- Never consolidate on family relationship alone (e.g., "ליאו" + "אביו של ליאו" → DO NOT consolidate "אביו" as a character unless it has its own name)
+- Never merge two candidates whose confirmed field values genuinely conflict (e.g. incompatible ages or genders both stated explicitly); keep them as separate entities or report the conflict in unresolved_references instead of silently picking one.
+
+PHYSICAL ATTRIBUTES — pay special attention to: age, height, gender, eye_color, eye_shape, eye_size, hair_color, hair_type.
+- Extract gender from an explicit statement or an unambiguous grammatical signal; do not guess from a name, role, clothing, or stereotype.
+- Extract hair_color and hair_type as separate fields whenever both are present. For example, “שיער שחור ארוך וחלק” means hair_color="שחור" and hair_type="ארוך וחלק"; “שיער חום מתולתל” means hair_color="חום" and hair_type="מתולתל".
+- Extract eye_color, eye_shape, and eye_size independently whenever each is supported. For example, “עיני שקד חומות” means eye_shape="שקד" and eye_color="חומות"; “עיניים כחולות גדולות” means eye_color="כחולות" and eye_size="גדולות".
+- Extract even when mentioned indirectly:
+  "חגג את יום הולדתו השמונה עשרה" → age: "18"
+  "שערו השחור נפל על עיניו הכחולות" → hair_color: "שחור", eye_color: "כחול"
+- If vague ("גבוה למדי") and cannot be converted to a concrete value → null.
+
+=== OBJECTS ===
+
+ONLY extract objects with DISTINCT IDENTITY, NARRATIVE IMPORTANCE, or UNIQUE PROPERTIES. Use entity type "object".
+
+DO NOT extract:
+- Generic furniture/items: שולחן, כיסא, דלת, חלון, מיטה, כוס, צלחת
+- Background items without narrative significance
+
+DO extract:
+- Named objects: "חרבו של דארקוליאון"
+- Objects with special/magical properties or plot significance
+
+FIELDS:
+- name — the object's canonical name, exactly as referenced in the text.
+- owners — an array of character names who own or currently carry the object, only when the text supports it. Never guess an owner from proximity alone.
+- special_properties — magical or unique characteristics, only when supported.
+- narrative_importance — why the object matters in the story, only when supported.
+Extract only populated fields. Never emit null, empty, or guessed values for absent fields. Always use an array for owners, even for one owner; when no owner is known, use an empty array.
+
+=== ABILITIES ===
+
+Extract every meaningful ability as a first-class entity. Use entity type "ability" for physical, combat, practical, or life skills and "magic_ability" for magical or supernatural abilities.
+
+Physical/life-skill examples: "קריאת שפתיים", "לחימה בשתי חרבות", "ריפוי אנרגטי".
+Magical examples: "טלקינזיס", "רונת אש".
+
+FIELDS:
+- name — the ability's canonical name, exactly as referenced in the text.
+- users — an array of character names who use or possess the ability, only when the text supports it.
+- mechanism — how the ability works, only when supported.
+- power_level — the ability's strength or limits, only when explicitly mentioned.
+Extract only populated fields. Never emit null, empty, or guessed values for absent fields. Always use an array for users, even for one user; when no user is known, use an empty array.
+
+An ability is always a top-level entity in the output, never embedded only inside a character. Do not create two entities for the same ability under "ability" and "magic_ability"; pick the type that matches the text.
+
+=== OBJECT AND ABILITY IDENTITY, DUPLICATE PREVENTION, AND CONTRADICTIONS ===
+- An alias is NOT a new entity. If the same object or ability has multiple names/references, use ONE entity with aliases[].
+- Only consolidate two mentions into one object/ability when the text supports they are the same thing.
+- Never merge two candidates whose confirmed field values genuinely conflict; keep them as separate entities or report the conflict in unresolved_references instead of silently picking one.
+- If two passages give incompatible values for the same object's or ability's same field, keep field_evidence pointing at both quotes rather than silently choosing one, and add a short note about the conflict to unresolved_references.
+- special_properties, narrative_importance, mechanism, and power_level may be lightly inferred from clearly supported context; when you do, mark that field's observation inferred=true with a short inference_note and supporting evidence. Do not infer owners or users.
+
+=== CONTRADICTION REPORTING ===
+- If two passages give incompatible values for the same character's same field, keep the field's field_evidence pointing at both quotes rather than silently choosing one, and add a short note about the conflict to unresolved_references.
+- Do not resolve a contradiction by omission. An unexplained contradiction must still surface in the output, not disappear.
+
+=== CONTEXT AWARENESS ===
+- If a word can be either a character name or a concept (e.g., "רונה" could be a person or a type of magic), decide based on context.
+- When uncertain, prefer NOT extracting over creating wrong entities.
+
+TEXT:
+${chunksText}`;
+}
+
 const SUB_BASE_2_PROFILE_INSTRUCTIONS = `=== SUB-BASE-2 PROFILE INSTRUCTIONS ===
 This is the sub-base-2 extraction profile. Keep the same JSON schema and evidence requirements as the sub-base profile, but this section is intentionally isolated so this profile's extraction instructions can evolve without changing the other profiles.
 `;
@@ -258,8 +469,8 @@ PLACE TYPE CATALOG (choose the closest type; do not impose a fixed hierarchy):
 - Do not invent location fields or containment when the text provides no evidence.
 `;
 
-const CHARACTER_PROFILE_INSTRUCTIONS = `=== SUB-BASE C CHARACTER MODEL A INSTRUCTIONS ===
-This is the isolated Sub-base C character-only profile. Extract only named or clearly identifiable characters, their grounded character fields, and relationships between characters.
+const CHARACTER_PROFILE_INSTRUCTIONS = `=== SUB-BASE C CHARACTER INSTRUCTIONS ===
+This section of the Sub-base C profile covers named or clearly identifiable characters, their grounded character fields, and relationships between characters. The same profile also extracts objects and abilities — see the OBJECTS and ABILITIES sections of the base prompt.
 
 IDENTITY AND FIELD RULES:
 - first_name is mandatory. Do not return a character candidate without a confidently identified first name.
@@ -312,9 +523,9 @@ export function buildSubBaseCCharactersInstructions(
 ): string {
   const sections = [CHARACTER_PROFILE_INSTRUCTIONS, `=== SERIAL EXTRACTION OUTPUT CONTRACT ===
 This profile runs as one serial extraction call per chunk window; do not use the parallel-experts contract, artifact fields, role fields, or window metadata.
-Return the common schema_version "2" object with an entities array. For every character entity, put first_name, last_name, all populated character fields, and character_field_observations inside attributes.
-Each character_field_observations entry must be an array of objects with value, evidence (short exact quotes or objects containing quote and chunk_position), confidence, inferred, and inference_note. Keep the character's entity type equal to "character".
-Return character-to-character relationships in the common relationships array using source, target, type, evidence, source_references, and chunk_positions. Do not return a separate characters array or a parallel specialist wrapper.
+Return the common schema_version "2" object with a single entities array containing characters, objects, and abilities/magic_abilities together. For every character entity, put first_name, last_name, all populated character fields, and character_field_observations inside attributes.
+Each character_field_observations entry must be an array of objects with value, evidence (short exact quotes or objects containing quote and chunk_position), confidence, inferred, and inference_note. Keep each entity's type equal to "character", "object", "ability", or "magic_ability" as appropriate.
+Return character-to-character relationships in the common relationships array using source, target, type, evidence, source_references, and chunk_positions. Return a character's link to an object or ability via that object's/ability's own owners/users field, not the relationships array. Do not return separate characters/objects/abilities arrays or a parallel specialist wrapper.
 
 === AGE OUTPUT CONTRACT — C ONLY ===
 - When the text gives a character's age, return age as one canonical ASCII decimal string only, such as "17". Never return a sentence, noun phrase, location phrase, quotation, or mixed description in age.
@@ -372,14 +583,15 @@ export function buildExtractionPromptForProfile(
   dynamicCharacterFields: DynamicCharacterFieldPromptDefinition[] = [],
   customPlaceFields: ProjectPlaceFieldPromptDefinition[] = [],
 ): string {
+  if (profile === "sub-base-c-characters") {
+    const characterBasePrompt = buildSubBaseCCharactersBasePrompt(chunks);
+    return `${characterBasePrompt}\n${buildSubBaseCCharactersInstructions(dynamicCharacterFields)}`;
+  }
+
   const basePrompt = buildExtractionPrompt(chunks);
 
   if (profile === "sub-base") {
     return basePrompt;
-  }
-
-  if (profile === "sub-base-c-characters") {
-    return `${basePrompt}\n${buildSubBaseCCharactersInstructions(dynamicCharacterFields)}`;
   }
 
   const subBase2Prompt = `${basePrompt}\n${SUB_BASE_2_PROFILE_INSTRUCTIONS}`;
