@@ -10,6 +10,7 @@ import {
 import {
   CHARACTER_FIELD_KEYS,
   CHARACTER_RELATIONSHIP_TYPES,
+  isSymmetricCharacterRelationship,
 } from '../_shared/character-specialist.ts';
 
 // Older character extractions emit these key spellings; map them onto the
@@ -582,4 +583,121 @@ export function adaptSubBaseCSerialExtraction(payload: unknown): Record<string, 
     .filter((item) => item !== null) as unknown[];
 
   return { ...record, characters, ...(rawRelationships.length > 0 ? { relationships } : {}) };
+}
+
+// ============================================================
+// Phase 2: Sub-base C persistence helpers (pure, testable)
+// ============================================================
+
+/**
+ * Returns the entity-id pair to store for a character relationship. For a
+ * symmetric relationship type the pair is sorted deterministically so that an
+ * A->B edge and a B->A edge collapse onto the same
+ * (source_entity_id, target_entity_id, relationship_type) conflict key.
+ * Directional relationship types are returned unchanged.
+ */
+export function orderRelationshipEndpointsForPersistence(
+  sourceId: string,
+  targetId: string,
+  relationshipType: string,
+): [string, string] {
+  if (!isSymmetricCharacterRelationship(relationshipType)) return [sourceId, targetId];
+  return sourceId <= targetId ? [sourceId, targetId] : [targetId, sourceId];
+}
+
+/**
+ * Builds a diagnostic message when a relationship cannot be persisted because
+ * one or both endpoints did not resolve to a persisted entity. Returns null
+ * when both endpoints resolved.
+ */
+export function describeUnresolvedRelationship(
+  relationshipType: string,
+  sourceName: string,
+  targetName: string,
+  sourceResolved: boolean,
+  targetResolved: boolean,
+): string | null {
+  if (sourceResolved && targetResolved) return null;
+  const parts: string[] = [];
+  if (!sourceResolved) parts.push(`source '${sourceName || "(missing)"}'`);
+  if (!targetResolved) parts.push(`target '${targetName || "(missing)"}'`);
+  return `Dropped relationship '${relationshipType}': unresolved ${parts.join(" and ")}`;
+}
+
+/**
+ * Returns a copy of `merged` in which every field key that the user has
+ * explicitly edited (an active user-owned knowledge_entity_values row) is taken
+ * from the existing persisted value instead of the incoming AI value. Keys the
+ * user has not touched are left as the extraction merge produced them.
+ */
+export function withUserOwnedStructuredFields(
+  merged: Record<string, unknown>,
+  existing: Record<string, unknown> | null | undefined,
+  userOwnedFieldPaths: Iterable<string>,
+): Record<string, unknown> {
+  const result = { ...merged };
+  const existingFields = existing || {};
+  for (const path of userOwnedFieldPaths) {
+    if (Object.prototype.hasOwnProperty.call(existingFields, path)) {
+      result[path] = existingFields[path];
+    } else {
+      delete result[path];
+    }
+  }
+  return result;
+}
+
+/**
+ * Whether `findExistingMainEntity` should run its fuzzy Main-character identity
+ * fallback (project-wide alias/prefix resolution) after an exact canonical_name
+ * lookup misses. Only the Sub-base C profile composes canonical_name from
+ * first+last name, so only its `character` entities need it.
+ */
+export function shouldUseMainCharacterFallback(
+  modelProfile: string | undefined,
+  entityType: string,
+): boolean {
+  return modelProfile === "sub-base-c-characters" && entityType === "character";
+}
+
+export interface CharacterRelationshipWritePlan {
+  action: "persist" | "drop" | "skip_self";
+  diagnostic: string | null;
+  source_entity_id?: string;
+  target_entity_id?: string;
+}
+
+/**
+ * Decides how one extracted character relationship should be persisted, given
+ * its resolved endpoint ids. Pure so the persistence loop's three inline
+ * decisions (unresolved -> drop + diagnostic, self-edge -> skip, otherwise ->
+ * one canonical ordered pair) can be tested without the Edge handler.
+ *
+ * The returned `source_entity_id` / `target_entity_id` are the single pair the
+ * caller must use for BOTH the existing-row probe and the upsert.
+ */
+export function planCharacterRelationshipWrite(input: {
+  relationshipType: string;
+  sourceName: string;
+  targetName: string;
+  sourceId: string | null;
+  targetId: string | null;
+  modelProfile: string;
+}): CharacterRelationshipWritePlan {
+  const { relationshipType, sourceName, targetName, sourceId, targetId, modelProfile } = input;
+
+  const diagnostic = describeUnresolvedRelationship(
+    relationshipType,
+    sourceName,
+    targetName,
+    Boolean(sourceId),
+    Boolean(targetId),
+  );
+  if (diagnostic) return { action: "drop", diagnostic };
+  if (sourceId === targetId) return { action: "skip_self", diagnostic: null };
+
+  const [source_entity_id, target_entity_id] = modelProfile === "sub-base-c-characters"
+    ? orderRelationshipEndpointsForPersistence(sourceId!, targetId!, relationshipType)
+    : [sourceId!, targetId!];
+  return { action: "persist", diagnostic: null, source_entity_id, target_entity_id };
 }

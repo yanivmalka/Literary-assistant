@@ -46,6 +46,7 @@ import { normalizeLegacyFieldEvidence } from "../_shared/field-provenance.ts";
 import {
   applyEntityOverrides,
   hasConflictingEntityContext,
+  resolveEntityCandidate,
   resolveExtractionCandidate,
   type EntityResolutionRecord,
 } from "../_shared/entity-resolution.ts";
@@ -59,12 +60,15 @@ import {
   validateExtractionMode,
   validateExtractionPayload,
   validateExtractionStrategy,
+  planCharacterRelationshipWrite,
+  shouldUseMainCharacterFallback,
+  withUserOwnedStructuredFields,
   type ExtractionStrategy,
 } from "./testable-pipeline.ts";
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
 import { buildAbilityLinks, buildObjectLinks, mergeAbilityLinkEntries } from "../_shared/ability-links.ts";
 import type { AbilityLinkEntity } from "../_shared/ability-links.ts";
-import { buildSkippedBatchResponse, getExtractionSkipReason } from "./skip-policy.ts";
+import { buildSkippedBatchResponse, getExtractionSkipReason, isSkipPerBatchAllowed } from "./skip-policy.ts";
 import {
   fingerprintShadowInput,
   persistShadowComparison,
@@ -748,6 +752,34 @@ async function loadEntityAliases(
   return aliasesByEntity;
 }
 
+/**
+ * Field paths on one entity that carry an active user-authored value in
+ * knowledge_entity_values. A later AI extraction must not overwrite these
+ * structured_fields keys.
+ */
+async function loadUserOwnedFieldPaths(
+  supabase: any,
+  entityId: string,
+  branchId: string | null,
+): Promise<Set<string>> {
+  let query = supabase
+    .from("knowledge_entity_values")
+    .select("field_path")
+    .eq("entity_id", entityId)
+    .eq("source_type", "user")
+    .eq("value_status", "active");
+  query = branchId ? query.eq("branch_id", branchId) : query.is("branch_id", null);
+
+  const { data, error } = await query;
+  if (error) {
+    // Provenance protection is best-effort: log and fall back to no extra guard
+    // rather than aborting a whole extraction batch.
+    console.warn(`[extract-knowledge] Could not load user-owned field paths for ${entityId}: ${error.message}`);
+    return new Set<string>();
+  }
+  return new Set<string>((data || []).map((row: { field_path: string }) => row.field_path).filter(Boolean));
+}
+
 async function findExistingEntity(
   supabase: any,
   projectId: string,
@@ -834,6 +866,7 @@ async function findExistingMainEntity(
   projectId: string,
   userId: string,
   entity: NormalizedEntity,
+  modelProfile?: string,
 ): Promise<ExtractionEntityCandidate | null> {
   // Scoped by project (not version_id) so entities extracted from one document
   // resolve against entities already extracted from other documents in the
@@ -852,8 +885,43 @@ async function findExistingMainEntity(
 
   if (error) throw new Error(`Failed to find existing Main entity: ${error.message}`);
 
-  const existing = (data?.[0] || null) as ExtractionEntityCandidate | null;
-  return existing;
+  const exact = (data?.[0] || null) as ExtractionEntityCandidate | null;
+  if (exact) return exact;
+
+  // Sub-base C characters compose canonical_name from first + last name, so a
+  // later run that adds/removes a surname or only sees the short name would miss
+  // the exact match above and create a duplicate. Fall back to the shared
+  // entity-resolution semantics over the project's Main character rows and their
+  // aliases. resolveEntityCandidate already returns null on ambiguity or a
+  // conflicting-context match, so this cannot introduce an unsafe merge.
+  if (!shouldUseMainCharacterFallback(modelProfile, entity.entity_type)) {
+    return null;
+  }
+
+  const { data: characterRows, error: characterError } = await supabase
+    .from("knowledge_entities")
+    .select(entitySelect)
+    .eq("project_id", projectId)
+    .eq("user_id", userId)
+    .eq("layer", "main")
+    .is("branch_id", null)
+    .eq("entity_type", "character");
+
+  if (characterError) {
+    throw new Error(`Failed to load Main character candidates: ${characterError.message}`);
+  }
+
+  const rows = (characterRows || []) as ExtractionEntityCandidate[];
+  if (rows.length === 0) return null;
+
+  const aliasesByEntity = await loadEntityAliases(supabase, rows.map((row) => row.id), null);
+  const candidates = rows.map((row) => ({
+    ...row,
+    aliases: aliasesByEntity.get(row.id) || [],
+  }));
+
+  const match = resolveEntityCandidate(entity, candidates) as ExtractionEntityCandidate | null;
+  return match ?? null;
 }
 
 function mergeNonNullFields(
@@ -1098,8 +1166,11 @@ Deno.serve(async (req) => {
     if (!isGeminiModelProfile(modelProfile)) {
       return errorResponse("Invalid model_profile. Choose a supported extraction model.", 400);
     }
-    if (body.skip_per_batch === true && modelProfile !== "sub-base-locations") {
-      return errorResponse("skip_per_batch is supported only for sub-base-locations.", 400);
+    if (body.skip_per_batch === true && !isSkipPerBatchAllowed(modelProfile)) {
+      return errorResponse(
+        "skip_per_batch is supported only for sub-base-locations and sub-base-c-characters.",
+        400,
+      );
     }
 
     const strategyValidation = validateExtractionStrategy(body.extraction_strategy);
@@ -1701,6 +1772,7 @@ Deno.serve(async (req) => {
           body.project_id,
           body.user_id,
           entity,
+          modelProfile,
         );
       }
 
@@ -1725,6 +1797,18 @@ Deno.serve(async (req) => {
         // Main extraction is repeat-safe: merge observations into the row
         // already created for this version instead of inserting a duplicate.
         const merged = mergeExistingBranchEntity(existing, entity);
+        if (existing.source !== "user") {
+          // Per-field guard: an AI-sourced row can still have individual fields
+          // the user edited. Those must survive re-extraction.
+          const userOwned = await loadUserOwnedFieldPaths(supabase, existing.id, null);
+          if (userOwned.size > 0) {
+            merged.structured_fields = withUserOwnedStructuredFields(
+              merged.structured_fields,
+              existing.structured_fields,
+              userOwned,
+            );
+          }
+        }
         const { error: mainUpdateError } = await supabase
           .from("knowledge_entities")
           .update({
@@ -1754,6 +1838,14 @@ Deno.serve(async (req) => {
           // Reuse the current Branch UUID and merge only non-null observations.
           // A missing field in a later extraction must not erase Branch data.
           const merged = mergeExistingBranchEntity(existing, entity);
+          const userOwned = await loadUserOwnedFieldPaths(supabase, existing.id, targetBranchId);
+          if (userOwned.size > 0) {
+            merged.structured_fields = withUserOwnedStructuredFields(
+              merged.structured_fields,
+              existing.structured_fields,
+              userOwned,
+            );
+          }
           const { error: branchUpdateError } = await supabase
             .from("knowledge_entities")
             .update({
@@ -1817,6 +1909,14 @@ Deno.serve(async (req) => {
           // Main entity: create or update the active Branch overlay. Preserve
           // prior overrides when this extraction omits those fields.
           const { overrides, baseValues } = buildOverlayChanges(existing, entity);
+          // Do not let this extraction re-assert a structured_fields override for
+          // a key the user edited in this Branch; the prior user override (in
+          // overlayOverrides) is kept instead.
+          const userOwned = await loadUserOwnedFieldPaths(supabase, existing.id, targetBranchId);
+          for (const key of userOwned) {
+            delete overrides[`structured_fields.${key}`];
+            delete baseValues[`structured_fields.${key}`];
+          }
           const mergedOverrides = { ...(existing.overlayOverrides || {}), ...overrides };
           const mergedBaseValues = { ...(existing.overlayBaseValues || {}), ...baseValues };
           const { error: overlayError } = await supabase
@@ -1887,6 +1987,7 @@ Deno.serve(async (req) => {
               body.project_id,
               body.user_id,
               entity,
+              modelProfile,
             );
             if (racedEntity) {
               entityId = racedEntity.id;
@@ -2188,6 +2289,7 @@ Deno.serve(async (req) => {
     }
 
     let relationshipsSaved = 0;
+    let relationshipsDropped = 0;
     const persistedRelationships = modelProfile === "sub-base-locations"
       ? extraction.relationships || []
       : (extraction.relationships || []).filter((relationship) => normalizeRelationshipType(relationship.relationship_type) !== "contained_in");
@@ -2195,12 +2297,14 @@ Deno.serve(async (req) => {
       const relationshipType = normalizeRelationshipType(rel.relationship_type);
       if (!relationshipType) continue;
 
+      const sourceName = rel.character_a?.trim() || "";
+      const targetName = rel.character_b?.trim() || "";
       const sourceId = await findPersistedEntityId(
         supabase,
         body.project_id,
         body.user_id,
         targetBranchId,
-        rel.character_a?.trim() || "",
+        sourceName,
         rel.source_type,
         entityIdEntries,
       );
@@ -2209,11 +2313,34 @@ Deno.serve(async (req) => {
         body.project_id,
         body.user_id,
         targetBranchId,
-        rel.character_b?.trim() || "",
+        targetName,
         rel.target_type,
         entityIdEntries,
       );
-      if (!sourceId || !targetId || sourceId === targetId) continue;
+
+      const relationshipPlan = planCharacterRelationshipWrite({
+        relationshipType,
+        sourceName,
+        targetName,
+        sourceId,
+        targetId,
+        modelProfile,
+      });
+      if (relationshipPlan.action === "drop") {
+        // Diagnostics for unresolved endpoints are a Sub-base C addition; other
+        // profiles keep the prior silent behavior.
+        if (modelProfile === "sub-base-c-characters") {
+          relationshipsDropped++;
+          console.warn(`[extract-knowledge] ${relationshipPlan.diagnostic}`);
+        }
+        continue;
+      }
+      if (relationshipPlan.action === "skip_self") continue;
+
+      // One canonical (source_entity_id, target_entity_id) pair, used for both
+      // the existing-row probe and the upsert so symmetric A->B / B->A collapse.
+      const persistSourceId = relationshipPlan.source_entity_id!;
+      const persistTargetId = relationshipPlan.target_entity_id!;
 
       let baseExists = false;
       if (targetLayer === "branch") {
@@ -2222,8 +2349,8 @@ Deno.serve(async (req) => {
           .select("id")
           .eq("project_id", body.project_id)
           .is("branch_id", null)
-          .eq("source_entity_id", sourceId)
-          .eq("target_entity_id", targetId)
+          .eq("source_entity_id", persistSourceId)
+          .eq("target_entity_id", persistTargetId)
           .eq("relationship_type", relationshipType)
           .limit(1)
           .maybeSingle();
@@ -2242,8 +2369,8 @@ Deno.serve(async (req) => {
             project_id: body.project_id,
             document_id: body.document_id,
             version_id: body.version_id,
-            source_entity_id: sourceId,
-            target_entity_id: targetId,
+            source_entity_id: persistSourceId,
+            target_entity_id: persistTargetId,
             relationship_type: relationshipType,
             evidence: rel.evidence?.join(" | ")?.slice(0, 1000) || null,
             chunk_position: rel.chunk_positions?.[0] || null,
@@ -2455,6 +2582,7 @@ Deno.serve(async (req) => {
           mentions_saved: mentionsSaved,
           aliases_saved: aliasesSaved,
           relationships_saved: relationshipsSaved,
+          relationships_dropped: relationshipsDropped || undefined,
           ability_relationships_saved: abilityRelationshipsSaved,
           ability_relationship_errors: abilityRelationshipErrors.length > 0 ? abilityRelationshipErrors : undefined,
           object_relationships_saved: objectRelationshipsSaved,

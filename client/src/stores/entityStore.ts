@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import i18n from '@/i18n'
 import { type EntityType } from '@/lib/entityTypes'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
+import { diffUserEditedFields } from '@/lib/userFieldValues'
 
 export interface Entity {
   id: string
@@ -70,6 +71,71 @@ async function syncEntityAliases(entityId: string, aliases: string[], branchId: 
     .from('knowledge_entity_aliases')
     .insert(normalizedAliases.map(alias => ({ entity_id: entityId, alias, branch_id: branchId })))
   if (error) throw error
+}
+
+/**
+ * Records a user's structured_fields edits as source_type: 'user' rows in
+ * knowledge_entity_values so a later AI extraction cannot silently overwrite
+ * them. Best-effort: a failure here is logged, not thrown, because the primary
+ * knowledge_entities write has already succeeded.
+ */
+async function persistUserEditedFieldValues(params: {
+  projectId: string
+  entityId: string
+  branchId: string | null
+  previousStructuredFields: Record<string, unknown> | null | undefined
+  nextStructuredFields: Record<string, unknown> | null | undefined
+}): Promise<void> {
+  // Fully best-effort: the primary knowledge_entities write has already
+  // succeeded, so nothing in here — the diff, auth lookup, or any DB call — may
+  // throw out of this function or turn a successful update into a failed one.
+  try {
+    const { projectId, entityId, branchId, previousStructuredFields, nextStructuredFields } = params
+    const writes = diffUserEditedFields(previousStructuredFields, nextStructuredFields)
+    if (writes.length === 0) return
+
+    const { data: authData } = await supabase.auth.getUser()
+    const userId = authData?.user?.id
+    if (!userId) {
+      console.warn('persistUserEditedFieldValues: no authenticated user; skipping value provenance write')
+      return
+    }
+
+    for (const write of writes) {
+      try {
+        let supersedeQuery = supabase
+          .from('knowledge_entity_values')
+          .update({ value_status: 'superseded', updated_at: new Date().toISOString() })
+          .eq('entity_id', entityId)
+          .eq('field_path', write.field_path)
+          .eq('value_status', 'active')
+        supersedeQuery = branchId
+          ? supersedeQuery.eq('branch_id', branchId)
+          : supersedeQuery.is('branch_id', null)
+        const { error: supersedeError } = await supersedeQuery
+        if (supersedeError) throw supersedeError
+
+        const { error: insertError } = await supabase
+          .from('knowledge_entity_values')
+          .insert({
+            project_id: projectId,
+            entity_id: entityId,
+            branch_id: branchId,
+            field_path: write.field_path,
+            value_json: write.value_json,
+            normalized_value: write.normalized_value,
+            source_type: 'user',
+            value_status: 'active',
+            created_by: userId,
+          })
+        if (insertError) throw insertError
+      } catch (error) {
+        console.error(`persistUserEditedFieldValues: failed for field '${write.field_path}':`, error)
+      }
+    }
+  } catch (error) {
+    console.error('persistUserEditedFieldValues: unexpected failure (entity update already applied):', error)
+  }
 }
 
 interface EntityState {
@@ -576,6 +642,16 @@ export const useEntityStore = create<EntityState>((set, get) => ({
             return false
           }
 
+          if (updates.structured_fields !== undefined) {
+            await persistUserEditedFieldValues({
+              projectId: (branchEntity as { project_id: string }).project_id,
+              entityId,
+              branchId,
+              previousStructuredFields: (branchEntity as { structured_fields?: Record<string, unknown> }).structured_fields,
+              nextStructuredFields: updates.structured_fields,
+            })
+          }
+
           const aliases = updates.aliases ?? (get().entities.find(entity => entity.id === entityId)?.aliases || [])
           await syncEntityAliases(entityId, aliases, branchId)
           const updatedAt = new Date().toISOString()
@@ -689,12 +765,54 @@ export const useEntityStore = create<EntityState>((set, get) => ({
           }
         }
 
+        if (updates.structured_fields !== undefined) {
+          const previousStructuredFields =
+            (get().entities.find(entity => entity.id === entityId)?.structured_fields as Record<string, unknown> | undefined)
+            ?? (mainEntity.structured_fields as Record<string, unknown> | undefined)
+          await persistUserEditedFieldValues({
+            projectId: mainEntity.project_id,
+            entityId: sourceEntityId,
+            branchId,
+            previousStructuredFields,
+            nextStructuredFields: updates.structured_fields,
+          })
+        }
+
         if (updates.aliases !== undefined) {
           await syncEntityAliases(sourceEntityId, updates.aliases, branchId)
         }
         return true
       } else {
-        // Main mode: update Main entity directly
+        // Main mode: update Main entity directly.
+
+        // Capture the provenance baseline BEFORE the write so a changed/cleared
+        // field is diffed against its pre-update value, not against the value we
+        // are about to store. project_id is not carried on the store Entity, so
+        // this fetch also supplies it (cache hit or miss).
+        let provenanceProjectId: string | undefined
+        let provenancePrevious: Record<string, unknown> | undefined
+        if (updates.structured_fields !== undefined) {
+          const cached = get().entities.find(entity => entity.id === entityId)
+            ?? (get().selectedEntity?.id === entityId ? get().selectedEntity : undefined)
+          provenancePrevious = cached?.structured_fields as Record<string, unknown> | undefined
+          provenanceProjectId = (cached as { project_id?: string } | undefined)?.project_id
+          if (!provenanceProjectId || !cached) {
+            try {
+              const { data: row } = await supabase
+                .from('knowledge_entities')
+                .select('project_id, structured_fields')
+                .eq('id', entityId)
+                .single()
+              provenanceProjectId = provenanceProjectId ?? (row as { project_id?: string } | null)?.project_id
+              if (!cached) {
+                provenancePrevious = (row as { structured_fields?: Record<string, unknown> } | null)?.structured_fields
+              }
+            } catch (error) {
+              console.error('updateEntity: could not load entity row for provenance baseline:', error)
+            }
+          }
+        }
+
         const dbUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
         if (updates.canonical_name !== undefined) dbUpdates.canonical_name = updates.canonical_name
@@ -710,6 +828,20 @@ export const useEntityStore = create<EntityState>((set, get) => ({
         if (error) {
           console.error('Failed to update entity:', error)
           return false
+        }
+
+        if (updates.structured_fields !== undefined) {
+          if (provenanceProjectId) {
+            await persistUserEditedFieldValues({
+              projectId: provenanceProjectId,
+              entityId,
+              branchId: null,
+              previousStructuredFields: provenancePrevious,
+              nextStructuredFields: updates.structured_fields,
+            })
+          } else {
+            console.warn('updateEntity: missing project_id for user-value provenance write', entityId)
+          }
         }
 
         if (updates.aliases !== undefined) {

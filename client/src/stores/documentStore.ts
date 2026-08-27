@@ -555,8 +555,11 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           extraction_run_id: extractionRunId,
           // Keep the selected profile constant across every batch in this run.
           model_profile: requestModelProfile,
-          // Only locations may continue after a classified Gemini batch failure.
-          skip_per_batch: modelProfile === 'sub-base-locations',
+          // Locations and Sub-base C run one serial call per window, so a
+          // classified Gemini batch failure skips that window instead of
+          // failing the whole document. (C never falls back to a legacy
+          // profile, so requestModelProfile stays equal to modelProfile here.)
+          skip_per_batch: modelProfile === 'sub-base-locations' || modelProfile === 'sub-base-c-characters',
         }
 
         let { data, error } = await supabase.functions.invoke('extract-knowledge', {

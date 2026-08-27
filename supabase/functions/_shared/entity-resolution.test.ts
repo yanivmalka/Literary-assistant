@@ -114,3 +114,72 @@ Deno.test("applies Branch overlay values to the candidate used for matching", ()
 
   assertEquals(effective.structured_fields?.age, "30");
 });
+
+// ============================================================
+// Phase 2: Main cross-run Sub-base C character identity fallback
+// (findExistingMainEntity reuses resolveEntityCandidate over the project's
+//  Main character rows + aliases; these prove the semantics it relies on.)
+// ============================================================
+
+Deno.test("Phase 2: a short first name on run A resolves to the full first+last name on run B", () => {
+  const runAEntity = {
+    id: "main-leo",
+    canonical_name: "Leo",
+    entity_type: "character",
+    aliases: [],
+    structured_fields: { first_name: "Leo", occupation: "archivist" },
+    attributes: {},
+  };
+  const resolved = resolveEntityCandidate(
+    {
+      canonical_name: "Leo Frost",
+      entity_type: "character",
+      structured_fields: { first_name: "Leo", last_name: "Frost", occupation: "archivist" },
+      attributes: {},
+    },
+    [runAEntity],
+  );
+  assertEquals(resolved?.id, "main-leo");
+});
+
+Deno.test("Phase 2: a conflicting explicit age blocks the short-to-full name merge", () => {
+  const runAEntity = {
+    id: "main-leo",
+    canonical_name: "Leo",
+    entity_type: "character",
+    aliases: [],
+    structured_fields: { first_name: "Leo", age: "27" },
+    attributes: {},
+  };
+  const resolved = resolveEntityCandidate(
+    {
+      canonical_name: "Leo Frost",
+      entity_type: "character",
+      structured_fields: { first_name: "Leo", last_name: "Frost", age: "41" },
+      attributes: {},
+    },
+    [runAEntity],
+  );
+  assertEquals(resolved, null);
+});
+
+Deno.test("Phase 2: an existing alias resolves run B to the same Main character", () => {
+  const runAEntity = {
+    id: "main-leo",
+    canonical_name: "Leo Sage",
+    entity_type: "character",
+    aliases: ["Leo"],
+    structured_fields: { first_name: "Leo", last_name: "Sage" },
+    attributes: {},
+  };
+  const resolved = resolveEntityCandidate(
+    {
+      canonical_name: "Leo",
+      entity_type: "character",
+      structured_fields: { first_name: "Leo" },
+      attributes: {},
+    },
+    [runAEntity],
+  );
+  assertEquals(resolved?.id, "main-leo");
+});

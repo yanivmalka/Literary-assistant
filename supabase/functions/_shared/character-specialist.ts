@@ -82,6 +82,28 @@ export const CHARACTER_RELATIONSHIP_TYPES = [
 
 export type CharacterRelationshipType = typeof CHARACTER_RELATIONSHIP_TYPES[number];
 
+/**
+ * Relationship types whose meaning does not depend on edge direction. For these,
+ * A->B and B->A describe the same bond and must collapse to a single stored row.
+ * The remaining types (mentorship, work_subordinate, work_supervisor,
+ * protection_or_dependency) are directional and are never reordered.
+ */
+export const SYMMETRIC_CHARACTER_RELATIONSHIP_TYPES = new Set<string>([
+  "acquaintance",
+  "friendship",
+  "friendship_deep",
+  "family",
+  "romantic_relationship",
+  "hostility",
+  "rivalry",
+  "alliance",
+  "no_significant_bond",
+]);
+
+export function isSymmetricCharacterRelationship(type: unknown): boolean {
+  return typeof type === "string" && SYMMETRIC_CHARACTER_RELATIONSHIP_TYPES.has(type);
+}
+
 /** Future extensions are intentionally reserved, not extracted in Model A yet. */
 export const CHARACTER_FUTURE_EXTENSION_KEYS = [
   "abilities",
