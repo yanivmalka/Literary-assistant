@@ -50,7 +50,7 @@ export default function DocumentsPage() {
   if (!projectId) return null
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
+    <div className="max-w-3xl mx-auto p-4 sm:p-6">
       <ProjectBreadcrumb currentPage="documents" showTabs={false} />
 
       <div className="mb-6">

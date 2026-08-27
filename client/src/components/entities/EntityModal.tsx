@@ -226,17 +226,17 @@ export default function EntityModal({
   const meta = ENTITY_TYPE_META[entityType]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="entity-modal-title">
+    <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="entity-modal-title">
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative w-full max-w-2xl max-h-[90vh] bg-card border border-border rounded-lg shadow-xl flex flex-col mx-4 overflow-hidden z-10">
+      <div className="relative w-full sm:max-w-2xl h-full sm:h-auto max-h-full sm:max-h-[90vh] bg-card border border-border rounded-none sm:rounded-lg shadow-xl flex flex-col mx-0 sm:mx-4 overflow-hidden z-10">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-muted/30 shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">{meta.icon}</span>
-            <h2 id="entity-modal-title" className="text-lg font-display font-semibold">
+        <div className="flex items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b border-border bg-muted/30 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-2xl shrink-0">{meta.icon}</span>
+            <h2 id="entity-modal-title" className="text-lg font-display font-semibold truncate">
               {isEditMode
                 ? t('entityModal.editTitle', { type: t(meta.labelKey) })
                 : t('entityModal.createTitle', { type: t(meta.labelKey) })
@@ -245,7 +245,7 @@ export default function EntityModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg hover:bg-muted transition-colors"
             aria-label={t('common.cancel')}
           >
             <X className="h-5 w-5" />
@@ -253,7 +253,7 @@ export default function EntityModal({
         </div>
 
         {/* Body — scrollable */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
           {/* Aliases */}
           <div className="border border-border rounded-lg p-4">
                 <label htmlFor="aliases-input" className="block text-sm font-medium text-muted-foreground mb-1">
@@ -310,11 +310,11 @@ export default function EntityModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-border bg-muted/30 shrink-0">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between px-4 sm:px-6 py-4 border-t border-border bg-muted/30 shrink-0">
           <div>
             {isEditMode && (
               showDeleteConfirm ? (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm text-destructive">{t('entityModal.confirmDelete')}</span>
                   <Button variant="destructive" size="sm" onClick={handleDelete} disabled={saving}>
                     {t('common.delete')}
@@ -337,10 +337,10 @@ export default function EntityModal({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="secondary" onClick={onClose}>
+            <Button variant="secondary" onClick={onClose} className="flex-1 sm:flex-none">
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none">
               <Save className="h-4 w-4" />
               {saving ? t('common.loading') : t('common.save')}
             </Button>

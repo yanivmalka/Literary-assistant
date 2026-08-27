@@ -42,17 +42,17 @@ export default function ProjectDetailPage() {
   )
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-3 sm:gap-4 mb-6 min-w-0">
         <button
           onClick={() => navigate('/projects')}
-          className="p-2 rounded-md hover:bg-accent transition-colors"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-accent transition-colors"
         >
           <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
         </button>
-        <div>
-          <h2 className="font-display text-2xl font-semibold tracking-tight">{currentProject.name}</h2>
+        <div className="min-w-0">
+          <h2 className="font-display text-xl sm:text-2xl font-semibold tracking-tight break-words">{currentProject.name}</h2>
           {currentProject.description && (
             <p className="text-muted-foreground mt-1">{currentProject.description}</p>
           )}
@@ -95,12 +95,12 @@ export default function ProjectDetailPage() {
 
       {/* Maps Section — always available */}
       <section className="mb-10">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-1">
           <h3 className="font-display text-xl font-semibold tracking-tight flex items-center gap-2">
-            <Map className="h-5 w-5" />
+            <Map className="h-5 w-5 shrink-0" />
             {t('home.maps.title')}
           </h3>
-          <Button size="sm" onClick={() => navigate(`/projects/${projectId}/maps/new`)}>
+          <Button size="sm" onClick={() => navigate(`/projects/${projectId}/maps/new`)} className="w-full sm:w-auto">
             <Plus className="h-4 w-4" />
             {t('maps.create')}
           </Button>

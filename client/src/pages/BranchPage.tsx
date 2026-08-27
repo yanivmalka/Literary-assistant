@@ -272,10 +272,10 @@ export default function BranchPage() {
               ) : (
                 // View mode
                 <>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
                       <span className="text-lg">{renderEntityTypeIcon(entity.entity_type || '')}</span>
-                      <h4 className="font-display font-semibold">{entity.canonical_name || ''}</h4>
+                      <h4 className="font-display font-semibold break-words">{entity.canonical_name || ''}</h4>
                       <Badge variant="info">{t('ui.branch.branch')}</Badge>
                       {entity.is_modified && (
                         <Badge variant="warning">{t('branch.modified')}</Badge>
@@ -283,7 +283,7 @@ export default function BranchPage() {
                     </div>
                     <button
                       onClick={() => handleStartEdit(entity)}
-                      className="p-1.5 rounded-md hover:bg-muted transition-colors"
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-muted transition-colors"
                       title={t('common.edit')}
                     >
                       <Edit3 className="h-4 w-4 text-muted-foreground" />
@@ -362,7 +362,7 @@ export default function BranchPage() {
   // ==============================
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6">
       <ProjectBreadcrumb currentPage="branches" showTabs={false} />
 
       {/* Header */}
@@ -514,15 +514,15 @@ function ComparisonCard({
   return (
     <Card className="overflow-hidden">
       {/* Entity header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-muted/50 border-b border-border">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between px-4 py-3 bg-muted/50 border-b border-border">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
           <span>{renderEntityTypeIcon(comparison.entityType)}</span>
-          <span className="font-display font-semibold">{comparison.entityName}</span>
+          <span className="font-display font-semibold break-words">{comparison.entityName}</span>
           <Badge variant="warning">
             {changedDiffs.length} {t('branch.changedFields')}
           </Badge>
         </div>
-        <Button size="sm" onClick={() => onTransferAll(comparison.sourceEntityId)}>
+        <Button size="sm" onClick={() => onTransferAll(comparison.sourceEntityId)} className="w-full sm:w-auto shrink-0">
           <ArrowRight className="h-3 w-3 rtl:rotate-180" />
           {t('branch.transferAll')}
         </Button>
@@ -530,24 +530,26 @@ function ComparisonCard({
 
       {/* Field comparison table */}
       <div className="divide-y divide-border">
-        <div className="grid grid-cols-[1fr_2fr_2fr_auto] gap-2 px-4 py-2 bg-muted/20 text-xs font-semibold text-muted-foreground">
+        <div className="hidden sm:grid grid-cols-[1fr_2fr_2fr_auto] gap-2 px-4 py-2 bg-muted/20 text-xs font-semibold text-muted-foreground">
           <span>{t('branch.field')}</span>
           <span>{t('ui.branch.comparisonMain')}</span>
           <span>{t('ui.branch.comparisonBranch')}</span>
           <span></span>
         </div>
         {changedDiffs.map(diff => (
-          <div key={diff.field} className="grid grid-cols-[1fr_2fr_2fr_auto] gap-2 px-4 py-2.5 items-center">
+          <div key={diff.field} className="grid grid-cols-1 gap-1.5 sm:grid-cols-[1fr_2fr_2fr_auto] sm:gap-2 px-4 py-2.5 sm:items-center">
             <span className="text-sm font-medium">{formatFieldName(diff.field)}</span>
-            <span className="text-sm text-muted-foreground truncate" title={formatValue(diff.mainValue)}>
+            <span className="text-sm text-muted-foreground sm:truncate" title={formatValue(diff.mainValue)}>
+              <span className="sm:hidden font-medium text-muted-foreground">{t('ui.branch.comparisonMain')}: </span>
               {formatValue(diff.mainValue)}
             </span>
-            <span className="text-sm text-info truncate" title={formatValue(diff.branchValue)}>
+            <span className="text-sm text-info sm:truncate" title={formatValue(diff.branchValue)}>
+              <span className="sm:hidden font-medium text-muted-foreground">{t('ui.branch.comparisonBranch')}: </span>
               {formatValue(diff.branchValue)}
             </span>
             <button
               onClick={() => onTransferField(comparison.sourceEntityId, diff.field, diff.branchValue)}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-success-soft text-success border border-success/20 rounded-md hover:opacity-80 whitespace-nowrap"
+              className="flex items-center justify-center gap-1 px-2 py-1.5 sm:py-1 text-xs bg-success-soft text-success border border-success/20 rounded-md hover:opacity-80 whitespace-nowrap w-full sm:w-auto mt-1 sm:mt-0"
               title={t('branch.transferToMain')}
             >
               <ArrowRight className="h-3 w-3 rtl:rotate-180" />

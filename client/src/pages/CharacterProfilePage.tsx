@@ -164,7 +164,7 @@ export default function CharacterProfilePage() {
 
   if (!entity) {
     return (
-      <div className="max-w-3xl mx-auto p-6">
+      <div className="max-w-3xl mx-auto p-4 sm:p-6">
         <Button
           variant="ghost"
           size="icon"
@@ -231,21 +231,22 @@ export default function CharacterProfilePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6">
       <ProjectBreadcrumb currentPage="entities" showTabs={false} />
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
+      <div className="flex items-start justify-between gap-3 mb-6">
+        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           <Button
             variant="ghost"
             size="icon"
+            className="shrink-0"
             onClick={() => navigate(`/projects/${projectId}/knowledge`)}
           >
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </Button>
-          <div>
-            <h1 className="font-display text-2xl font-semibold tracking-tight">{entity.name}</h1>
+          <div className="min-w-0">
+            <h1 className="font-display text-xl sm:text-2xl font-semibold tracking-tight break-words">{entity.name}</h1>
             <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
               {t('entities.typesSingular.character')}
               {currentBranch && (
@@ -256,7 +257,7 @@ export default function CharacterProfilePage() {
         </div>
 
         {viewMode === 'profile' && (
-          <Button onClick={handleEdit} size="sm">
+          <Button onClick={handleEdit} size="sm" className="shrink-0">
             <Edit3 className="h-4 w-4" />
             {t('common.edit')}
           </Button>
@@ -266,7 +267,7 @@ export default function CharacterProfilePage() {
       {/* Version Selection */}
       {currentBranch && viewMode === 'profile' && (
         <div className="mb-6">
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-muted-foreground">{t('branch.version')}:</span>
             <button
               onClick={() => setSelectedVersion('main')}
@@ -293,7 +294,7 @@ export default function CharacterProfilePage() {
       )}
 
       {/* Content */}
-      <Card className="p-6">
+      <Card className="p-4 sm:p-6">
         {fieldGroups.map(group => {
           const appearanceSummaries = isDynamicProfile && viewMode === 'profile' && group.key === 'מראה חיצוני'
             ? getCharacterAppearanceSummaries(entity, modelProfile, dynamicFields)

@@ -82,6 +82,15 @@
     background-color: hsl(var(--background));
   }
 
+  /* Guard against residual horizontal overflow on small screens. */
+  html, body {
+    overflow-x: hidden;
+  }
+
+  img, svg, video {
+    max-width: 100%;
+  }
+
   * {
     @apply border-border;
   }

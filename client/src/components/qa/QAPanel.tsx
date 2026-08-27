@@ -65,7 +65,7 @@ export default function QAPanel({ projectId }: QAPanelProps) {
         {messages.length > 0 && (
           <button
             onClick={handleClearHistory}
-            className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
+            className="inline-flex h-8 w-8 items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors"
             title={t('qa.clearHistory')}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -167,8 +167,8 @@ export default function QAPanel({ projectId }: QAPanelProps) {
           className="flex-1"
           disabled={loading}
         />
-        <Button type="submit" size="icon" disabled={!input.trim() || loading}>
-          <Send className="h-4 w-4" />
+        <Button type="submit" size="icon" className="shrink-0" disabled={!input.trim() || loading}>
+          <Send className="h-4 w-4 rtl:rotate-180" />
         </Button>
       </form>
     </div>

@@ -386,12 +386,12 @@ export default function CharacterEditModal({
       variant="default"
     />
     <div
-      className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-stretch sm:items-center justify-center z-50 p-0 sm:p-4"
       onClick={handleBackdropClick}
     >
-      <div className="bg-card border border-border rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-auto">
+      <div className="bg-card border border-border rounded-none sm:rounded-lg shadow-lg sm:max-w-3xl w-full h-full sm:h-auto max-h-full sm:max-h-[90vh] overflow-auto flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-card border-b border-border p-6 flex items-start justify-between">
+        <div className="sticky top-0 bg-card border-b border-border p-4 sm:p-6 flex items-start justify-between">
           <div>
             <h2 className="font-display text-2xl font-semibold tracking-tight">{t('common.edit')}</h2>
             <p className="text-sm text-muted-foreground mt-1">{character.name}</p>
@@ -405,7 +405,7 @@ export default function CharacterEditModal({
         </div>
 
         {/* Form Content */}
-        <div className="p-6 space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto">
+        <div className="flex-1 p-4 sm:p-6 space-y-6 overflow-y-auto sm:max-h-[calc(90vh-200px)]">
           {fieldGroups.map(group => (
             <div key={group.key} className="rounded-lg border border-border bg-card">
               <button
@@ -468,7 +468,7 @@ export default function CharacterEditModal({
                   <h3 className="font-display font-semibold">{t('ui.character.addFieldTitle')}</h3>
                   <p className="text-xs text-muted-foreground">{t('ui.character.addFieldHint')}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <label htmlFor="character-field-to-add" className="sr-only">{t('ui.character.selectField')}</label>
                   <select
                     id="character-field-to-add"
@@ -477,12 +477,12 @@ export default function CharacterEditModal({
                     value={fieldToAdd}
                     onChange={event => setFieldToAdd(event.target.value)}
                     disabled={dynamicSchemaLoading || availableDynamicFields.length === 0}
-                    className="flex-1 h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
+                    className="w-full sm:flex-1 h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring"
                   >
                     <option value="">{t('ui.character.selectField')}</option>
                     {availableDynamicFields.map(field => <option key={field.field_key} value={field.field_key}>{field.label}</option>)}
                   </select>
-                  <Button variant="secondary" onClick={handleAddField} disabled={!fieldToAdd || dynamicSchemaLoading}>
+                  <Button variant="secondary" onClick={handleAddField} disabled={!fieldToAdd || dynamicSchemaLoading} className="w-full sm:w-auto">
                     {t('ui.character.addField')}
                   </Button>
                 </div>
@@ -493,7 +493,7 @@ export default function CharacterEditModal({
                   <h3 className="font-display font-semibold">{t('ui.character.addCustomFieldTitle')}</h3>
                   <p className="text-xs text-muted-foreground">{t('ui.character.addCustomFieldHint')}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
                     id="character-custom-field-label"
                     name="character-custom-field-label"
@@ -502,13 +502,13 @@ export default function CharacterEditModal({
                     onChange={event => setNewFieldLabel(event.target.value)}
                     onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void handleAddCustomField() } }}
                     placeholder={t('ui.character.customFieldPlaceholder')}
-                    className="flex-1"
+                    className="w-full sm:flex-1"
                   />
-                  <select value={newFieldType} onChange={event => setNewFieldType(event.target.value as 'text' | 'long_text')} className="h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring">
+                  <select value={newFieldType} onChange={event => setNewFieldType(event.target.value as 'text' | 'long_text')} className="w-full sm:w-auto h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50 focus:border-ring">
                     <option value="text">{t('ui.character.textField')}</option>
                     <option value="long_text">{t('ui.character.longTextField')}</option>
                   </select>
-                  <Button variant="secondary" onClick={() => void handleAddCustomField()} disabled={!newFieldLabel.trim()}>
+                  <Button variant="secondary" onClick={() => void handleAddCustomField()} disabled={!newFieldLabel.trim()} className="w-full sm:w-auto">
                     <Plus className="h-4 w-4" />{t('ui.character.addField')}
                   </Button>
                 </div>
@@ -518,10 +518,10 @@ export default function CharacterEditModal({
         </div>
 
         {/* Footer - Action Buttons */}
-        <div className="sticky bottom-0 bg-card border-t border-border p-6 flex items-center justify-between gap-3">
+        <div className="sticky bottom-0 bg-card border-t border-border p-4 sm:p-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             {showDeleteConfirm ? (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-destructive">{t('entityModal.confirmDelete')}</span>
                 <Button variant="destructive" size="sm" onClick={handleDelete} disabled={saving}>
                   {t('common.delete')}
@@ -544,10 +544,10 @@ export default function CharacterEditModal({
             )}
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={handleCancel} disabled={saving}>
+            <Button variant="secondary" onClick={handleCancel} disabled={saving} className="flex-1 sm:flex-none">
               {t('common.cancel')}
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none">
               <Save className="h-4 w-4" />
               {saving ? t('common.saving') : t('common.save')}
             </Button>

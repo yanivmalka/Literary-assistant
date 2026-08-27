@@ -34,7 +34,7 @@ export default function ProjectBreadcrumb({ currentPage, showTabs = true }: Proj
   return (
     <div className="mb-6">
       {/* Breadcrumb */}
-      <nav aria-label={t('nav.breadcrumb')} className="flex items-center gap-1.5 text-sm text-muted-foreground mb-3">
+      <nav aria-label={t('nav.breadcrumb')} className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground mb-3">
         <Link
           to="/projects"
           className="flex items-center gap-1 hover:text-foreground transition-colors"
@@ -45,7 +45,7 @@ export default function ProjectBreadcrumb({ currentPage, showTabs = true }: Proj
         <ChevronRight className="h-3.5 w-3.5 rtl:rotate-180" />
         <Link
           to={`/projects/${projectId}`}
-          className="hover:text-foreground transition-colors max-w-[200px] truncate"
+          className="hover:text-foreground transition-colors max-w-[45vw] sm:max-w-[200px] truncate"
         >
           {projectName}
         </Link>

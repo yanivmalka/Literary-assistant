@@ -90,14 +90,14 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
             <>
               <button
                 onClick={(e) => { e.stopPropagation(); onConfirm(entity.id) }}
-                className="p-1 text-success hover:bg-success-soft rounded transition-colors"
+                className="inline-flex h-8 w-8 items-center justify-center text-success hover:bg-success-soft rounded transition-colors"
                 title={t('entities.confirm')}
               >
                 <CheckCircle className="h-4 w-4" />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); onDismiss(entity.id) }}
-                className="p-1 text-destructive hover:bg-destructive/10 rounded transition-colors"
+                className="inline-flex h-8 w-8 items-center justify-center text-destructive hover:bg-destructive/10 rounded transition-colors"
                 title={t('entities.dismiss')}
               >
                 <XCircle className="h-4 w-4" />
@@ -105,7 +105,7 @@ export default function EntityCard({ entity, onConfirm, onDismiss, onViewDetails
               {onViewDetails && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onViewDetails(entity.id) }}
-                  className="p-1 text-muted-foreground hover:bg-muted rounded transition-colors"
+                  className="inline-flex h-8 w-8 items-center justify-center text-muted-foreground hover:bg-muted rounded transition-colors"
                   title={t('entities.viewDetails')}
                 >
                   <Eye className="h-4 w-4" />

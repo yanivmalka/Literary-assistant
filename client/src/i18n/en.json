@@ -26,7 +26,8 @@
     "notice": "Notice"
   },
   "nav": {
-    "breadcrumb": "Breadcrumb navigation"
+    "breadcrumb": "Breadcrumb navigation",
+    "menu": "Menu"
   },
   "home": {
     "welcome": "Build Maps for Your Fantasy Worlds",

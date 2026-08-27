@@ -85,10 +85,10 @@ export default function EntityReviewPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6">
       <ProjectBreadcrumb currentPage="entities" showTabs={false} />
 
-      <div className="mb-6 flex items-end justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div>
           <h2 className="font-display text-xl font-semibold tracking-tight">
             {typeFilter ? t(`entities.types.${typeFilter}`) : t('entities.title')}
@@ -97,7 +97,7 @@ export default function EntityReviewPage() {
             {typeFilter ? t('entities.subtitleByType', { type: t(`entities.types.${typeFilter}`) }) : t('entities.subtitle')}
           </p>
         </div>
-        <Button size="sm" onClick={handleCreateNew}>
+        <Button size="sm" onClick={handleCreateNew} className="w-full sm:w-auto">
           <Plus className="h-4 w-4" />
           {t('entityModal.createNew')}
         </Button>
@@ -137,7 +137,7 @@ export default function EntityReviewPage() {
       </div>
 
       {/* Status filter + Branch link */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         {['pending', 'confirmed'].map(status => (
           <button
             key={status}

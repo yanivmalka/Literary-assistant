@@ -152,19 +152,19 @@ export default function CharacterDetailModal({
   }
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
-      <div className="bg-card border border-border rounded-lg shadow-lg max-w-3xl w-full max-h-[90vh] overflow-auto">
-        <div className="sticky top-0 bg-card border-b border-border p-6 flex items-start justify-between z-10">
-          <div>
-            <h2 className="font-display text-2xl font-semibold tracking-tight">{character.name}</h2>
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-stretch sm:items-center justify-center z-50 p-0 sm:p-4" onClick={handleBackdropClick}>
+      <div className="bg-card border border-border rounded-none sm:rounded-lg shadow-lg sm:max-w-3xl w-full h-full sm:h-auto max-h-full sm:max-h-[90vh] overflow-auto flex flex-col">
+        <div className="sticky top-0 bg-card border-b border-border p-4 sm:p-6 flex items-start justify-between gap-3 z-10">
+          <div className="min-w-0">
+            <h2 className="font-display text-xl sm:text-2xl font-semibold tracking-tight break-words">{character.name}</h2>
             <p className="text-sm text-muted-foreground mt-1">{t('entities.typesSingular.character')}</p>
           </div>
-          <button onClick={handleClose} className="p-1 rounded-md hover:bg-accent transition-colors" aria-label={t('common.close')}>
+          <button onClick={handleClose} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-accent transition-colors" aria-label={t('common.close')}>
             <X className="h-6 w-6" />
           </button>
         </div>
 
-        <div className="p-6">
+        <div className="flex-1 p-4 sm:p-6">
           {view === 'detail' && (
             <div className="space-y-6">
               {isDynamicProfile ? (

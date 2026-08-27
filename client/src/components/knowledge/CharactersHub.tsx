@@ -195,12 +195,12 @@ export default function CharactersHub({ projectId, modelProfile }: CharactersHub
 
       {/* Character Tiles */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4 gap-4">
-          <h2 className="font-display text-lg font-semibold">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 sm:gap-4">
+          <h2 className="font-display text-lg font-semibold break-words">
             {selectedVersion === 'main' ? t('branch.main') : currentBranch?.name}
           </h2>
-          <div className="flex items-center gap-3">
-            <label className="relative block min-w-56">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <label className="relative block w-full sm:w-auto sm:min-w-56">
               <span className="sr-only">{t('ui.character.searchPlaceholder')}</span>
               <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input

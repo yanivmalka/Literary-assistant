@@ -338,14 +338,14 @@ export default function LocationEditModal({
       onConfirm={() => setAlertMessage(null)}
       variant="default"
     />
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-card border border-border rounded-lg shadow-lg max-w-4xl w-full max-h-[92vh] overflow-auto">
-        <div className="sticky top-0 bg-card border-b border-border p-6 flex items-start justify-between z-10">
-          <div><h2 className="font-display text-2xl font-semibold tracking-tight">{isNewLocation ? t('ui.location.newTitle') : t('ui.location.editTitle')}</h2><p className="text-sm text-muted-foreground mt-1">{location?.name || t('ui.location.place')}</p></div>
-          <button onClick={onClose} className="p-1 rounded-md hover:bg-accent transition-colors"><X className="h-6 w-6" /></button>
+    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-stretch sm:items-center justify-center z-50 p-0 sm:p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-card border border-border rounded-none sm:rounded-lg shadow-lg sm:max-w-4xl w-full h-full sm:h-auto max-h-full sm:max-h-[92vh] overflow-auto flex flex-col">
+        <div className="sticky top-0 bg-card border-b border-border p-4 sm:p-6 flex items-start justify-between gap-3 z-10">
+          <div className="min-w-0"><h2 className="font-display text-xl sm:text-2xl font-semibold tracking-tight">{isNewLocation ? t('ui.location.newTitle') : t('ui.location.editTitle')}</h2><p className="text-sm text-muted-foreground mt-1 break-words">{location?.name || t('ui.location.place')}</p></div>
+          <button onClick={onClose} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-accent transition-colors"><X className="h-6 w-6" /></button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="flex-1 p-4 sm:p-6 space-y-6">
           {loadingSchema ? <p className="text-sm text-muted-foreground">{t('ui.location.loadingSchema')}</p> : null}
           <section className="rounded-lg border border-border bg-card p-4 space-y-4">
             <h3 className="font-display font-semibold">{t('ui.location.identity')}</h3>
@@ -364,13 +364,13 @@ export default function LocationEditModal({
 
           {groupedFields.map(([groupKey, groupFields]) => <section key={groupKey} className="rounded-lg border border-border bg-card"><button onClick={() => toggleGroup(groupKey)} className="w-full flex items-center justify-between p-4 hover:bg-muted/50"><h3 className="font-display font-semibold">{placeGroupLabel(groupKey, t)}</h3>{expandedGroups.has(groupKey) ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>{expandedGroups.has(groupKey) && <div className="border-t p-4 grid grid-cols-1 md:grid-cols-2 gap-5">{groupFields.map(renderField)}</div>}</section>)}
 
-          <section className="rounded-lg border border-dashed border-border p-4 space-y-3"><div><h3 className="font-display font-semibold">{t('ui.location.customField')}</h3><p className="text-xs text-muted-foreground">{t('ui.location.customFieldHint')}</p></div><div className="flex gap-2"><Input id="location-custom-field-label" name="location-custom-field-label" autoComplete="off" value={newFieldLabel} onChange={e => setNewFieldLabel(e.target.value)} placeholder={t('ui.location.fieldNamePlaceholder')} className="flex-1" /><Button variant="secondary" onClick={addCustomField} disabled={!newFieldLabel.trim()}><Plus className="h-4 w-4" />{t('ui.location.addField')}</Button></div></section>
+          <section className="rounded-lg border border-dashed border-border p-4 space-y-3"><div><h3 className="font-display font-semibold">{t('ui.location.customField')}</h3><p className="text-xs text-muted-foreground">{t('ui.location.customFieldHint')}</p></div><div className="flex flex-col gap-2 sm:flex-row"><Input id="location-custom-field-label" name="location-custom-field-label" autoComplete="off" value={newFieldLabel} onChange={e => setNewFieldLabel(e.target.value)} placeholder={t('ui.location.fieldNamePlaceholder')} className="w-full sm:flex-1" /><Button variant="secondary" onClick={addCustomField} disabled={!newFieldLabel.trim()} className="w-full sm:w-auto"><Plus className="h-4 w-4" />{t('ui.location.addField')}</Button></div></section>
         </div>
 
-        <div className="sticky bottom-0 bg-card border-t border-border p-6 flex items-center justify-between gap-3">
+        <div className="sticky bottom-0 bg-card border-t border-border p-4 sm:p-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             {!isNewLocation && (showDeleteConfirm ? (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm text-destructive">{t('ui.location.deleteConfirm')}</span>
                 <Button variant="destructive" size="sm" onClick={handleDelete} disabled={saving}>{t('ui.location.yes')}</Button>
                 <Button variant="secondary" size="sm" onClick={() => setShowDeleteConfirm(false)}>{t('ui.location.no')}</Button>
@@ -389,8 +389,8 @@ export default function LocationEditModal({
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={() => { setFormData(originalFormData); onClose() }} disabled={saving}>{t('ui.location.cancel')}</Button>
-            <Button onClick={handleSave} disabled={saving || loadingSchema}>
+            <Button variant="secondary" onClick={() => { setFormData(originalFormData); onClose() }} disabled={saving} className="flex-1 sm:flex-none">{t('ui.location.cancel')}</Button>
+            <Button onClick={handleSave} disabled={saving || loadingSchema} className="flex-1 sm:flex-none">
               <Save className="h-4 w-4" />
               {saving ? t('ui.location.saving') : t('ui.location.save')}
             </Button>

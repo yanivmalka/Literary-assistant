@@ -78,7 +78,7 @@ export default function LocationsHub({ projectId, modelProfile }: LocationsHubPr
       </div>
 
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4"><h2 className="font-display text-lg font-semibold">{selectedVersion === 'main' ? t('branch.main') : currentBranch?.name}</h2><Button onClick={handleCreateNew} disabled={selectedVersion === 'branch' && !currentBranch} size="sm"><Plus className="h-4 w-4" />{t('entities.newLocation')}</Button></div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4"><h2 className="font-display text-lg font-semibold break-words">{selectedVersion === 'main' ? t('branch.main') : currentBranch?.name}</h2><Button onClick={handleCreateNew} disabled={selectedVersion === 'branch' && !currentBranch} size="sm" className="w-full sm:w-auto"><Plus className="h-4 w-4" />{t('entities.newLocation')}</Button></div>
         {locations.length === 0 ? <div className="border-2 border-dashed border-border rounded-lg p-12 text-center"><p className="text-muted-foreground">{t('entities.emptyLocations')}</p></div> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{locations.map(location => <LocationTile key={location.id} location={location} parentNames={(parentsByChild[location.id] || []).map(displayName)} onEdit={handleEditLocation} />)}</div>}
       </div>
 

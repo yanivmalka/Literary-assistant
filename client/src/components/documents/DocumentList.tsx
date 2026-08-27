@@ -120,11 +120,11 @@ export default function DocumentList({ projectId }: DocumentListProps) {
           key={doc.id}
           className={`border border-border rounded-lg p-4 bg-card ${processing ? 'document-tile-processing' : ''}`}
         >
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-3 min-w-0">
               <FileText className={`h-5 w-5 flex-shrink-0 ${isReady ? 'text-success' : 'text-muted-foreground'}`} />
-              <div>
-                <h4 className={`font-display font-semibold text-sm ${isReady ? 'text-success' : ''}`}>{doc.name}</h4>
+              <div className="min-w-0">
+                <h4 className={`font-display font-semibold text-sm break-words ${isReady ? 'text-success' : ''}`}>{doc.name}</h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   <span className={isReady ? 'text-success' : ''}>{doc.file_type.toUpperCase()}</span>
                   {doc.latest_version?.file_size && (
@@ -139,7 +139,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto sm:flex-nowrap sm:gap-1 sm:flex-shrink-0">
               {doc.latest_version?.status === 'ready' && (
                 <>
                   <label htmlFor={`extraction-model-${doc.id}`} className="sr-only">
@@ -156,7 +156,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
                       setStoredExtractionModelProfile(profile)
                     }}
                     disabled={extractionInProgress || hasPausedExtraction}
-                    className="max-w-36 rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground disabled:opacity-50"
+                    className="flex-1 min-w-0 sm:flex-none sm:max-w-36 rounded-md border border-input bg-background px-2 py-1.5 sm:py-1 text-xs text-foreground disabled:opacity-50"
                     title={t('ui.documents.modelProfile')}
                   >
                     {EXTRACTION_MODEL_PROFILES.map(profile => (
@@ -187,7 +187,7 @@ export default function DocumentList({ projectId }: DocumentListProps) {
               {isReady && !extractionInProgress && (
                 <button
                   onClick={() => handleDelete(doc.id)}
-                  className="relative z-20 p-1.5 text-destructive hover:opacity-80 rounded-md transition-opacity"
+                  className="relative z-20 inline-flex h-9 w-9 sm:h-8 sm:w-8 items-center justify-center text-destructive hover:opacity-80 rounded-md transition-opacity"
                   title={t('common.delete')}
                 >
                   <Trash2 className="h-4 w-4" />

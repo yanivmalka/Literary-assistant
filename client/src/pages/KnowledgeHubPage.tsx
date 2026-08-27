@@ -72,25 +72,25 @@ export default function KnowledgeHubPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6">
         {/* Header */}
-        <div className="mb-6 flex items-center gap-4">
+        <div className="mb-6 flex items-center gap-3 sm:gap-4">
           <button
             onClick={() => navigateToProject(`/projects/${projectId}`)}
-            className="p-2 rounded-md hover:bg-accent transition-colors"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-accent transition-colors"
           >
             <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </button>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">{t('knowledge.title')}</h1>
+          <h1 className="font-display text-xl sm:text-2xl font-semibold tracking-tight">{t('knowledge.title')}</h1>
         </div>
 
         {/* Tab Navigation */}
-        <nav className="flex gap-1 mb-8 p-1 rounded-lg bg-muted w-fit">
+        <nav className="flex gap-1 mb-8 p-1 rounded-lg bg-muted w-full sm:w-fit overflow-x-auto">
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-md transition-colors ${
                 activeTab === tab.id
                   ? 'bg-card text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'

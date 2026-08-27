@@ -141,14 +141,14 @@ export default function AccountSettingsPage() {
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-center gap-3 sm:gap-4 mb-8">
           <button
             onClick={() => navigate('/')}
-            className="p-2 hover:bg-muted rounded-md transition-colors"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center hover:bg-muted rounded-md transition-colors"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5 rtl:rotate-180" />
           </button>
-          <h1 className="text-3xl font-bold">{t('ui.account.settings')}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">{t('ui.account.settings')}</h1>
         </div>
 
         {/* Error/Success Messages */}
@@ -164,7 +164,7 @@ export default function AccountSettingsPage() {
         )}
 
         {/* User Info */}
-        <div className="border rounded-lg p-6 bg-card mb-6">
+        <div className="border rounded-lg p-4 sm:p-6 bg-card mb-6">
           <h2 className="text-xl font-semibold mb-4">{t('ui.account.accountInformation')}</h2>
           <div className="space-y-2 text-sm">
             <p><span className="text-muted-foreground">{t('ui.account.email')}</span> {user.email}</p>
@@ -174,7 +174,7 @@ export default function AccountSettingsPage() {
         </div>
 
         {/* Appearance */}
-        <div className="border rounded-lg p-6 bg-card mb-6">
+        <div className="border rounded-lg p-4 sm:p-6 bg-card mb-6">
           <h2 className="text-xl font-semibold">{t('ui.theme.appearanceTitle')}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{t('ui.theme.appearanceDescription')}</p>
 
@@ -259,7 +259,7 @@ export default function AccountSettingsPage() {
         </div>
 
         {/* Extraction Progress Style */}
-        <div className="border rounded-lg p-6 bg-card mb-6">
+        <div className="border rounded-lg p-4 sm:p-6 bg-card mb-6">
           <h2 className="text-xl font-semibold">{t('ui.extraction.progressStyleTitle')}</h2>
           <p className="mt-1 text-sm text-muted-foreground">{t('ui.extraction.progressStyleDescription')}</p>
 
@@ -283,7 +283,7 @@ export default function AccountSettingsPage() {
         </div>
 
         {/* Authentication Methods */}
-        <div className="border rounded-lg p-6 bg-card mb-6">
+        <div className="border rounded-lg p-4 sm:p-6 bg-card mb-6">
           <h2 className="text-xl font-semibold mb-6">{t('ui.account.authenticationMethods')}</h2>
           
           <div className="space-y-4">

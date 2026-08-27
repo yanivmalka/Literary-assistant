@@ -19,7 +19,7 @@ export default function QuillsStorePage() {
   }, [loadWallet, wallet])
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6">
       <Link
         to="/projects"
         className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground mb-6"
@@ -34,7 +34,7 @@ export default function QuillsStorePage() {
             <div className="rounded-xl bg-primary-soft p-3 text-primary">
               <Feather className="h-7 w-7" />
             </div>
-            <h2 className="font-display text-3xl font-semibold tracking-tight">{t('quills.storeTitle')}</h2>
+            <h2 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight">{t('quills.storeTitle')}</h2>
           </div>
           <p className="text-muted-foreground max-w-xl">{t('quills.storeDescription')}</p>
         </div>
