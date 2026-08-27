@@ -116,6 +116,28 @@ export function normalizeFieldObservationMap(
   return result;
 }
 
+/**
+ * Orders observations so explicit facts (`inferred === false`) precede inferred
+ * ones, then higher confidence first, then original order. Age has its own
+ * dedicated ordering (see character-age.ts) and is not passed through here.
+ */
+export function prioritizeExplicitObservations(
+  observations: NormalizedFieldObservation[],
+): NormalizedFieldObservation[] {
+  return observations
+    .map((observation, index) => ({ observation, index }))
+    .sort((left, right) => {
+      const leftInferred = left.observation.inferred ? 1 : 0;
+      const rightInferred = right.observation.inferred ? 1 : 0;
+      if (leftInferred !== rightInferred) return leftInferred - rightInferred;
+      const leftConfidence = typeof left.observation.confidence === "number" ? left.observation.confidence : -1;
+      const rightConfidence = typeof right.observation.confidence === "number" ? right.observation.confidence : -1;
+      if (leftConfidence !== rightConfidence) return rightConfidence - leftConfidence;
+      return left.index - right.index;
+    })
+    .map(({ observation }) => observation);
+}
+
 export function mergeFieldObservationMaps(
   target: FieldObservationMap,
   incoming: FieldObservationMap,

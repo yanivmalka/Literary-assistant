@@ -21,6 +21,86 @@ const HEBREW_TEEN_AGES: Record<string, number> = {
   "תשעה עשר": 19,
 };
 
+// Hebrew cardinal words used for ages. Both the feminine forms (used with "בת")
+// and the masculine forms (used with "בן") are accepted for every value.
+const HEBREW_ONES: Record<string, number> = {
+  "אחת": 1, "אחד": 1,
+  "שתיים": 2, "שתים": 2, "שניים": 2, "שנים": 2, "שתי": 2, "שני": 2,
+  "שלוש": 3, "שלושה": 3,
+  "ארבע": 4, "ארבעה": 4,
+  "חמש": 5, "חמישה": 5,
+  "שש": 6, "שישה": 6, "ששה": 6,
+  "שבע": 7, "שבעה": 7,
+  "שמונה": 8,
+  "תשע": 9, "תשעה": 9,
+  "עשר": 10, "עשרה": 10,
+};
+
+const HEBREW_TENS: Record<string, number> = {
+  "עשרים": 20,
+  "שלושים": 30,
+  "ארבעים": 40,
+  "חמישים": 50,
+  "שישים": 60, "ששים": 60,
+  "שבעים": 70,
+  "שמונים": 80,
+  "תשעים": 90,
+};
+
+// The trailing word of a Hebrew teen ("שבע עשרה" = 17, "שמונה עשר" = 18).
+const HEBREW_TEEN_SUFFIX = new Set(["עשרה", "עשר"]);
+
+/**
+ * Parses an unambiguous Hebrew age phrase (already stripped of a leading
+ * "בת"/"בן") into a number. Returns null unless every token is a known cardinal
+ * word forming one of: a single ones word (1-10), a single tens word, a teen
+ * ("<ones> עשרה/עשר"), or a tens+ones combination in either order
+ * ("עשרים וחמש" or "חמש ועשרים"). Any unknown token fails the whole phrase, so
+ * descriptive prose can never become an age.
+ */
+function parseHebrewAgeWords(core: string): number | null {
+  const exactTeen = HEBREW_TEEN_AGES[core];
+  if (exactTeen !== undefined) return exactTeen;
+
+  const words = core
+    .split(" ")
+    .map((word) => (word.startsWith("ו") ? word.slice(1) : word)) // drop leading vav ("וחמש" -> "חמש")
+    .filter((word) => word.length > 0);
+  if (words.length === 0 || words.length > 2) return null;
+
+  if (words.length === 1) {
+    const ones = HEBREW_ONES[words[0]];
+    if (ones !== undefined) return ones;
+    const tens = HEBREW_TENS[words[0]];
+    return tens ?? null;
+  }
+
+  const [first, second] = words;
+
+  // Teen: "<ones 1-9> עשרה/עשר"
+  if (HEBREW_TEEN_SUFFIX.has(second)) {
+    const ones = HEBREW_ONES[first];
+    if (ones !== undefined && ones >= 1 && ones <= 9) return 10 + ones;
+    return null;
+  }
+
+  // Tens + ones: "עשרים וחמש"
+  if (HEBREW_TENS[first] !== undefined && HEBREW_ONES[second] !== undefined) {
+    const ones = HEBREW_ONES[second];
+    if (ones >= 1 && ones <= 9) return HEBREW_TENS[first] + ones;
+    return null;
+  }
+
+  // Ones + tens: "חמש ועשרים"
+  if (HEBREW_ONES[first] !== undefined && HEBREW_TENS[second] !== undefined) {
+    const ones = HEBREW_ONES[first];
+    if (ones >= 1 && ones <= 9) return HEBREW_TENS[second] + ones;
+    return null;
+  }
+
+  return null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -28,6 +108,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function normalizeAgeText(value: string): string {
   return value
     .normalize("NFKC")
+    // Strip Hebrew combining points/accents before any lexical parsing.
+    // Deliberately excludes punctuation such as U+05BE maqaf, which the
+    // dash-normalization step below turns into a word separator.
+    .replace(/[\u0591-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]/g, "")
     .trim()
     .replace(/[\u05BE\u2010-\u2015\u2212\u002D]/g, " ")
     .replace(/\s+/g, " ");
@@ -57,8 +141,11 @@ export function normalizeCharacterAge(value: unknown): string | null {
       : null;
   }
 
-  const hebrewAge = HEBREW_TEEN_AGES[core];
-  return hebrewAge === undefined ? null : String(hebrewAge);
+  const hebrewAge = parseHebrewAgeWords(core);
+  if (hebrewAge === null) return null;
+  return Number.isInteger(hebrewAge) && hebrewAge >= 0 && hebrewAge <= 130
+    ? String(hebrewAge)
+    : null;
 }
 
 function ageObservationSortKey(

@@ -303,6 +303,15 @@ A character's link to an object or ability is NOT a relationship-array edge. Put
 
 Do NOT return locations, organizations, or events as entities. Do NOT invent a top-level "characters"/"objects"/"abilities" array; use the unified entities array above.
 
+=== CHARACTER ENTITY SHAPE ===
+For an entity whose type is "character", put every character field INSIDE "attributes":
+- "attributes.first_name" (mandatory) and "attributes.last_name" (when a surname is given) as plain strings. Do NOT place first_name in "aliases".
+- Every other populated character field as "attributes.<field_key>" with its plain value (age as a canonical ASCII string, e.g. "25").
+- "attributes.character_field_observations": an object mapping each populated field key to an ARRAY of observation objects, each shaped:
+  { "value": <the field value>, "evidence": [{ "quote": "exact supporting quote", "chunk_position": 0 }], "confidence": 0.0, "inferred": false, "inference_note": null }
+  Use "inferred": true with a short "inference_note" only for a field inferred from strongly supported context; explicit facts use "inferred": false.
+Do NOT use top-level "field_evidence" or top-level flat fields (e.g. a sibling "age"/"hair_color" next to "name") for characters; those belong in attributes as shown above. Objects and abilities keep using their own fields as described in the OBJECTS and ABILITIES sections.
+
 === FIELD-SPECIFIC EVIDENCE REQUIREMENT ===
 **CRITICAL: For important fields, you MUST provide supporting evidence from the text.**
 
@@ -328,23 +337,30 @@ ABILITIES - key fields requiring evidence:
 - mechanism: How it works, with quote
 - power_level: If mentioned, with quote
 
-Example - CHARACTER with field_evidence:
+Example - CHARACTER (first_name, last_name, and every field live inside attributes; character_field_observations carries the evidence):
 {
   "name": "ליאו פרוסט",
+  "type": "character",
   "aliases": ["ליאו"],
-  "age": 25,
-  "hair_color": "שחור",
-  "eye_color": "כחול",
-  "description": "A brooding sorcerer...",
-  "evidence": ["...מחשבותיו על הזעם הקדום..."],
-  "chunk_positions": [5, 17, 42],
-  "field_evidence": {
-    "name": ["אני ליאו פרוסט, הקוסם החקור של אירויין"],
-    "age": ["ליאו הציע את יד ימינו לבת עשרים וחמש, זעום אל עצמו שהוא בן חמש ועשרים"],
-    "hair_color": ["שערו השחור נפל על עיניו"],
-    "eye_color": ["על עיניו הכחולות"],
-    "narrative_role": ["ליאו היה הקוסם היחיד שיכול לעצור את קללתה"]
-  }
+  "description": "קוסם קודר מאירויין.",
+  "attributes": {
+    "first_name": "ליאו",
+    "last_name": "פרוסט",
+    "age": "25",
+    "hair_color": "שחור",
+    "eye_color": "כחול",
+    "narrative_role": "הקוסם היחיד שיכול לעצור את הקללה",
+    "character_field_observations": {
+      "first_name": [{ "value": "ליאו", "evidence": [{ "quote": "אני ליאו פרוסט", "chunk_position": 5 }], "confidence": 0.98, "inferred": false, "inference_note": null }],
+      "last_name": [{ "value": "פרוסט", "evidence": [{ "quote": "אני ליאו פרוסט", "chunk_position": 5 }], "confidence": 0.98, "inferred": false, "inference_note": null }],
+      "age": [{ "value": "25", "evidence": [{ "quote": "בן חמש ועשרים", "chunk_position": 17 }], "confidence": 0.9, "inferred": false, "inference_note": null }],
+      "hair_color": [{ "value": "שחור", "evidence": [{ "quote": "שערו השחור נפל על עיניו", "chunk_position": 17 }], "confidence": 0.85, "inferred": false, "inference_note": null }],
+      "eye_color": [{ "value": "כחול", "evidence": [{ "quote": "עיניו הכחולות", "chunk_position": 17 }], "confidence": 0.85, "inferred": false, "inference_note": null }],
+      "narrative_role": [{ "value": "הקוסם היחיד שיכול לעצור את הקללה", "evidence": [{ "quote": "ליאו היה הקוסם היחיד שיכול לעצור את קללתה", "chunk_position": 42 }], "confidence": 0.8, "inferred": false, "inference_note": null }]
+    }
+  },
+  "evidence": ["מחשבותיו על הזעם הקדום"],
+  "chunk_positions": [5, 17, 42]
 }
 
 === GENERAL RULES ===

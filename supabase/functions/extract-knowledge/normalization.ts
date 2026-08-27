@@ -18,6 +18,7 @@ import {
   mergeFieldObservationMaps,
   normalizeFieldObservationMap,
   normalizeLegacyFieldEvidence,
+  prioritizeExplicitObservations,
   type FieldConfidenceMap,
   type FieldEvidenceMap,
   type FieldInferenceMap,
@@ -340,9 +341,15 @@ export function normalizeEntities(
   options: DynamicCharacterFieldOptions = {},
 ): NormalizedEntity[] {
   const entityMap = new Map<string, NormalizedEntity>();
+  // Count Sub-base C characters discarded because no usable name could be found
+  // at all (not merely a missing first_name, which is now derived below).
+  let unnamedCharacterDrops = 0;
 
   function addEntity(name: string, type: string, entity: ExtractedEntity) {
-    if (!name || !name.trim()) return;
+    if (!name || !name.trim()) {
+      if (profile === "sub-base-c-characters" && type === "character") unnamedCharacterDrops++;
+      return;
+    }
     if (profile === "sub-base-c-characters" && type === "character") {
       entity.attributes = normalizeSubBaseCCharacterAttributes(entity.attributes || {});
     }
@@ -360,14 +367,39 @@ export function normalizeEntities(
         incomingStructuredFields.age = normalizeCharacterAge(primaryAge.value);
       }
     }
-    const incomingProvenance = deriveFieldProvenance(incomingObservations);
-    const firstName = typeof incomingStructuredFields.first_name === "string"
+    if (profile === "sub-base-c-characters" && type === "character") {
+      // Explicit facts must outrank inferred guesses for every field except age,
+      // which has its own dedicated ordering above.
+      for (const field of Object.keys(incomingObservations)) {
+        if (field === "age") continue;
+        incomingObservations[field] = prioritizeExplicitObservations(incomingObservations[field]);
+      }
+    }
+    let firstName = typeof incomingStructuredFields.first_name === "string"
       ? incomingStructuredFields.first_name.trim()
       : "";
-    const lastName = typeof incomingStructuredFields.last_name === "string"
+    let lastName = typeof incomingStructuredFields.last_name === "string"
       ? incomingStructuredFields.last_name.trim()
       : "";
-    if (profile === "sub-base-c-characters" && type === "character" && !firstName) return;
+    if (profile === "sub-base-c-characters" && type === "character" && !firstName) {
+      // The model gave a usable display name but no structured first_name. Derive
+      // first/last from the name's tokens instead of discarding the character.
+      const nameTokens = stripNikud(name.trim()).split(/\s+/).filter(Boolean);
+      if (nameTokens.length === 0) {
+        unnamedCharacterDrops++;
+        return;
+      }
+      firstName = nameTokens[0];
+      incomingStructuredFields.first_name = firstName;
+      if (!lastName && nameTokens.length > 1) {
+        lastName = nameTokens.slice(1).join(" ");
+        incomingStructuredFields.last_name = lastName;
+      }
+      console.warn(
+        `[normalizeEntities] Sub-base C character '${name.trim()}' had no first_name; derived first_name='${firstName}'`,
+      );
+    }
+    const incomingProvenance = deriveFieldProvenance(incomingObservations);
     const displayName = profile === "sub-base-c-characters" && type === "character"
       ? [firstName, lastName].filter(Boolean).join(" ")
       : name.trim();
@@ -445,6 +477,10 @@ export function normalizeEntities(
         existing.field_observations = mergeFieldObservationMaps(existing.field_observations || {}, incomingObservations);
         if (existing.field_observations.age) {
           existing.field_observations.age = prioritizeCharacterAgeObservations(existing.field_observations.age);
+        }
+        for (const field of Object.keys(existing.field_observations)) {
+          if (field === "age") continue;
+          existing.field_observations[field] = prioritizeExplicitObservations(existing.field_observations[field]);
         }
         const mergedProvenance = deriveFieldProvenance(existing.field_observations);
         existing.field_evidence = mergedProvenance.field_evidence;
@@ -556,6 +592,12 @@ export function normalizeEntities(
     for (const organization of extraction.organizations || []) addEntity(organization.name, "organization", organization);
   }
 
+  if (unnamedCharacterDrops > 0) {
+    console.warn(
+      `[normalizeEntities] Sub-base C dropped ${unnamedCharacterDrops} character(s) with no usable name`,
+    );
+  }
+
   const entries = Array.from(entityMap.entries());
   const consolidationCandidates: Array<{ keyA: string; keyB: string; score: number }> = [];
 
@@ -610,6 +652,10 @@ export function normalizeEntities(
       keep.field_observations = mergeFieldObservationMaps(keep.field_observations || {}, remove.field_observations);
       if (keep.field_observations.age) {
         keep.field_observations.age = prioritizeCharacterAgeObservations(keep.field_observations.age);
+      }
+      for (const field of Object.keys(keep.field_observations)) {
+        if (field === "age") continue;
+        keep.field_observations[field] = prioritizeExplicitObservations(keep.field_observations[field]);
       }
       const mergedProvenance = deriveFieldProvenance(keep.field_observations);
       keep.field_evidence = mergedProvenance.field_evidence;

@@ -7,6 +7,26 @@ import {
   normalizeCharacterAgeObservationMap,
   normalizeSubBaseCCharacterAttributes,
 } from '../_shared/character-age.ts';
+import {
+  CHARACTER_FIELD_KEYS,
+  CHARACTER_RELATIONSHIP_TYPES,
+} from '../_shared/character-specialist.ts';
+
+// Older character extractions emit these key spellings; map them onto the
+// canonical Sub-base C field keys so their values are not filtered out later.
+const C_COMPAT_FIELD_ALIASES: Record<string, string> = {
+  favorite_food: 'favorite_foods',
+  dislikes: 'disliked_foods',
+  religion_and_beliefs: 'beliefs',
+};
+
+// Structural/identity keys are handled explicitly by the adapter and must never
+// be lifted from a flat candidate into `attributes` as ordinary fields.
+const C_NON_FLAT_FIELD_KEYS = new Set(['first_name', 'last_name', 'aliases']);
+
+function isLiftableFlatValue(value: unknown): boolean {
+  return value != null && (typeof value !== 'object' || Array.isArray(value));
+}
 
 export type ExtractionMode = 'bootstrap' | 'branch';
 
@@ -459,6 +479,42 @@ export function adaptSubBaseCSerialExtraction(payload: unknown): Record<string, 
         }
       }
 
+      // Recover recognized character fields that a flat/legacy payload placed as
+      // siblings of `name` rather than inside `attributes`.
+      for (const key of CHARACTER_FIELD_KEYS) {
+        if (C_NON_FLAT_FIELD_KEYS.has(key)) continue;
+        if (attributes[key] == null && isLiftableFlatValue(candidate[key])) {
+          attributes[key] = candidate[key];
+        }
+      }
+
+      // Map compatibility key spellings onto their canonical field keys.
+      for (const [fromKey, toKey] of Object.entries(C_COMPAT_FIELD_ALIASES)) {
+        if (attributes[fromKey] == null && isLiftableFlatValue(candidate[fromKey])) {
+          attributes[fromKey] = candidate[fromKey];
+        }
+        if (attributes[fromKey] != null && attributes[toKey] == null) {
+          attributes[toKey] = attributes[fromKey];
+        }
+        if (attributes[fromKey] != null) delete attributes[fromKey];
+        if (observations[fromKey] && !observations[toKey]) observations[toKey] = observations[fromKey];
+        if (observations[fromKey]) delete observations[fromKey];
+      }
+
+      // Fill value-less observation entries when a field value is available.
+      for (const [field, rawObs] of Object.entries(observations)) {
+        if (!Array.isArray(rawObs) || attributes[field] == null) continue;
+        observations[field] = rawObs.map((entry) => {
+          if (
+            entry && typeof entry === 'object' && !Array.isArray(entry)
+            && (!('value' in entry) || (entry as Record<string, unknown>).value == null)
+          ) {
+            return { ...(entry as Record<string, unknown>), value: attributes[field] };
+          }
+          return entry;
+        });
+      }
+
       attributes.character_field_observations = observations;
       attributes = normalizeSubBaseCCharacterAttributes(attributes);
       observations = normalizeCharacterAgeObservationMap(attributes.character_field_observations);
@@ -503,11 +559,27 @@ export function adaptSubBaseCSerialExtraction(payload: unknown): Record<string, 
     });
 
   const rawRelationships = Array.isArray(record.relationships) ? record.relationships : [];
-  const relationships = rawRelationships.map((item) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
-    const relationship = item as Record<string, unknown>;
-    return canonicalRelationshipToLegacy(relationship) ?? relationship;
-  });
+  const relationships = rawRelationships
+    .map((item) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+      const relationship = item as Record<string, unknown>;
+      const legacy = canonicalRelationshipToLegacy(relationship);
+      // A relationship missing source/target/type is left untouched so the
+      // shared validator can reject it explicitly.
+      if (!legacy) return relationship;
+      const normalizedType = String(legacy.relationship_type ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, '_');
+      if (!(CHARACTER_RELATIONSHIP_TYPES as readonly string[]).includes(normalizedType)) {
+        // Not a Sub-base C character relationship type: drop it rather than
+        // persist a hallucinated edge type.
+        return null;
+      }
+      legacy.relationship_type = normalizedType;
+      return legacy;
+    })
+    .filter((item) => item !== null) as unknown[];
 
   return { ...record, characters, ...(rawRelationships.length > 0 ? { relationships } : {}) };
 }

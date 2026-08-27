@@ -62,12 +62,43 @@ Deno.test("C normalization enforces first_name and derives display name", () => 
   assertEquals(entity.field_observations?.age.length, 2);
 });
 
-Deno.test("C normalization drops characters without first_name", () => {
+Deno.test("C normalization derives first/last name from a usable name instead of dropping the character", () => {
   const extraction = { characters: [character({
     name: "Unnamed Figure",
     attributes: { character_field_observations: { fears: [{ value: "darkness", evidence: [{ quote: "dark", chunk_position: 2 }] }] } },
   })] } as unknown as GeminiExtraction;
+  const entities = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  assertEquals(entities.length, 1);
+  assertEquals(entities[0].structured_fields.first_name, "Unnamed");
+  assertEquals(entities[0].structured_fields.last_name, "Figure");
+  assertEquals(entities[0].canonical_name, "Unnamed Figure");
+});
+
+Deno.test("C normalization still drops a character with no usable name at all", () => {
+  const extraction = { characters: [character({
+    name: "   ",
+    attributes: { character_field_observations: { fears: [{ value: "darkness", evidence: [{ quote: "dark", chunk_position: 2 }] }] } },
+  })] } as unknown as GeminiExtraction;
   assertEquals(normalizeEntities(extraction, chunkLookup, "sub-base-c-characters").length, 0);
+});
+
+Deno.test("C normalization prioritizes explicit observations over inferred ones", () => {
+  const extraction = { characters: [character({
+    attributes: {
+      first_name: "Leah",
+      last_name: "Frost",
+      hair_color: "black",
+      character_field_observations: {
+        hair_color: [
+          { value: "brown", evidence: [{ quote: "a brownish tint", chunk_position: 2 }], confidence: 0.4, inferred: true, inference_note: "impression" },
+          { value: "black", evidence: [{ quote: "her black hair", chunk_position: 2 }], confidence: 0.9, inferred: false },
+        ],
+      },
+    },
+  })] } as unknown as GeminiExtraction;
+  const [entity] = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  assertEquals(entity.field_observations?.hair_color?.[0].value, "black");
+  assertEquals(entity.field_inferred?.hair_color, false);
 });
 
 Deno.test("dynamic fields remain profile-scoped and legacy fields stay compatible", () => {
@@ -456,4 +487,149 @@ Deno.test("C path: two objects with the same name but conflicting field values a
   assertEquals(swords.length, 2);
   const properties = swords.map((sword) => sword.structured_fields.special_properties).sort();
   assertEquals(properties, ["בוערת באש", "קרה כקרח"]);
+});
+
+// ============================================================
+// Phase 1 regression tests: C prompt/adapter/normalization/age
+// ============================================================
+
+Deno.test("Phase 1: C prompt CHARACTER example uses attributes.first_name and character_field_observations, not flat fields", () => {
+  const prompt = buildExtractionPromptForProfile([{ position: 0, content: "x" }], "sub-base-c-characters");
+  const exampleStart = prompt.indexOf("Example - CHARACTER");
+  assert(exampleStart !== -1, "C prompt must contain a CHARACTER example");
+  const example = prompt.slice(exampleStart, exampleStart + 2000);
+  assert(example.includes('"first_name": "ליאו"'), "example must put first_name inside attributes");
+  assert(example.includes('"character_field_observations"'), "example must show character_field_observations");
+  assert(!/\n\s*"age":\s*25/.test(example), "example must not show a flat numeric age sibling of name");
+  assert(!example.includes('"field_evidence"'), "C CHARACTER example must not use top-level field_evidence");
+});
+
+Deno.test("Phase 1: C adapter recovers recognized flat character fields into attributes", () => {
+  const adapted = adaptSubBaseCSerialExtraction({
+    schema_version: "2",
+    characters: [{
+      name: "ליאו פרוסט",
+      type: "character",
+      attributes: { first_name: "ליאו", last_name: "פרוסט" },
+      hair_color: "שחור",
+      age: 25,
+      occupation: "ארכיונאי",
+      field_evidence: { hair_color: ["שערו השחור"] },
+    }],
+  });
+  const attributes = (adapted?.characters as Array<Record<string, unknown>>)[0].attributes as Record<string, unknown>;
+  assertEquals(attributes.hair_color, "שחור");
+  assertEquals(attributes.age, "25");
+  assertEquals(attributes.occupation, "ארכיונאי");
+  const observations = attributes.character_field_observations as Record<string, Array<Record<string, unknown>>>;
+  assertEquals(observations.hair_color[0].value, "שחור");
+});
+
+Deno.test("Phase 1: C adapter fills value-less observation entries from an available field value", () => {
+  const adapted = adaptSubBaseCSerialExtraction({
+    characters: [{
+      name: "ליאו",
+      attributes: {
+        first_name: "ליאו",
+        hair_color: "שחור",
+        character_field_observations: {
+          hair_color: [{ evidence: [{ quote: "שערו השחור", chunk_position: 0 }], confidence: 0.9, inferred: false }],
+        },
+      },
+    }],
+  });
+  const attributes = (adapted?.characters as Array<Record<string, unknown>>)[0].attributes as Record<string, unknown>;
+  const observations = attributes.character_field_observations as Record<string, Array<Record<string, unknown>>>;
+  assertEquals(observations.hair_color[0].value, "שחור");
+});
+
+Deno.test("Phase 1: C adapter maps compatibility field aliases onto canonical keys", () => {
+  const adapted = adaptSubBaseCSerialExtraction({
+    characters: [{
+      name: "ליאו",
+      attributes: { first_name: "ליאו" },
+      favorite_food: "עוגה",
+      dislikes: "דגים",
+      religion_and_beliefs: "חילוני",
+    }],
+  });
+  const attributes = (adapted?.characters as Array<Record<string, unknown>>)[0].attributes as Record<string, unknown>;
+  assertEquals(attributes.favorite_foods, "עוגה");
+  assertEquals(attributes.disliked_foods, "דגים");
+  assertEquals(attributes.beliefs, "חילוני");
+  assertEquals(attributes.favorite_food, undefined);
+  assertEquals(attributes.dislikes, undefined);
+  assertEquals(attributes.religion_and_beliefs, undefined);
+});
+
+Deno.test("Phase 1: C adapter drops relationships with a non-C relationship type and keeps valid ones", () => {
+  const adapted = adaptSubBaseCSerialExtraction({
+    characters: [
+      { name: "ליאו", attributes: { first_name: "ליאו" } },
+      { name: "מירה", attributes: { first_name: "מירה" } },
+    ],
+    relationships: [
+      { source: { name: "ליאו" }, target: { name: "מירה" }, type: "besties" },
+      { source: { name: "ליאו" }, target: { name: "מירה" }, type: "family" },
+      { source: { name: "ליאו" }, target: { name: "מירה" }, type: "Mentorship" },
+    ],
+  });
+  const relationships = adapted?.relationships as Array<Record<string, unknown>>;
+  assertEquals(relationships.length, 2);
+  assertEquals(relationships.map((relationship) => relationship.relationship_type).sort(), ["family", "mentorship"]);
+});
+
+Deno.test("Phase 1: Hebrew age lexicon covers ones, tens and combined ages", () => {
+  for (const [raw, expected] of [
+    ["בן שבע", "7"],
+    ["בת תשע", "9"],
+    ["בן עשר", "10"],
+    ["בן שלושים", "30"],
+    ["בת עשרים וחמש", "25"],
+    ["בן חמש ועשרים", "25"],
+    ["בן שבעים ושלוש", "73"],
+  ] as const) {
+    assertEquals(normalizeCharacterAge(raw), expected);
+  }
+  // Descriptive prose and ambiguous phrases must never become an age.
+  assertEquals(normalizeCharacterAge("נערה מהכפר שבע עשרה"), null);
+  assertEquals(normalizeCharacterAge("בן גיל העמידה"), null);
+  assertEquals(normalizeCharacterAge("בן מאה"), null);
+});
+
+Deno.test("Phase 1: nikud is stripped before Hebrew age parsing", () => {
+  // Vocalized "בן שש עשרה" (age 16) with nikud on every letter.
+  assertEquals(normalizeCharacterAge("בֶּן שֵׁשׁ עֶשְׂרֵה"), "16");
+});
+
+Deno.test("Phase 1: prompt->adapter->normalization round-trips a character in the documented C shape", () => {
+  const modelPayload = {
+    schema_version: "2",
+    characters: [{
+      name: "ליאו פרוסט",
+      type: "character",
+      aliases: ["ליאו"],
+      description: "קוסם קודר",
+      attributes: {
+        first_name: "ליאו",
+        last_name: "פרוסט",
+        age: "25",
+        hair_color: "שחור",
+        character_field_observations: {
+          first_name: [{ value: "ליאו", evidence: [{ quote: "אני ליאו פרוסט", chunk_position: 2 }], confidence: 0.98, inferred: false }],
+          age: [{ value: "25", evidence: [{ quote: "בן חמש ועשרים", chunk_position: 2 }], confidence: 0.9, inferred: false }],
+          hair_color: [{ value: "שחור", evidence: [{ quote: "שערו השחור", chunk_position: 2 }], confidence: 0.85, inferred: false }],
+        },
+      },
+      chunk_positions: [2],
+    }],
+  };
+  const adapted = adaptSubBaseCSerialExtraction(modelPayload) as unknown as GeminiExtraction;
+  const [entity] = normalizeEntities(adapted, chunkLookup, "sub-base-c-characters");
+  assertEquals(entity.canonical_name, "ליאו פרוסט");
+  assertEquals(entity.structured_fields.first_name, "ליאו");
+  assertEquals(entity.structured_fields.last_name, "פרוסט");
+  assertEquals(entity.structured_fields.age, "25");
+  assertEquals(entity.structured_fields.hair_color, "שחור");
+  assertEquals(entity.field_evidence?.hair_color?.[0].chunk_id, "chunk-2");
 });
