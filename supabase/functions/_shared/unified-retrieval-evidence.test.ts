@@ -148,3 +148,52 @@ Deno.test("integration: evidence for another branch's value never leaks into thi
   assertEquals(evidenceChunkIds.includes("chunk-leaked"), false);
   assertEquals(evidenceChunkIds, ["chunk-1"]);
 });
+
+Deno.test("Phase 4 integration: loadUnifiedRetrievalRows fetches document_chunks/document_versions and federates version/document/position onto the value's evidence", async () => {
+  const db: Record<string, Row[]> = {
+    knowledge_entities: [
+      {
+        id: "main-david", canonical_name: "David", entity_type: "character", entity_types: null,
+        description: null, attributes: {}, structured_fields: {}, layer: "main", branch_id: null,
+        review_status: "confirmed", version_id: "version-1", document_id: "doc-1", raw_extraction_id: null,
+        project_id: PROJECT_ID,
+      },
+    ],
+    knowledge_branch_entities: [],
+    knowledge_entity_values: [
+      {
+        id: "value-1", entity_id: "main-david", branch_id: null, field_path: "hair_color",
+        value_json: { value: "black" }, source_type: "ai", value_status: "active", raw_extraction_id: "extraction-3",
+      },
+    ],
+    knowledge_entity_value_evidence: [
+      {
+        id: "ev-1", value_id: "value-1", chunk_id: "chunk-9", quote: "his black hair",
+        position_start: 120, position_end: 135, page_number: 3, raw_extraction_id: "extraction-3",
+      },
+    ],
+    knowledge_entity_mentions: [{ id: "m-1", entity_id: "main-david", chunk_id: "chunk-9", page_number: 3, evidence: null }],
+    knowledge_entity_relationships: [],
+    knowledge_events: [],
+    document_chunks: [{ id: "chunk-9", version_id: "version-1", position: 4, page: 3 }],
+    document_versions: [{ id: "version-1", document_id: "doc-1" }],
+  };
+
+  const result = await runUnifiedRetrieval({
+    supabase: fakeSupabase(db),
+    projectId: PROJECT_ID,
+    branchId: null,
+    chunks: [],
+    rawScope: { projectId: PROJECT_ID },
+  });
+
+  const valueEvidence = result.candidates.find((c) => c.kind === "value")!.evidenceRecords[0];
+  assertEquals(valueEvidence.versionId, "version-1");
+  assertEquals(valueEvidence.documentId, "doc-1");
+  assertEquals(valueEvidence.metadata, { rawExtractionId: "extraction-3", chunkPosition: 4, page: 3 });
+
+  const entry = result.sourceRegistry.find((e) => e.candidateId === "main-david:hair_color")!;
+  assertEquals(entry.resolution, "chunk-grounded");
+  assertEquals(entry.sources[0].versionId, "version-1");
+  assertEquals(entry.sources[0].documentId, "doc-1");
+});

@@ -30,6 +30,7 @@ import type { QASource } from "../_shared/notebook-types.ts";
 import { runUnifiedRetrieval } from "../_shared/unified-retrieval.ts";
 import { selectCandidates } from "../_shared/selection.ts";
 import { appendStructuredKnowledgeContext, formatStructuredKnowledgeContext } from "../_shared/structured-context.ts";
+import { buildSourceRegistry, type CandidateSourceEntry } from "../_shared/source-registry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -763,6 +764,11 @@ Deno.serve(async (req) => {
     // `structuredKnowledgeBlock` simply stays "" and QA proceeds exactly as
     // it did before this integration.
     let structuredKnowledgeBlock = "";
+    // Phase 4: deterministic, evidence-backed source map for the structured
+    // candidates that actually reach the QA context. Reads only evidence already
+    // federated onto each candidate; never fabricates a source. Stays [] on any
+    // failure, exactly like `structuredKnowledgeBlock`.
+    let structuredSources: CandidateSourceEntry[] = [];
     try {
       const unified = await runUnifiedRetrieval({
         supabase,
@@ -781,6 +787,7 @@ Deno.serve(async (req) => {
       const structuredRanked = unified.ranked.filter((entry) => entry.candidate.kind !== "chunk");
       const selectedStructured = selectCandidates(structuredRanked, { maxTotal: 25 });
       structuredKnowledgeBlock = formatStructuredKnowledgeContext(selectedStructured);
+      structuredSources = buildSourceRegistry(selectedStructured);
       console.log(
         `[ask-question] Unified retrieval: ${unified.ranked.length} ranked candidates, ` +
           `${selectedStructured.length} structured candidates selected ` +
@@ -796,6 +803,7 @@ Deno.serve(async (req) => {
         unifiedError instanceof Error ? unifiedError.message : unifiedError,
       );
       structuredKnowledgeBlock = "";
+      structuredSources = [];
     }
 
     // --- No results: insufficient context ---
@@ -978,6 +986,7 @@ Deno.serve(async (req) => {
       model_used: geminiResult.modelUsed,
       latency_ms: latencyMs,
       finish_reason: finishReason,
+      structured_sources: structuredSources,
     });
 
     return new Response(

@@ -21,6 +21,7 @@ import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { runUnifiedRetrieval } from "./unified-retrieval.ts";
 import { selectCandidates } from "./selection.ts";
 import { appendStructuredKnowledgeContext, formatStructuredKnowledgeContext } from "./structured-context.ts";
+import { buildSourceRegistry, type CandidateSourceEntry } from "./source-registry.ts";
 import type { QASource } from "./notebook-types.ts";
 import type { RankedCandidate } from "./ranking.ts";
 import type { RetrievalCandidateWithEvidence } from "./evidence.ts";
@@ -85,7 +86,7 @@ async function runAskQuestionContextPipeline(
   supabase: any,
   branchId: string | null,
   chunks: QASource[],
-): Promise<{ context: string; selected: RankedCandidate<RetrievalCandidateWithEvidence>[] }> {
+): Promise<{ context: string; selected: RankedCandidate<RetrievalCandidateWithEvidence>[]; structuredSources: CandidateSourceEntry[] }> {
   const baseContext = chunks
     .map((s, i) => {
       const ref = s.chapterTitle
@@ -101,6 +102,7 @@ async function runAskQuestionContextPipeline(
 
   let selected: RankedCandidate<RetrievalCandidateWithEvidence>[] = [];
   let structuredKnowledgeBlock = "";
+  let structuredSources: CandidateSourceEntry[] = [];
   try {
     const unified = await runUnifiedRetrieval({
       supabase,
@@ -112,12 +114,14 @@ async function runAskQuestionContextPipeline(
     const structuredRanked = unified.ranked.filter((entry) => entry.candidate.kind !== "chunk");
     selected = selectCandidates(structuredRanked, { maxTotal: 25 });
     structuredKnowledgeBlock = formatStructuredKnowledgeContext(selected);
+    structuredSources = buildSourceRegistry(selected);
   } catch {
     selected = [];
     structuredKnowledgeBlock = "";
+    structuredSources = [];
   }
 
-  return { context: appendStructuredKnowledgeContext(baseContext, structuredKnowledgeBlock), selected };
+  return { context: appendStructuredKnowledgeContext(baseContext, structuredKnowledgeBlock), selected, structuredSources };
 }
 
 function entityRow(overrides: Partial<Row> = {}): Row {
@@ -329,7 +333,41 @@ Deno.test("Scenario 7b (unified retrieval failure): falls back to the exact old 
     chunkId: "chunk-only", content: "Nothing structured is known about this passage yet.",
     chapterNumber: 1, chapterTitle: null, page: null, position: 0, versionId: "version-1", score: 1,
   }];
-  const { context, selected } = await runAskQuestionContextPipeline(failingSupabase(), null, chunks);
+  const { context, selected, structuredSources } = await runAskQuestionContextPipeline(failingSupabase(), null, chunks);
   assertEquals(context, "[Chapter 1]\nNothing structured is known about this passage yet.");
   assertEquals(selected, []);
+  // Phase 4: the structured source registry also degrades to empty on failure — QA proceeds unchanged.
+  assertEquals(structuredSources, []);
+});
+
+Deno.test("Scenario 7c (Phase 4 source registry): a chunk-grounded value exposes an evidence-backed source entry without altering the rendered context", async () => {
+  const chunks: QASource[] = [{
+    chunkId: "chunk-9", content: "his black hair caught the light",
+    chapterNumber: 1, chapterTitle: null, page: 3, position: 0, versionId: "version-1", score: 0.8,
+  }];
+  const db = Object.assign(emptyDb(), {
+    knowledge_entities: [entityRow({ version_id: "version-1", document_id: "doc-1" })],
+    knowledge_entity_values: [{
+      id: "value-1", entity_id: "main-david", branch_id: null, field_path: "hair_color",
+      value_json: { value: "black" }, source_type: "ai", value_status: "active", raw_extraction_id: "extraction-3",
+    }],
+    knowledge_entity_value_evidence: [{
+      id: "ev-1", value_id: "value-1", chunk_id: "chunk-9", quote: "his black hair",
+      position_start: 120, position_end: 135, page_number: 3, raw_extraction_id: "extraction-3",
+    }],
+    document_chunks: [{ id: "chunk-9", version_id: "version-1", position: 4, page: 3 }],
+    document_versions: [{ id: "version-1", document_id: "doc-1" }],
+  });
+
+  const { context, structuredSources } = await runAskQuestionContextPipeline(fakeSupabase(db), null, chunks);
+
+  const valueEntry = structuredSources.find((e) => e.candidateId === "main-david:hair_color")!;
+  assertEquals(valueEntry.resolution, "chunk-grounded");
+  assertEquals(valueEntry.sources[0].chunkId, "chunk-9");
+  assertEquals(valueEntry.sources[0].versionId, "version-1");
+  assertEquals(valueEntry.sources[0].documentId, "doc-1");
+  // The rendered context still only carries the chunk passage + the plain structured line — no citation text injected.
+  assertEquals(context.includes("his black hair caught the light"), true);
+  assertEquals(context.includes(`- [Value] hair_color: {"value":"black"}`), true);
+  assertEquals(context.includes("version-1"), false);
 });

@@ -8,6 +8,7 @@ import type {
 } from "./branch-resolution.ts";
 import type { KnowledgeEntityMentionRecord, KnowledgeEntityValueEvidenceRecord } from "./evidence.ts";
 import type { QASource } from "./notebook-types.ts";
+import type { ChunkSourceRow } from "./evidence.ts";
 import { buildUnifiedRetrieval, EMPTY_UNIFIED_RETRIEVAL_ROWS, type UnifiedRetrievalRows } from "./unified-retrieval.ts";
 
 const PROJECT_ID = "project-1";
@@ -318,4 +319,127 @@ Deno.test("no cross-branch structured knowledge (entities, values, relationships
   assertEquals(result.candidates.filter((c) => c.kind === "value"), []);
   assertEquals(result.candidates.filter((c) => c.kind === "relationship").map((c) => c.branchId), [null]);
   assertEquals(result.candidates.filter((c) => c.kind === "event"), []);
+});
+
+// --- Phase 4: chunk-source federation + source registry -----------------------
+
+const federationValues: KnowledgeEntityValueRecord[] = [
+  { id: "value-1", entity_id: "main-david", branch_id: null, field_path: "hair_color", value_json: "black", source_type: "ai", value_status: "active" },
+];
+const federationValueEvidence: KnowledgeEntityValueEvidenceRecord[] = [
+  { id: "ev-1", value_id: "value-1", chunk_id: "chunk-9", position_start: 120, position_end: 135, raw_extraction_id: "extraction-3" },
+];
+const federationMentions: KnowledgeEntityMentionRecord[] = [
+  { id: "mention-1", entity_id: "main-david", chunk_id: "chunk-9" },
+];
+const federationChunkSources: ChunkSourceRow[] = [
+  { id: "chunk-9", version_id: "version-1", document_id: "doc-1", position: 4, page: 3 },
+];
+
+Deno.test("Phase 4: chunk-grounded value/mention evidence is federated to real version/document/position from chunkSources", () => {
+  const result = buildUnifiedRetrieval(
+    rows({
+      mainEntities: [mainDavid],
+      mentions: federationMentions,
+      entityValues: federationValues,
+      valueEvidence: federationValueEvidence,
+      chunkSources: federationChunkSources,
+    }),
+    { projectId: PROJECT_ID },
+  );
+
+  const valueCandidate = result.candidates.find((c) => c.kind === "value")!;
+  assertEquals(valueCandidate.evidenceRecords, [{
+    kind: "value-evidence", id: "ev-1", chunkId: "chunk-9",
+    versionId: "version-1", documentId: "doc-1",
+    startPosition: 120, endPosition: 135, fieldPath: "hair_color",
+    sourceType: "value_evidence", confidence: null,
+    metadata: { rawExtractionId: "extraction-3", chunkPosition: 4, page: 3 },
+  }]);
+
+  const mentionEvidence = result.candidates
+    .find((c) => c.kind === "entity")!
+    .evidenceRecords.find((e) => e.kind === "mention")!;
+  assertEquals(mentionEvidence.versionId, "version-1");
+  assertEquals(mentionEvidence.documentId, "doc-1");
+
+  // Source registry: the value candidate resolves as chunk-grounded, carrying the federated coordinates.
+  const valueEntry = result.sourceRegistry.find((e) => e.candidateId === "main-david:hair_color")!;
+  assertEquals(valueEntry.resolution, "chunk-grounded");
+  assertEquals(valueEntry.sources[0].versionId, "version-1");
+  assertEquals(valueEntry.sources[0].documentId, "doc-1");
+  assertEquals(result.sourceRegistry.length, result.ranked.length);
+});
+
+Deno.test("Phase 4 REGRESSION: with no chunkSources the candidate set, evidence, ranking order and scope are byte-identical to the pre-Phase-4 output", () => {
+  const baseRows: Partial<UnifiedRetrievalRows> = {
+    chunks: [sampleChunk],
+    mainEntities: [mainDavid],
+    branchEntities: [branchOnlyJonathan],
+    mentions: federationMentions,
+    entityValues: federationValues,
+    valueEvidence: federationValueEvidence,
+    mainRelationships: [approvedMainRel],
+  };
+  const withoutSources = buildUnifiedRetrieval(rows(baseRows), { projectId: PROJECT_ID });
+  const withEmptySources = buildUnifiedRetrieval(rows({ ...baseRows, chunkSources: [] }), { projectId: PROJECT_ID });
+
+  assertEquals(
+    withEmptySources.candidates.map((c) => ({ id: c.id, kind: c.kind, evidenceRecords: c.evidenceRecords })),
+    withoutSources.candidates.map((c) => ({ id: c.id, kind: c.kind, evidenceRecords: c.evidenceRecords })),
+  );
+  assertEquals(withEmptySources.ranked.map((r) => r.candidate.id), withoutSources.ranked.map((r) => r.candidate.id));
+  assertEquals(withEmptySources.effectiveEntities.map((e) => e.conceptualEntityId), ["main-david"]);
+
+  // The value evidence still has no fabricated version/document without a chunk source.
+  const valueEvidenceRecord = withEmptySources.candidates.find((c) => c.kind === "value")!.evidenceRecords[0];
+  assertEquals(valueEvidenceRecord.versionId, null);
+  assertEquals(valueEvidenceRecord.documentId, null);
+});
+
+Deno.test("Phase 4: a chunk id absent from chunkSources is never fabricated; a version with no document keeps documentId null", () => {
+  const notFabricated = buildUnifiedRetrieval(
+    rows({
+      mainEntities: [mainDavid],
+      entityValues: federationValues,
+      valueEvidence: federationValueEvidence,
+      chunkSources: [{ id: "some-other-chunk", version_id: "version-x", document_id: "doc-x", position: 1, page: 1 }],
+    }),
+    { projectId: PROJECT_ID },
+  );
+  const untouched = notFabricated.candidates.find((c) => c.kind === "value")!.evidenceRecords[0];
+  assertEquals(untouched.versionId, null);
+  assertEquals(untouched.documentId, null);
+
+  const versionOnly = buildUnifiedRetrieval(
+    rows({
+      mainEntities: [mainDavid],
+      entityValues: federationValues,
+      valueEvidence: federationValueEvidence,
+      chunkSources: [{ id: "chunk-9", version_id: "version-1", document_id: null, position: 2, page: null }],
+    }),
+    { projectId: PROJECT_ID },
+  );
+  const partial = versionOnly.candidates.find((c) => c.kind === "value")!.evidenceRecords[0];
+  assertEquals(partial.versionId, "version-1");
+  assertEquals(partial.documentId, null);
+  assertEquals(partial.metadata.chunkPosition, 2);
+});
+
+Deno.test("Phase 4: chunk-source federation does not change which candidates appear or the Main/Branch scope", () => {
+  const scopedRows: Partial<UnifiedRetrievalRows> = {
+    mainEntities: [mainDavid],
+    branchEntities: [otherBranchEntity],
+    entityValues: federationValues,
+    valueEvidence: federationValueEvidence,
+    chunkSources: federationChunkSources,
+  };
+  const branchResult = buildUnifiedRetrieval(rows(scopedRows), { projectId: PROJECT_ID, branchId: "branch-1" });
+  // branch-2's entity still never leaks into branch-1, federation or not.
+  assertEquals(branchResult.effectiveEntities.map((e) => e.conceptualEntityId), ["main-david"]);
+  assertEquals(
+    branchResult.candidates.map((c) => c.id).sort(),
+    buildUnifiedRetrieval(rows({ ...scopedRows, chunkSources: [] }), { projectId: PROJECT_ID, branchId: "branch-1" })
+      .candidates.map((c) => c.id).sort(),
+  );
 });

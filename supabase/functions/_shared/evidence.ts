@@ -286,7 +286,7 @@ export type ChunkSourceIndex = Map<string, {
   page: number | null;
 }>;
 
-interface ChunkSourceRow {
+export interface ChunkSourceRow {
   id: string;
   version_id?: string | null;
   document_id?: string | null;

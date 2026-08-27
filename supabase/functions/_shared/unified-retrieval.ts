@@ -47,11 +47,15 @@ import {
   attachEventEvidence,
   attachRelationshipEvidence,
   attachValueEvidence,
+  buildChunkSourceIndex,
+  federateEvidenceThroughChunks,
+  type ChunkSourceRow,
   type KnowledgeEntityMentionRecord,
   type KnowledgeEntityValueEvidenceRecord,
   type RetrievalCandidateWithEvidence,
 } from "./evidence.ts";
 import { rankCandidates, type RankedCandidate, type RankingWeights } from "./ranking.ts";
+import { buildSourceRegistry, type CandidateSourceEntry } from "./source-registry.ts";
 import type { QASource } from "./notebook-types.ts";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +74,14 @@ export interface UnifiedRetrievalRows {
   branchRelationships: BranchRelationshipRecord[];
   mainEvents: KnowledgeEventRecord[];
   branchEvents: KnowledgeEventRecord[];
+  /**
+   * Phase 4: `document_chunks`-shaped rows for the chunk ids referenced by the
+   * loaded mentions / value-evidence, used to federate real version / document /
+   * position onto chunk-grounded evidence (Phase 3's
+   * `federateEvidenceThroughChunks`). Optional and additive: when absent or
+   * empty, every candidate is byte-identical to the pre-Phase-4 output.
+   */
+  chunkSources?: ChunkSourceRow[];
 }
 
 export const EMPTY_UNIFIED_RETRIEVAL_ROWS: UnifiedRetrievalRows = {
@@ -84,6 +96,7 @@ export const EMPTY_UNIFIED_RETRIEVAL_ROWS: UnifiedRetrievalRows = {
   branchRelationships: [],
   mainEvents: [],
   branchEvents: [],
+  chunkSources: [],
 };
 
 export interface UnifiedRetrievalResult {
@@ -91,6 +104,13 @@ export interface UnifiedRetrievalResult {
   effectiveEntities: EffectiveEntity[];
   candidates: RetrievalCandidateWithEvidence[];
   ranked: RankedCandidate<RetrievalCandidateWithEvidence>[];
+  /**
+   * Phase 4: deterministic, evidence-backed source map for `ranked`, in ranked
+   * order. Reads only the evidence already attached to each candidate (after
+   * chunk federation); never re-resolves scope, re-ranks, or fabricates a
+   * source. `[]` when there are no ranked candidates.
+   */
+  sourceRegistry: CandidateSourceEntry[];
 }
 
 /**
@@ -162,9 +182,25 @@ export function buildUnifiedRetrieval(
     candidates.push(attachEventEvidence(eventCandidate, event));
   }
 
-  const ranked = rankCandidates(candidates, weights);
+  // Phase 4: federate real version / document / position onto chunk-grounded
+  // evidence, from the loaded `document_chunks` rows. `federateEvidenceThroughChunks`
+  // never fabricates or overwrites; when `chunkSources` is absent/empty the
+  // candidate list is returned untouched (identical reference), so ranking,
+  // selection, and every existing caller see the pre-Phase-4 output exactly.
+  const federatedCandidates = rows.chunkSources && rows.chunkSources.length > 0
+    ? (() => {
+      const chunkIndex = buildChunkSourceIndex(rows.chunkSources);
+      return candidates.map((candidate) => ({
+        ...candidate,
+        evidenceRecords: federateEvidenceThroughChunks(candidate.evidenceRecords, chunkIndex),
+      }));
+    })()
+    : candidates;
 
-  return { scope, effectiveEntities, candidates, ranked };
+  const ranked = rankCandidates(federatedCandidates, weights);
+  const sourceRegistry = buildSourceRegistry(ranked);
+
+  return { scope, effectiveEntities, candidates: federatedCandidates, ranked, sourceRegistry };
 }
 
 // ---------------------------------------------------------------------------
@@ -280,17 +316,67 @@ export async function loadUnifiedRetrievalRows(
       .in("value_id", valueIds)
     : { data: [], error: null };
 
+  const valueEvidence: KnowledgeEntityValueEvidenceRecord[] = valueEvidenceRes.data ?? [];
+  const mentions: KnowledgeEntityMentionRecord[] = mentionsRes.data ?? [];
+
+  // Phase 4: resolve chunk_id -> version / document / position for exactly the
+  // chunk ids referenced by the mentions and value-evidence just loaded (both
+  // already scoped to this project + selected branch). `document_chunks` carries
+  // version_id/position/page but not document_id, so document_id is resolved via
+  // a bounded `document_versions` lookup. Anything unresolved is simply left out
+  // — `federateEvidenceThroughChunks` never fabricates a missing coordinate.
+  const evidenceChunkIds = Array.from(new Set(
+    [
+      ...mentions.map((m) => m.chunk_id),
+      ...valueEvidence.map((e) => e.chunk_id),
+    ].filter((id): id is string => typeof id === "string" && id.length > 0),
+  ));
+
+  let chunkSources: ChunkSourceRow[] = [];
+  if (evidenceChunkIds.length > 0) {
+    const chunkRowsRes = await supabase
+      .from("document_chunks")
+      .select("id, version_id, position, page")
+      .in("id", evidenceChunkIds);
+    const chunkRows: Array<{ id: string; version_id: string | null; position: number | null; page: number | null }> =
+      chunkRowsRes.data ?? [];
+
+    const versionIds = Array.from(new Set(
+      chunkRows.map((c) => c.version_id).filter((id): id is string => typeof id === "string" && id.length > 0),
+    ));
+    let versionToDocument = new Map<string, string | null>();
+    if (versionIds.length > 0) {
+      const versionsRes = await supabase
+        .from("document_versions")
+        .select("id, document_id")
+        .in("id", versionIds);
+      versionToDocument = new Map(
+        ((versionsRes.data ?? []) as Array<{ id: string; document_id: string | null }>)
+          .map((v) => [v.id, v.document_id ?? null] as const),
+      );
+    }
+
+    chunkSources = chunkRows.map((c) => ({
+      id: c.id,
+      version_id: c.version_id ?? null,
+      document_id: c.version_id ? (versionToDocument.get(c.version_id) ?? null) : null,
+      position: typeof c.position === "number" ? c.position : null,
+      page: typeof c.page === "number" ? c.page : null,
+    }));
+  }
+
   return {
     mainEntities,
     branchEntities,
     branchOverlays,
     entityValues,
-    valueEvidence: valueEvidenceRes.data ?? [],
-    mentions: mentionsRes.data ?? [],
+    valueEvidence,
+    mentions,
     mainRelationships: mainRelRes.data ?? [],
     branchRelationships: branchRelRes.data ?? [],
     mainEvents: mainEventsRes.data ?? [],
     branchEvents: branchEventsRes.data ?? [],
+    chunkSources,
   };
 }
 
