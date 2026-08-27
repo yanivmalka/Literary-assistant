@@ -120,6 +120,31 @@ function contextTokens(record: EntityResolutionRecord): Set<string> {
   return result;
 }
 
+/**
+ * Character fields that genuinely discriminate identity. A mismatch on one of
+ * these between two same-named characters is real evidence they are different
+ * people, so it may veto a name match.
+ *
+ * Every other character field (height, hair_color, hair_length, eye_color,
+ * build, common_clothing, face_structure, scars, tattoos, personality prose,
+ * …) is descriptive and volatile across extraction runs: the same person is
+ * routinely rendered as a word on one run and a number on the next ("גבוה"
+ * vs "180"), or simply described in different words. A mismatch there must not
+ * block an otherwise strong identity/name match (e.g. "<first>" on one run
+ * resolving to "<first> <last>" on the next).
+ */
+const CHARACTER_IDENTITY_FIELDS = new Set<string>([
+  "age",
+  "gender",
+  "race",
+  "species",
+  "narrative_role",
+]);
+
+function isCharacterRecord(record: EntityResolutionRecord): boolean {
+  return record.entity_type === "character" || !!record.entity_types?.includes("character");
+}
+
 function fieldValues(record: EntityResolutionRecord): Map<string, string> {
   const result = new Map<string, string>();
   const addFields = (fields: Record<string, unknown> | null | undefined) => {
@@ -192,10 +217,16 @@ export function hasConflictingEntityContext(
     if (sharedDescriptionTokens.length === 0) return true;
   }
 
-  // Signal 2: Both have same field with different values → STRONG conflict
+  // Signal 2: Both have same field with different values → STRONG conflict.
+  // For a character/character pair, only genuinely identity-discriminating
+  // fields count here; a mismatch on a descriptive/volatile field (height,
+  // hair_color, clothing, …) is not evidence that two same-named characters
+  // are different people and must not veto the match.
   const leftFields = fieldValues(left);
   const rightFields = fieldValues(right);
+  const identityFieldsOnly = isCharacterRecord(left) && isCharacterRecord(right);
   for (const [key, leftValue] of leftFields) {
+    if (identityFieldsOnly && !CHARACTER_IDENTITY_FIELDS.has(key)) continue;
     const rightValue = rightFields.get(key);
     if (rightValue && leftValue !== rightValue) return true;
   }

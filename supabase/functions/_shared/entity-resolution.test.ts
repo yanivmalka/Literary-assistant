@@ -163,6 +163,92 @@ Deno.test("Phase 2: a conflicting explicit age blocks the short-to-full name mer
   assertEquals(resolved, null);
 });
 
+Deno.test("a differing height representation does not block the short-to-full name merge", () => {
+  // Run A saw only the given name and a descriptive height; run B saw the
+  // surname and a numeric height. Same person, two surface forms.
+  const runAEntity = {
+    id: "main-sara",
+    canonical_name: "שרה",
+    entity_type: "character",
+    aliases: [],
+    structured_fields: { first_name: "שרה", height: "גבוה" },
+    attributes: {},
+  };
+  const resolved = resolveEntityCandidate(
+    {
+      canonical_name: "שרה כהן",
+      entity_type: "character",
+      structured_fields: { first_name: "שרה", last_name: "כהן", height: "180" },
+      attributes: {},
+    },
+    [runAEntity],
+  );
+  assertEquals(resolved?.id, "main-sara");
+});
+
+Deno.test("a cosmetic field mismatch (hair_color) does not block the short-to-full name merge", () => {
+  const runAEntity = {
+    id: "main-sara",
+    canonical_name: "שרה",
+    entity_type: "character",
+    aliases: [],
+    structured_fields: { first_name: "שרה", hair_color: "חום", common_clothing: "גלימה" },
+    attributes: {},
+  };
+  const resolved = resolveEntityCandidate(
+    {
+      canonical_name: "שרה כהן",
+      entity_type: "character",
+      structured_fields: { first_name: "שרה", last_name: "כהן", hair_color: "שחור", common_clothing: "מעיל עור" },
+      attributes: {},
+    },
+    [runAEntity],
+  );
+  assertEquals(resolved?.id, "main-sara");
+});
+
+Deno.test("a conflicting gender still blocks the short-to-full name merge", () => {
+  const runAEntity = {
+    id: "main-sara",
+    canonical_name: "שרה",
+    entity_type: "character",
+    aliases: [],
+    structured_fields: { first_name: "שרה", gender: "female" },
+    attributes: {},
+  };
+  const resolved = resolveEntityCandidate(
+    {
+      canonical_name: "שרה כהן",
+      entity_type: "character",
+      structured_fields: { first_name: "שרה", last_name: "כהן", gender: "male" },
+      attributes: {},
+    },
+    [runAEntity],
+  );
+  assertEquals(resolved, null);
+});
+
+Deno.test("non-character entities still treat any field mismatch as conflicting", () => {
+  const runAEntity = {
+    id: "loc-harbor",
+    canonical_name: "Harbor",
+    entity_type: "location",
+    aliases: [],
+    structured_fields: { place_type: "port", region: "north" },
+    attributes: {},
+  };
+  const resolved = resolveEntityCandidate(
+    {
+      canonical_name: "Harbor District",
+      entity_type: "location",
+      structured_fields: { place_type: "port", region: "south" },
+      attributes: {},
+    },
+    [runAEntity],
+  );
+  assertEquals(resolved, null);
+});
+
 Deno.test("Phase 2: an existing alias resolves run B to the same Main character", () => {
   const runAEntity = {
     id: "main-leo",
