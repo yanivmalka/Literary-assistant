@@ -12,6 +12,58 @@ import type {
 } from "./field-provenance.ts";
 
 import { buildValueWritePlan } from "./value-write-plan.ts";
+import { ENTITY_TYPE_DEFINITIONS } from "./rules/extraction.ts";
+import { CHARACTER_FIELD_KEYS } from "./character-specialist.ts";
+
+/**
+ * The field paths `syncEntityValues` is permitted to write to
+ * `knowledge_entity_values` for a given entity type.
+ *
+ * Authoritative source (no new taxonomy is invented here):
+ * - the per-entity-type `fields` catalogue in `rules/extraction.ts`
+ * - for `character`, the static Sub-base C character field keys
+ *   (`CHARACTER_FIELD_KEYS`)
+ * - this project's active dynamic Character/Location field-definition keys,
+ *   passed in by the caller
+ * - `name` / `description`
+ *
+ * Returns `null` for entity types with no catalogue entry (e.g. `organization`,
+ * `event`); callers leave those unfiltered so persistence behaviour outside the
+ * catalogued types is unchanged.
+ */
+export function persistableFieldPaths(
+  entityType: string,
+  activeDynamicFieldKeys: readonly string[] = [],
+): Set<string> | null {
+  const catalogue = ENTITY_TYPE_DEFINITIONS[entityType]?.fields;
+  if (!catalogue) return null;
+  const allowed = new Set<string>(["name", "description"]);
+  for (const field of catalogue) allowed.add(field);
+  if (entityType === "character") {
+    for (const field of CHARACTER_FIELD_KEYS) allowed.add(field);
+  }
+  for (const field of activeDynamicFieldKeys) allowed.add(field);
+  return allowed;
+}
+
+/**
+ * Drops any field path not permitted for this entity type (see
+ * `persistableFieldPaths`). Pure: returns a new object. Entity types with no
+ * catalogue entry are returned as a shallow copy, unfiltered.
+ */
+export function filterToPersistableFields(
+  fieldValues: Record<string, unknown>,
+  entityType: string,
+  activeDynamicFieldKeys: readonly string[] = [],
+): Record<string, unknown> {
+  const allowed = persistableFieldPaths(entityType, activeDynamicFieldKeys);
+  if (!allowed) return { ...fieldValues };
+  const filtered: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fieldValues)) {
+    if (allowed.has(key)) filtered[key] = value;
+  }
+  return filtered;
+}
 
 export interface SyncValueRequest {
   supabase: SupabaseClient<any, "public", any>;
@@ -20,6 +72,13 @@ export interface SyncValueRequest {
   userId: string;
   rawExtractionId: string;
   branchId: string | null;
+  /**
+   * Active project-dynamic field-definition keys for this entity's type
+   * (Character or Location). Extends the static `rules/extraction.ts` catalogue
+   * used by `filterToPersistableFields`. Empty / omitted for types without a
+   * dynamic catalogue.
+   */
+  activeDynamicFieldKeys?: readonly string[];
   normalizedEntity: {
     canonical_name: string;
     entity_type: string;
@@ -46,7 +105,7 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
   evidenceSynced: number;
   errors: string[];
 }> {
-  const { supabase, entityId, projectId, userId, rawExtractionId, branchId, normalizedEntity } = req;
+  const { supabase, entityId, projectId, userId, rawExtractionId, branchId, normalizedEntity, activeDynamicFieldKeys = [] } = req;
   const errors: string[] = [];
   let valuesSynced = 0;
   let evidenceSynced = 0;
@@ -79,6 +138,19 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
       allFieldValues[field] = observations[0].value;
     }
   }
+
+  // Issue 14: restrict the AI write set to this entity type's authoritative field
+  // catalogue (`rules/extraction.ts`) plus the project's active dynamic field
+  // keys. Internal / relational attributes (`users`, `members`, `purpose`,
+  // `relationship_labels`, …) never become user-visible Knowledge values. This
+  // only narrows what AI writes — it issues no deletes and never touches an
+  // existing user-authored value; user-over-AI precedence and Main/Branch
+  // scoping are still enforced downstream by `buildValueWritePlan`.
+  const persistableFieldValues = filterToPersistableFields(
+    allFieldValues,
+    normalizedEntity.entity_type,
+    activeDynamicFieldKeys,
+  );
 
   const normalizeValue = (value: unknown): string => {
     if (typeof value === "string") return value.toLowerCase().trim();
@@ -152,7 +224,7 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
   };
 
   // Process each field that has a value.
-  for (const [fieldPath, value] of Object.entries(allFieldValues)) {
+  for (const [fieldPath, value] of Object.entries(persistableFieldValues)) {
     if (value === null || value === undefined) continue;
 
     const observations = observationsForField(fieldPath, value)

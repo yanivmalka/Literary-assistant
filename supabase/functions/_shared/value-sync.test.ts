@@ -50,7 +50,7 @@ Deno.test("Value sync: character age field should be preserved across extraction
   // The fix: track which fields were provided, don't skip provided fields
   const providedFields2 = Object.keys(characterFieldsEx2.structured_fields);
   const nullFields2 = providedFields2
-    .filter(field => characterFieldsEx2.structured_fields[field] === null);
+    .filter(field => (characterFieldsEx2.structured_fields as Record<string, unknown>)[field] === null);
   
   assertEquals(nullFields2.length, 2, "Extraction 2 provides 2 null fields (age, hair_color)");
   

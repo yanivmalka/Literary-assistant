@@ -8,6 +8,7 @@ import { getFieldGroupsForType, getFieldsForType, TEXTAREA_FIELDS } from '@/lib/
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import {
   CHARACTER_FIELD_CATALOG,
+  SUB_BASE_C_ADDABLE_FIELD_KEYS,
   DYNAMIC_CHARACTER_PROFILE,
   createCustomCharacterField,
   enableCharacterField,
@@ -162,8 +163,15 @@ export default function CharacterEditModal({
       : staticFields,
     [isDynamicProfile, staticFields, visibleDynamicFields],
   )
+  // Issue 15: only offer catalog fields the Sub-base C extraction pipeline
+  // actually supports. `narrative_impact` and the legacy compatibility keys are
+  // filtered out by normalization, so presenting them as new extraction fields
+  // would be misleading. Already-populated values for excluded keys still render
+  // (via `populatedDynamicKeys` -> `visibleDynamicFields`); they are only kept
+  // out of the "add field" picker.
   const availableDynamicFields = CHARACTER_FIELD_CATALOG.filter(
-    field => !visibleDynamicFields.some(selected => selected.field_key === field.field_key),
+    field => SUB_BASE_C_ADDABLE_FIELD_KEYS.has(field.field_key)
+      && !visibleDynamicFields.some(selected => selected.field_key === field.field_key),
   )
 
   useEffect(() => {

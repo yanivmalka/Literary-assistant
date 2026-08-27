@@ -98,6 +98,37 @@ export const CHARACTER_FIELD_CATALOG: readonly CharacterFieldDefinition[] = [
   characterField('religion_and_beliefs', 'דת ואמונה', 'long_text', 'זהות ופרטים אישיים', 108),
 ]
 
+/**
+ * The fixed Character field keys the Sub-base C extraction pipeline actually
+ * supports. This mirrors the server source of truth,
+ * `supabase/functions/_shared/character-specialist.ts` `CHARACTER_FIELD_KEYS`
+ * — keep the two in sync. `characterSchema.test.ts` asserts every key here
+ * resolves in `CHARACTER_FIELD_CATALOG`.
+ *
+ * Catalog entries NOT listed here (`narrative_impact`, the legacy compatibility
+ * keys, …) are still rendered when a character already holds a value for them,
+ * but must never be offered as new extraction fields — the pipeline filters them
+ * out, so presenting them as active would be misleading.
+ */
+export const SUB_BASE_C_FIXED_FIELD_KEYS: readonly string[] = [
+  'first_name', 'last_name', 'aliases', 'age', 'gender', 'sexual_orientation',
+  'pronouns', 'occupation', 'hobbies', 'favorite_foods', 'disliked_foods',
+  'religion', 'beliefs', 'race', 'height', 'narrative_role', 'status',
+  'personality_traits', 'strengths', 'weaknesses', 'fears', 'goals_and_desires',
+  'values_and_principles', 'habits_and_mannerisms', 'speech_style', 'secrets',
+  'emotional_state', 'eye_color', 'eye_shape', 'eye_size', 'skin_color',
+  'hair_color', 'hair_type', 'tattoos', 'scars', 'jewelry', 'body_type',
+  'facial_features', 'distinguishing_features', 'typical_clothing',
+  'posture_and_body_language', 'appearance_traits',
+]
+
+/** Catalog keys that may be edited when already populated but are not offered as new extraction fields. */
+export const SUB_BASE_C_ADDABLE_FIELD_KEYS: ReadonlySet<string> = new Set<string>([
+  ...SUB_BASE_C_FIXED_FIELD_KEYS,
+  'name',
+  'description',
+])
+
 export function normalizeCharacterGroupKey(groupKey: string): string {
   const normalized = groupKey.trim().replace(/\s+/g, ' ')
   const identityKeys = new Set([

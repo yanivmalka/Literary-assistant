@@ -469,6 +469,17 @@ export function normalizeEntities(
           ...entityUsers,
         ])]
       }
+      // Issue 10: keep an object's owners as an array on attributes.owners
+      // (mirroring attributes.users above) so buildObjectLinks can build the
+      // character -> object "owns" edges. structured_fields.owners keeps its
+      // existing joined-string representation for compatibility.
+      const entityOwners = normalizeStringList(entity.owners)
+      if (entityOwners.length > 0) {
+        existing.attributes.owners = [...new Set([
+          ...normalizeStringList(existing.attributes.owners),
+          ...entityOwners,
+        ])]
+      }
       if (entity.members && entity.members.length > 0) {
         existing.attributes.members = [...((existing.attributes.members as string[]) || []), ...entity.members];
       }
@@ -500,6 +511,11 @@ export function normalizeEntities(
       if (relationshipLabels.length > 0) mergeRelationshipLabels(attributes, relationshipLabels);
       const entityUsers = normalizeStringList(entity.users)
       if (entityUsers.length > 0) attributes.users = entityUsers;
+      // Issue 10: see the existing-entity branch above — owners is preserved as
+      // an array on attributes so ownership links can be built; structured_fields
+      // keeps its joined-string owners.
+      const entityOwners = normalizeStringList(entity.owners)
+      if (entityOwners.length > 0) attributes.owners = entityOwners;
       if (entity.members && entity.members.length > 0) attributes.members = entity.members;
       if (entity.purpose) attributes.purpose = entity.purpose;
 

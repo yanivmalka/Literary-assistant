@@ -69,7 +69,7 @@ import {
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
 import { buildAbilityLinks, buildObjectLinks, mergeAbilityLinkEntries } from "../_shared/ability-links.ts";
 import type { AbilityLinkEntity } from "../_shared/ability-links.ts";
-import { buildSkippedBatchResponse, getExtractionSkipReason, isSkipPerBatchAllowed } from "./skip-policy.ts";
+import { buildSkippedBatchResponse, getExtractionSkipReason, getUnusableResponseSkip, isSkipPerBatchAllowed } from "./skip-policy.ts";
 import {
   fingerprintShadowInput,
   persistShadowComparison,
@@ -1522,10 +1522,30 @@ Deno.serve(async (req) => {
       : [];
     console.log(`[extract-knowledge] Model: ${modelUsed}, Response length: ${responseText.length}, Candidates: ${candidates.length}`);
 
+    // Issue 11: for skip-eligible profiles with skip_per_batch, a *post-response*
+    // failure (empty / unparseable / schema-mismatch / invalid payload) isolates
+    // to this chunk window — the same isolation the transport-failure path
+    // already has — instead of failing the whole document extraction. The
+    // diagnostic each caller already logs is preserved; other profiles keep the
+    // existing errorResponse behaviour. Shadow runs never skip.
+    const skipUnusableOrError = (message: string, status: number, details?: string): Response => {
+      const unusableSkip = getUnusableResponseSkip(modelProfile, body.skip_per_batch === true);
+      if (unusableSkip && !shadowOnly) {
+        console.warn(
+          `[extract-knowledge] Skipping ${chunks.length} chunk(s) at offset ${offset}: ${unusableSkip} (${message})`,
+        );
+        return new Response(
+          JSON.stringify(buildSkippedBatchResponse(unusableSkip, chunks, offset, limit)),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      return errorResponse(message, status, details);
+    };
+
     if (!responseText) {
       const message = `Gemini returned an empty response from ${modelUsed}.`;
       console.error(`[extract-knowledge] ${message}`);
-      return errorResponse(
+      return skipUnusableOrError(
         message,
         502,
         `model=${modelUsed}, candidates=${candidates.length}`,
@@ -1548,7 +1568,7 @@ Deno.serve(async (req) => {
     if (!normalizedExtraction) {
       const message = "Gemini returned JSON that does not match the extraction schema.";
       console.error(`[extract-knowledge] ${message} offset=${offset}`);
-      return errorResponse(
+      return skipUnusableOrError(
         message,
         502,
         `model=${modelUsed}, response_length=${responseText.length}`,
@@ -1560,7 +1580,7 @@ Deno.serve(async (req) => {
     if (!extractionValidation.valid) {
       const message = "Gemini returned an invalid extraction payload.";
       console.error(`[extract-knowledge] ${message}`, extractionValidation.errors);
-      return errorResponse(
+      return skipUnusableOrError(
         message,
         502,
         extractionValidation.errors.slice(0, 20).join("; "),
@@ -1577,7 +1597,7 @@ Deno.serve(async (req) => {
     if (!storageSafeExtraction) {
       const message = "Extraction payload could not be serialized as JSON.";
       console.error(`[extract-knowledge] ${message} offset=${offset}`);
-      return errorResponse(message, 422);
+      return skipUnusableOrError(message, 422);
     }
 
     if (shadowOnly) {
@@ -2079,6 +2099,16 @@ Deno.serve(async (req) => {
       entityIdEntries.push({ entity, id: entityId });
       entitiesSaved++;
 
+      // Issue 14: the active project-dynamic field keys for this entity's type,
+      // so value persistence uses the same catalogue the prompt and normalization
+      // already use. Static per-type fields come from rules/extraction.ts inside
+      // syncEntityValues; only the project-specific dynamic keys are passed here.
+      const activeDynamicFieldKeys = entity.entity_type === "character"
+        ? projectCharacterFields.map((field) => field.field_key)
+        : entity.entity_type === "location"
+          ? projectPlaceFields.map((field) => field.field_key)
+          : [];
+
       // Sync canonical values to knowledge_entity_values (after entity is created)
       const { valuesSynced: valueCount, evidenceSynced: evidenceCount, errors: syncErrors } = await syncEntityValues({
         supabase,
@@ -2087,6 +2117,7 @@ Deno.serve(async (req) => {
         userId: body.user_id,
         rawExtractionId,
         branchId: targetBranchId,
+        activeDynamicFieldKeys,
         normalizedEntity: entity,
       });
       valuesSynced += valueCount;

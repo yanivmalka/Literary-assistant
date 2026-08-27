@@ -270,6 +270,7 @@
       "completedWithWarningsSummary": "Found {{entities}} entities and {{events}} events; {{chunks}} chunks were skipped",
       "safetySkipped": "Some chunks were skipped because Gemini blocked their content",
       "transientSkipped": "Some chunks were skipped after temporary Gemini failures",
+      "unusableSkipped": "Some chunks were skipped because Gemini returned an unusable response",
       "completedSummary": "Found {{entities}} entities and {{events}} events",
       "cancelled": "Entity extraction cancelled",
       "cancelledDescription": "Entities already extracted have been saved. You can restart at any time.",

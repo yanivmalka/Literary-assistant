@@ -237,3 +237,65 @@ Deno.test("Item1: two same-first-name candidates with no distinguishing context 
   );
   assertEquals(match, null);
 });
+
+// ============================================================
+// Issue 6 (Phase 5, verification only): a relationship whose endpoint did not
+// resolve is dropped observably (a diagnostic that names the endpoint, which the
+// Edge handler counts into relationships_dropped) — and a fully-resolved
+// relationship still persists with a single canonical endpoint pair.
+// ============================================================
+
+Deno.test("Issue 6: an unresolved endpoint yields a drop plan with a diagnostic that names the endpoint", () => {
+  const plan = planCharacterRelationshipWrite({
+    relationshipType: "friendship",
+    sourceName: "Leo",
+    targetName: "Mira",
+    sourceId: "entity-leo",
+    targetId: null,
+    modelProfile: "sub-base-c-characters",
+  });
+  assertEquals(plan.action, "drop");
+  assert(plan.diagnostic && plan.diagnostic.includes("target 'Mira'"));
+  assert(plan.diagnostic && !plan.diagnostic.includes("source"));
+  assertEquals(plan.source_entity_id, undefined);
+});
+
+Deno.test("Issue 6: both endpoints missing is still observable (names both, no silent loss)", () => {
+  const plan = planCharacterRelationshipWrite({
+    relationshipType: "family",
+    sourceName: "",
+    targetName: "Mira",
+    sourceId: null,
+    targetId: null,
+    modelProfile: "sub-base-c-characters",
+  });
+  assertEquals(plan.action, "drop");
+  assert(plan.diagnostic && plan.diagnostic.includes("source '(missing)'"));
+  assert(plan.diagnostic && plan.diagnostic.includes("target 'Mira'"));
+});
+
+Deno.test("Issue 6: a fully-resolved relationship still persists (no regression) with one canonical pair", () => {
+  const plan = planCharacterRelationshipWrite({
+    relationshipType: "friendship",
+    sourceName: "Mira",
+    targetName: "Leo",
+    sourceId: "id-mira",
+    targetId: "id-leo",
+    modelProfile: "sub-base-c-characters",
+  });
+  assertEquals(plan.action, "persist");
+  assertEquals(plan.diagnostic, null);
+  // symmetric type -> deterministic ordered pair regardless of input order
+  const reverse = planCharacterRelationshipWrite({
+    relationshipType: "friendship",
+    sourceName: "Leo",
+    targetName: "Mira",
+    sourceId: "id-leo",
+    targetId: "id-mira",
+    modelProfile: "sub-base-c-characters",
+  });
+  assertEquals(
+    [plan.source_entity_id, plan.target_entity_id],
+    [reverse.source_entity_id, reverse.target_entity_id],
+  );
+});

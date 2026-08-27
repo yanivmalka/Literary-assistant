@@ -270,6 +270,7 @@
       "completedWithWarningsSummary": "נמצאו {{entities}} ישויות ו-{{events}} אירועים; {{chunks}} קטעים דולגו",
       "safetySkipped": "חלק מהקטעים דולגו כי Gemini חסם את התוכן שלהם",
       "transientSkipped": "חלק מהקטעים דולגו לאחר כשלים זמניים ב-Gemini",
+      "unusableSkipped": "חלק מהקטעים דולגו כי Gemini החזיר תגובה שאינה שמישה",
       "completedSummary": "נמצאו {{entities}} ישויות ו-{{events}} אירועים",
       "cancelled": "חילוץ הישויות בוטל",
       "cancelledDescription": "הישויות שכבר חולצו נשמרו. ניתן להפעיל מחדש בכל עת.",

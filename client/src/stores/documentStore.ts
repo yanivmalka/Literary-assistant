@@ -33,7 +33,7 @@ export interface Document {
   latest_version: DocumentVersion | null
 }
 
-export type ExtractionSkipReason = 'safety_block' | 'transient_failure'
+export type ExtractionSkipReason = 'safety_block' | 'transient_failure' | 'unusable_response'
 
 export interface ExtractionWarning {
   reason: ExtractionSkipReason
@@ -607,7 +607,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           const skippedChunks = Array.isArray(data.skipped_chunks)
             ? data.skipped_chunks.filter((position: unknown): position is number => typeof position === 'number')
             : []
-          const skipReason = data.skip_reason === 'safety_block' || data.skip_reason === 'transient_failure'
+          const skipReason = data.skip_reason === 'safety_block'
+            || data.skip_reason === 'transient_failure'
+            || data.skip_reason === 'unusable_response'
             ? data.skip_reason as ExtractionSkipReason
             : null
 

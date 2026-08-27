@@ -3,6 +3,7 @@ import {
   deriveFieldProvenance,
   mergeFieldObservationMaps,
   normalizeFieldObservationMap,
+  prioritizeExplicitObservations,
 } from "./field-provenance.ts";
 
 const chunks = new Map<number, { id: string; page: number | null }>([
@@ -94,4 +95,28 @@ Deno.test("Phase 3: a lookup without version context yields byte-identical refer
   const reference = observations.eye_color[0].evidence[0];
   assertEquals(Object.prototype.hasOwnProperty.call(reference, "version_id"), false);
   assertEquals(Object.prototype.hasOwnProperty.call(reference, "document_id"), false);
+});
+
+// ============================================================
+// Issue 16 (Phase 5, verification only): a more reliable observation must win.
+// prioritizeExplicitObservations orders explicit before inferred, then by
+// descending confidence, then stable original order. syncEntityValues writes
+// observations[0] as the active value, so this ordering decides the winner.
+// ============================================================
+
+Deno.test("Issue 16: an explicit observation beats an inferred one even at lower confidence", () => {
+  const ordered = prioritizeExplicitObservations([
+    { value: "guess", evidence: [], confidence: 0.95, inferred: true, inference_note: "pattern" },
+    { value: "fact", evidence: [], confidence: 0.4, inferred: false, inference_note: null },
+  ]);
+  assertEquals(ordered.map((o) => o.value), ["fact", "guess"]);
+});
+
+Deno.test("Issue 16: among equally explicit observations, higher confidence wins; ties keep original order", () => {
+  const ordered = prioritizeExplicitObservations([
+    { value: "low", evidence: [], confidence: 0.6, inferred: false, inference_note: null },
+    { value: "high", evidence: [], confidence: 0.9, inferred: false, inference_note: null },
+    { value: "high-second", evidence: [], confidence: 0.9, inferred: false, inference_note: null },
+  ]);
+  assertEquals(ordered.map((o) => o.value), ["high", "high-second", "low"]);
 });

@@ -1,4 +1,4 @@
-export type ExtractionSkipReason = "safety_block" | "transient_failure";
+export type ExtractionSkipReason = "safety_block" | "transient_failure" | "unusable_response";
 
 interface GeminiFailureLike {
   status: number;
@@ -37,6 +37,24 @@ export function getExtractionSkipReason(
 
   if (failure.isRetriable) return "transient_failure";
   return null;
+}
+
+/**
+ * Whether a *post-response* failure (Gemini returned HTTP 200 but the payload is
+ * empty, unparseable, schema-mismatched, or otherwise unusable) should isolate
+ * to the current chunk window instead of failing the whole document extraction.
+ *
+ * This is a deterministic classification: unlike `getExtractionSkipReason` it
+ * does not inspect a transport-failure object — the caller has already
+ * determined the response is unusable. It only gates on profile eligibility and
+ * the opt-in `skip_per_batch` flag, exactly like the transport-failure path.
+ */
+export function getUnusableResponseSkip(
+  modelProfile: string,
+  skipPerBatch: boolean,
+): ExtractionSkipReason | null {
+  if (!SKIP_ELIGIBLE_PROFILES.has(modelProfile) || !skipPerBatch) return null;
+  return "unusable_response";
 }
 
 export function buildSkippedBatchResponse(

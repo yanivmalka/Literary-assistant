@@ -111,6 +111,7 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
   if (extractionDone && extractionWarnings.length > 0) {
     const hasSafetySkips = extractionWarnings.some((warning) => warning.reason === 'safety_block')
     const hasTransientSkips = extractionWarnings.some((warning) => warning.reason === 'transient_failure')
+    const hasUnusableSkips = extractionWarnings.some((warning) => warning.reason === 'unusable_response')
 
     return (
       <div className="border border-warning/30 bg-warning-soft rounded-lg p-4 space-y-2">
@@ -132,6 +133,7 @@ export default function ExtractionProgress({ documentId }: ExtractionProgressPro
         <div className="space-y-1 ps-7 text-xs text-warning">
           {hasSafetySkips && <p>{t('documents.extraction.safetySkipped')}</p>}
           {hasTransientSkips && <p>{t('documents.extraction.transientSkipped')}</p>}
+          {hasUnusableSkips && <p>{t('documents.extraction.unusableSkipped')}</p>}
         </div>
       </div>
     )

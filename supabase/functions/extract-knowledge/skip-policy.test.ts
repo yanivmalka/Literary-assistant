@@ -2,6 +2,7 @@ import { assertEquals, assert } from "https://deno.land/std@0.208.0/assert/mod.t
 import {
   buildSkippedBatchResponse,
   getExtractionSkipReason,
+  getUnusableResponseSkip,
   isSkipPerBatchAllowed,
   SKIP_ELIGIBLE_PROFILES,
 } from "./skip-policy.ts";
@@ -116,4 +117,45 @@ Deno.test("A1: profiles that are not skip-eligible keep aborting (skip_per_batch
     assertEquals(getExtractionSkipReason(profile, true, safetyFailure), null);
     assertEquals(getExtractionSkipReason(profile, true, transientFailure), null);
   }
+});
+
+// ============================================================
+// Issue 11 (Phase 5): post-response failures (empty / unparseable /
+// schema-mismatch / invalid payload) isolate to the current window for
+// skip-eligible profiles with skip_per_batch, instead of failing the run.
+// ============================================================
+
+Deno.test("Issue 11: getUnusableResponseSkip isolates the window only for skip-eligible profiles with skip_per_batch", () => {
+  assertEquals(getUnusableResponseSkip("sub-base-c-characters", true), "unusable_response");
+  assertEquals(getUnusableResponseSkip("sub-base-locations", true), "unusable_response");
+
+  // opt-in flag off -> not skippable
+  assertEquals(getUnusableResponseSkip("sub-base-c-characters", false), null);
+
+  // not skip-eligible -> never skippable, flag or no flag
+  assertEquals(getUnusableResponseSkip("sub-base-2", true), null);
+  assertEquals(getUnusableResponseSkip("sub-base", true), null);
+  assertEquals(getUnusableResponseSkip("totally-unknown", true), null);
+});
+
+Deno.test("Issue 11: an unusable-response skip response reports zeros and advances the offset like any skipped window", () => {
+  const chunks = [{ position: 4 }, { position: 5 }];
+  const response = buildSkippedBatchResponse("unusable_response", chunks, 4, 10);
+  assertEquals(response.skipped, true);
+  assertEquals(response.skip_reason, "unusable_response");
+  assertEquals(response.skipped_chunks, [4, 5]);
+  assertEquals(response.next_offset, 6);
+  assertEquals(response.done, true); // 2 chunks < limit 10 -> final window
+  assertEquals(response.summary.entities_saved, 0);
+  assertEquals(response.summary.chunks_skipped, 2);
+});
+
+Deno.test("Issue 11: the transport-failure classifier is unchanged by the new post-response path", () => {
+  // getExtractionSkipReason still only skips retriable/safety transport failures.
+  assertEquals(getExtractionSkipReason("sub-base-c-characters", true, transientFailure), "transient_failure");
+  assertEquals(getExtractionSkipReason("sub-base-c-characters", true, safetyFailure), "safety_block");
+  assertEquals(
+    getExtractionSkipReason("sub-base-c-characters", true, { status: 400, isRetriable: false, fallbackChain: [] }),
+    null,
+  );
 });

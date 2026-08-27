@@ -7,6 +7,8 @@
 // the current rule configuration.
 // ============================================
 
+import { CHARACTER_FIELD_KEYS } from "../character-specialist.ts";
+
 /**
  * Build the full extraction prompt for a set of text chunks.
  * This is the single function that produces the LLM instruction.
@@ -498,7 +500,7 @@ IDENTITY AND FIELD RULES:
 - Use the fixed field names supplied by the Model A contract. Project-defined fields may be returned only when listed in the selected project fields section.
 
 SUPPORTED FIXED FIELDS:
-first_name, last_name, aliases, age, gender, sexual_orientation, pronouns, occupation, hobbies, favorite_foods, disliked_foods, religion, beliefs, race, height, narrative_role, status, personality_traits, strengths, weaknesses, fears, goals_and_desires, values_and_principles, habits_and_mannerisms, speech_style, secrets, emotional_state, eye_color, eye_shape, eye_size, skin_color, hair_color, hair_type, tattoos, scars, jewelry, body_type, facial_features, distinguishing_features, typical_clothing, posture_and_body_language, appearance_traits.
+${CHARACTER_FIELD_KEYS.join(", ")}.
 
 GENDER AND APPEARANCE EXTRACTION:
 - For this C profile, the generic rule that asks for explicit gender is superseded by this rule: extract gender when the text gives an explicit statement OR consistent, unambiguous grammatical evidence such as gendered pronouns, adjectives, or verb forms referring to the named character.

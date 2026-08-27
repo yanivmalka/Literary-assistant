@@ -696,3 +696,96 @@ Deno.test("Phase 3: a lookup without version context leaves C field evidence byt
   assertEquals(Object.prototype.hasOwnProperty.call(reference ?? {}, "version_id"), false);
   assertEquals(Object.prototype.hasOwnProperty.call(reference ?? {}, "document_id"), false);
 });
+
+// ============================================================
+// Issue 10 (Phase 5): an object's owners keeps its array structure on
+// attributes.owners so character -> object ownership links can be built,
+// even when the model emits owners only as a top-level array.
+// ============================================================
+
+function objectLinkEntries(entities: ReturnType<typeof normalizeEntities>): AbilityLinkEntity[] {
+  return entities.map((entity, index) => ({
+    id: `entity-${index}`,
+    canonical_name: entity.canonical_name,
+    entity_type: entity.entity_type,
+    aliases: entity.aliases,
+    attributes: entity.attributes,
+  }));
+}
+
+Deno.test("Issue 10: a top-level owners array (no attributes.owners) is preserved as attributes.owners", () => {
+  const extraction = {
+    objects: [{
+      name: "חרב הזהב",
+      type: "object",
+      owners: ["Leah Frost"],
+      chunk_positions: [2],
+    }],
+  } as unknown as GeminiExtraction;
+
+  const [object] = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  assertEquals(object.attributes.owners, ["Leah Frost"]);
+  // structured_fields keeps its existing joined-string representation.
+  assertEquals(object.structured_fields.owners, "Leah Frost");
+});
+
+Deno.test("Issue 10: multiple owners are kept as an array, never joined, on attributes.owners", () => {
+  const extraction = {
+    objects: [{
+      name: "חרב הזהב",
+      type: "object",
+      owners: ["Leah Frost", "Ada North"],
+      chunk_positions: [2],
+    }],
+  } as unknown as GeminiExtraction;
+
+  const [object] = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  assertEquals(object.attributes.owners, ["Leah Frost", "Ada North"]);
+  assertEquals(object.structured_fields.owners, "Leah Frost, Ada North");
+});
+
+Deno.test("Issue 10: ownership link is built from a top-level owners array alone", () => {
+  const extraction = {
+    characters: [character()],
+    objects: [{ name: "חרב הזהב", type: "object", owners: ["Leah Frost"], chunk_positions: [2] }],
+  } as unknown as GeminiExtraction;
+
+  const entities = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  const links = buildObjectLinks(objectLinkEntries(entities));
+  assertEquals(links.length, 1);
+  assertEquals(links[0].objectName, "חרב הזהב");
+  assertEquals(links[0].relationshipType, "owns");
+});
+
+Deno.test("Issue 10: the same object repeated with the same owner keeps a deduped owners array (never a join)", () => {
+  const merged = normalizeEntities(
+    {
+      objects: [
+        { name: "חרב הזהב", type: "object", owners: ["Leah Frost"], chunk_positions: [2] },
+        { name: "חרב הזהב", type: "object", owners: ["Leah Frost"], chunk_positions: [2] },
+      ],
+    } as unknown as GeminiExtraction,
+    chunkLookup,
+    "sub-base-c-characters",
+  );
+  const object = merged.find((entity) => entity.entity_type === "object")!;
+  assertEquals(object.attributes.owners, ["Leah Frost"]);
+});
+
+Deno.test("Issue 10: an object arriving in a later batch links to a character from an earlier batch via attributes.owners", () => {
+  const earlierBatch = normalizeEntities(
+    { characters: [character()] } as unknown as GeminiExtraction,
+    chunkLookup,
+    "sub-base-c-characters",
+  );
+  const laterBatch = normalizeEntities(
+    { objects: [{ name: "חרב הזהב", type: "object", owners: ["Leah Frost"], chunk_positions: [2] }] } as unknown as GeminiExtraction,
+    chunkLookup,
+    "sub-base-c-characters",
+  );
+  const persisted = objectLinkEntries(earlierBatch).map((entry, i) => ({ ...entry, id: `persisted-${i}` }));
+  const current = objectLinkEntries(laterBatch).map((entry, i) => ({ ...entry, id: `current-${i}` }));
+  const links = buildObjectLinks([...persisted, ...current]);
+  assertEquals(links.length, 1);
+  assertEquals(links[0].relationshipType, "owns");
+});
