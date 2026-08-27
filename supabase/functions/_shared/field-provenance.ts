@@ -5,7 +5,21 @@ export interface FieldEvidenceReference {
   page: number | null;
   position_start: number | null;
   position_end: number | null;
+  /**
+   * Phase 3 (Evidence Federation): the source version / document the resolved
+   * chunk belongs to. Populated only when the chunk lookup carries it (the
+   * extraction batch is always a single known version); absent otherwise so no
+   * existing reference shape or equality changes.
+   */
+  version_id?: string | null;
+  document_id?: string | null;
 }
+
+/** Chunk metadata the provenance resolver needs, keyed by chunk position. */
+export type ChunkPositionLookup = Map<
+  number,
+  { id: string; page: number | null; version_id?: string | null; document_id?: string | null }
+>;
 
 export interface NormalizedFieldObservation {
   value: unknown;
@@ -31,13 +45,13 @@ function finiteNumber(value: unknown): number | null {
 
 function normalizeReference(
   value: unknown,
-  chunkLookup: Map<number, { id: string; page: number | null }>,
+  chunkLookup: ChunkPositionLookup,
 ): FieldEvidenceReference | null {
   if (!isRecord(value)) return null;
   const position = Number.isInteger(value.chunk_position) ? value.chunk_position as number : null;
   const chunk = position === null ? undefined : chunkLookup.get(position);
   const page = finiteNumber(value.page) ?? chunk?.page ?? null;
-  return {
+  const reference: FieldEvidenceReference = {
     quote: typeof value.quote === "string" && value.quote.trim() ? value.quote.trim() : null,
     chunk_position: position,
     chunk_id: chunk?.id ?? null,
@@ -45,11 +59,16 @@ function normalizeReference(
     position_start: finiteNumber(value.start_offset),
     position_end: finiteNumber(value.end_offset),
   };
+  // Phase 3: carry the source version/document forward only when the lookup
+  // provides it, so references built without that context are byte-identical.
+  if (chunk?.version_id != null) reference.version_id = chunk.version_id;
+  if (chunk?.document_id != null) reference.document_id = chunk.document_id;
+  return reference;
 }
 
 function normalizeEvidence(
   value: unknown,
-  chunkLookup: Map<number, { id: string; page: number | null }>,
+  chunkLookup: ChunkPositionLookup,
 ): FieldEvidenceReference[] {
   if (!Array.isArray(value)) return [];
   const references = value
@@ -68,7 +87,7 @@ function normalizeEvidence(
 
 function normalizeObservation(
   value: unknown,
-  chunkLookup: Map<number, { id: string; page: number | null }>,
+  chunkLookup: ChunkPositionLookup,
 ): NormalizedFieldObservation | null {
   if (!isRecord(value) || !("value" in value)) return null;
   const evidence = normalizeEvidence(value.evidence, chunkLookup);
@@ -95,7 +114,7 @@ function observationKey(observation: NormalizedFieldObservation): string {
 
 export function normalizeFieldObservationMap(
   value: unknown,
-  chunkLookup: Map<number, { id: string; page: number | null }>,
+  chunkLookup: ChunkPositionLookup,
 ): FieldObservationMap {
   if (!isRecord(value)) return {};
   const result: FieldObservationMap = {};

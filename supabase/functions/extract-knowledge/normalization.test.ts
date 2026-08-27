@@ -633,3 +633,66 @@ Deno.test("Phase 1: prompt->adapter->normalization round-trips a character in th
   assertEquals(entity.structured_fields.hair_color, "שחור");
   assertEquals(entity.field_evidence?.hair_color?.[0].chunk_id, "chunk-2");
 });
+
+// ============================================================
+// Phase 3 (Evidence Federation): the C extraction path preserves
+// version/document on each field's evidence, alongside chunk id.
+// ============================================================
+
+Deno.test("Phase 3: C normalization preserves version_id/document_id on field evidence", () => {
+  const versionedLookup = new Map<number, { id: string; page: number | null; version_id?: string | null; document_id?: string | null }>([
+    [2, { id: "chunk-2", page: 7, version_id: "version-501", document_id: "doc-9" }],
+  ]);
+  const extraction = {
+    characters: [{
+      name: "ליאו פרוסט",
+      type: "character",
+      attributes: {
+        first_name: "ליאו",
+        last_name: "פרוסט",
+        hair_color: "שחור",
+        character_field_observations: {
+          hair_color: [{
+            value: "שחור",
+            evidence: [{ quote: "שערו השחור", chunk_position: 2 }],
+            confidence: 0.85,
+            inferred: false,
+          }],
+        },
+      },
+      chunk_positions: [2],
+    }],
+  } as unknown as GeminiExtraction;
+
+  const [entity] = normalizeEntities(extraction, versionedLookup, "sub-base-c-characters");
+  const reference = entity.field_evidence?.hair_color?.[0];
+  assertEquals(reference?.chunk_id, "chunk-2");
+  assertEquals(reference?.chunk_position, 2);
+  assertEquals(reference?.version_id, "version-501");
+  assertEquals(reference?.document_id, "doc-9");
+  // The observation carries the same resolved reference.
+  assertEquals(entity.field_observations?.hair_color?.[0].evidence[0].version_id, "version-501");
+});
+
+Deno.test("Phase 3: a lookup without version context leaves C field evidence byte-identical (no regression)", () => {
+  const extraction = {
+    characters: [{
+      name: "ליאו פרוסט",
+      type: "character",
+      attributes: {
+        first_name: "ליאו",
+        hair_color: "שחור",
+        character_field_observations: {
+          hair_color: [{ value: "שחור", evidence: [{ quote: "שערו השחור", chunk_position: 2 }], confidence: 0.85, inferred: false }],
+        },
+      },
+      chunk_positions: [2],
+    }],
+  } as unknown as GeminiExtraction;
+
+  const [entity] = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
+  const reference = entity.field_evidence?.hair_color?.[0];
+  assertEquals(reference?.chunk_id, "chunk-2");
+  assertEquals(Object.prototype.hasOwnProperty.call(reference ?? {}, "version_id"), false);
+  assertEquals(Object.prototype.hasOwnProperty.call(reference ?? {}, "document_id"), false);
+});

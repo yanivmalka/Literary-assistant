@@ -51,6 +51,7 @@ import type {
 } from "./branch-resolution.ts";
 import { findWinningValueRecord } from "./retrieval-candidate.ts";
 import type { RetrievalCandidate } from "./retrieval-candidate.ts";
+import type { FieldEvidenceReference } from "./field-provenance.ts";
 
 // ---------------------------------------------------------------------------
 // Unified evidence shape
@@ -262,6 +263,115 @@ export function attachEventEvidence(
     sourceType: "event",
   });
   return { ...candidate, evidenceRecords };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 (this plan): federate evidence through the chunk -> version chain
+// ---------------------------------------------------------------------------
+//
+// `resolveValueEvidence` / `resolveMentionEvidence` above stop at `chunkId`
+// (their source tables have no version/document column, and this module never
+// queries a DB). The helpers below are the *shared* step that resolves
+// `chunkId -> { versionId, documentId, position }` from an already-loaded
+// `document_chunks` index, and that normalizes the extraction-side
+// `FieldEvidenceReference` into the same `UnifiedEvidence` shape. They are
+// additive and opt-in: no existing resolver, `attach*` helper, retrieval
+// caller, persistence path, schema, or QA prompt is touched.
+
+/** chunkId -> the source coordinates that only `document_chunks` carries. */
+export type ChunkSourceIndex = Map<string, {
+  versionId: string | null;
+  documentId: string | null;
+  position: number | null;
+  page: number | null;
+}>;
+
+interface ChunkSourceRow {
+  id: string;
+  version_id?: string | null;
+  document_id?: string | null;
+  position?: number | null;
+  page?: number | null;
+}
+
+/** Builds a `ChunkSourceIndex` from `document_chunks`-shaped rows. Rows without a real `id` are skipped. */
+export function buildChunkSourceIndex(chunks: ChunkSourceRow[]): ChunkSourceIndex {
+  const index: ChunkSourceIndex = new Map();
+  for (const chunk of chunks) {
+    if (typeof chunk.id !== "string" || chunk.id.length === 0) continue;
+    index.set(chunk.id, {
+      versionId: chunk.version_id ?? null,
+      documentId: chunk.document_id ?? null,
+      position: typeof chunk.position === "number" ? chunk.position : null,
+      page: typeof chunk.page === "number" ? chunk.page : null,
+    });
+  }
+  return index;
+}
+
+/**
+ * Fills `versionId` / `documentId` (and `metadata.chunkPosition` / `metadata.page`
+ * when absent) for evidence records whose `chunkId` resolves in `chunkIndex`.
+ * Records with no `chunkId`, or a `chunkId` not in the index, are returned
+ * unchanged — no fabricated version, document, or position. Pure: returns new
+ * objects, never mutates the inputs.
+ */
+export function federateEvidenceThroughChunks(
+  records: UnifiedEvidence[],
+  chunkIndex: ChunkSourceIndex,
+): UnifiedEvidence[] {
+  return records.map((record) => {
+    if (record.chunkId === null) return record;
+    const source = chunkIndex.get(record.chunkId);
+    if (!source) return record;
+    const metadata: Record<string, unknown> = { ...record.metadata };
+    if (metadata.chunkPosition === undefined && source.position !== null) {
+      metadata.chunkPosition = source.position;
+    }
+    if (metadata.page === undefined && source.page !== null) {
+      metadata.page = source.page;
+    }
+    return {
+      ...record,
+      versionId: record.versionId ?? source.versionId,
+      documentId: record.documentId ?? source.documentId,
+      metadata,
+    };
+  });
+}
+
+/**
+ * Normalizes extraction-side `FieldEvidenceReference[]` (produced by
+ * `field-provenance.ts` for one structured field) into the shared
+ * `UnifiedEvidence` shape, so the extraction and retrieval sides speak one
+ * evidence representation. `version_id` / `document_id` are carried through when
+ * the reference already resolved them (Phase 3 threads the batch version into
+ * the chunk lookup); otherwise a later `federateEvidenceThroughChunks` pass can
+ * still fill them from a `ChunkSourceIndex`.
+ */
+export function fieldEvidenceReferencesToUnifiedEvidence(
+  fieldPath: string,
+  references: FieldEvidenceReference[],
+): UnifiedEvidence[] {
+  return references.map((reference, position) => {
+    const metadata: Record<string, unknown> = {};
+    if (reference.chunk_position !== null) metadata.chunkPosition = reference.chunk_position;
+    if (reference.page !== null && reference.page !== undefined) metadata.page = reference.page;
+    if (typeof reference.quote === "string" && reference.quote.length > 0) metadata.quote = reference.quote;
+    return {
+      kind: "value-evidence",
+      id: reference.chunk_id ?? `${fieldPath}:${reference.chunk_position ?? "none"}:${position}`,
+      chunkId: reference.chunk_id ?? null,
+      versionId: reference.version_id ?? null,
+      documentId: reference.document_id ?? null,
+      startPosition: reference.position_start,
+      endPosition: reference.position_end,
+      fieldPath,
+      sourceType: "value_evidence",
+      confidence: null,
+      metadata,
+    };
+  });
 }
 
 // BranchId re-export kept for callers that only need this module.

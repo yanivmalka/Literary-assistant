@@ -36,6 +36,7 @@ import { shouldFilterEntity } from "../_shared/rules/filtering.ts";
 import { isPrefixMatch, scoreConsolidation, CONSOLIDATION_THRESHOLDS } from "../_shared/rules/consolidation.ts";
 import { syncEntityValues } from "../_shared/value-sync.ts";
 import type {
+  ChunkPositionLookup,
   FieldConfidenceMap,
   FieldEvidenceMap,
   FieldInferenceMap,
@@ -1411,10 +1412,18 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build chunk lookup map for mentions persistence
-    const chunkLookup = new Map<number, { id: string; page: number | null }>();
+    // Build chunk lookup map for mentions persistence. Every chunk in this batch
+    // belongs to body.version_id / body.document_id (the fetch is scoped to that
+    // version), so the per-field evidence resolver can carry the source version
+    // and document forward instead of losing them (Phase 3: Evidence Federation).
+    const chunkLookup: ChunkPositionLookup = new Map();
     for (const c of chunks) {
-      chunkLookup.set(c.position, { id: c.id, page: c.page });
+      chunkLookup.set(c.position, {
+        id: c.id,
+        page: c.page,
+        version_id: body.version_id,
+        document_id: body.document_id,
+      });
     }
 
     const chunkData = chunks.map((c: { position: number; content: string; page: number | null }) => ({
