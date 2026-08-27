@@ -206,20 +206,45 @@ export const useQAStore = create<QAState>((set, get) => ({
   loadConversation: async (projectId) => {
     set({ loading: true, error: null })
     try {
-      const { data: conversation, error: conversationError } = await supabase
+      // Consider only non-archived conversations for this project, then pick the
+      // one whose most recent message is newest. Selecting by the most recent
+      // message (rather than notebook_conversations.updated_at) structurally
+      // skips message-less conversation rows — e.g. orphan rows left behind when
+      // a QA turn failed to persist after its conversation row was created — so
+      // a fresh question after a deletion starts a new conversation instead of
+      // silently resuming a stale empty one.
+      const { data: candidateConversations, error: conversationError } = await supabase
         .from('notebook_conversations')
         .select('id')
         .eq('project_id', projectId)
         .is('archived_at', null)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
 
       if (conversationError) throw conversationError
-      if (!conversation?.id) {
+
+      const candidateIds = (candidateConversations ?? [])
+        .map((row: { id: string }) => row.id)
+        .filter(Boolean)
+
+      if (candidateIds.length === 0) {
         set({ conversationId: null, messages: [], loading: false })
         return
       }
+
+      const { data: latestMessage, error: latestMessageError } = await supabase
+        .from('notebook_messages')
+        .select('conversation_id')
+        .in('conversation_id', candidateIds)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (latestMessageError) throw latestMessageError
+      if (!latestMessage?.conversation_id) {
+        set({ conversationId: null, messages: [], loading: false })
+        return
+      }
+
+      const conversation = { id: latestMessage.conversation_id as string }
 
       const { data: storedMessages, error: messagesError } = await supabase
         .from('notebook_messages')
