@@ -5,7 +5,12 @@
 // `knowledge_entity_values`. User-over-AI precedence and Main/Branch scoping are
 // unchanged: filtering only narrows the AI write set and issues no deletes.
 
-import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import {
+  assert,
+  assertArrayIncludes,
+  assertEquals,
+  assertExists,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   filterToPersistableFields,
   persistableFieldPaths,
@@ -133,6 +138,7 @@ function makeFakeSupabase(seedExistingValues: Row[]) {
             if (f.column === "value_status") return row.value_status === f.value;
             if (f.column === "entity_id") return row.entity_id === f.value;
             if (f.column === "field_path") return row.field_path === f.value;
+            if (f.column === "source_type") return row.source_type === f.value;
             if (f.column === "branch_id") return (row.branch_id ?? null) === (f.value ?? null);
             return true;
           })
@@ -270,7 +276,7 @@ Deno.test("Issue 10 x 14: an object with a string structured_fields.owners and a
   assertEquals(inserted.includes("relationship_labels"), false);
 });
 
-Deno.test("syncEntityValues: Branch scope still filters existing-value lookups by branch_id (unchanged)", async () => {
+Deno.test("Issue 2: Branch AI supersede lookups and inserts stay scoped to the current branch", async () => {
   const { supabase, ops } = makeFakeSupabase([]);
   await syncEntityValues({
     // deno-lint-ignore no-explicit-any
@@ -283,16 +289,122 @@ Deno.test("syncEntityValues: Branch scope still filters existing-value lookups b
     normalizedEntity: characterEntity(),
   });
 
-  const selects = ops.filter((o) => o.table === "knowledge_entity_values" && o.kind === "select");
-  assert(selects.length > 0);
-  for (const select of selects) {
+  // The existing-value lookup that drives AI supersession is branch-scoped and
+  // never widened to Main.
+  const supersedeLookups = ops.filter((o) =>
+    o.table === "knowledge_entity_values" && o.kind === "select" &&
+    !o.filters.some((f) => f.column === "source_type")
+  );
+  assert(supersedeLookups.length > 0);
+  for (const select of supersedeLookups) {
     assertEquals(
       select.filters.some((f) => f.column === "branch_id" && f.type === "eq" && f.value === "branch-9"),
       true,
     );
+    assertEquals(select.filters.some((f) => f.column === "branch_id" && f.type === "is"), false);
   }
   // Every AI insert is scoped to the branch too.
   for (const insert of ops.filter((o) => o.table === "knowledge_entity_values" && o.kind === "insert")) {
     assertEquals(insert.payload!.branch_id, "branch-9");
+  }
+});
+
+Deno.test("Issue 2: a Main user value (branch_id IS NULL) is honored during Branch extraction and blocks only that field", async () => {
+  const { supabase, ops } = makeFakeSupabase([
+    {
+      id: "main-user-age",
+      entity_id: "entity-1",
+      field_path: "age",
+      branch_id: null,
+      source_type: "user",
+      value_status: "active",
+    },
+  ]);
+  await syncEntityValues({
+    // deno-lint-ignore no-explicit-any
+    supabase: supabase as any,
+    entityId: "entity-1",
+    projectId: "project-1",
+    userId: "user-1",
+    rawExtractionId: "raw-1",
+    branchId: "branch-9",
+    normalizedEntity: characterEntity({
+      structured_fields: { first_name: "Leah", age: "30" },
+    }),
+  });
+
+  // A dedicated Main user-provenance lookup ran for the protected field.
+  const mainUserLookup = ops.find((o) =>
+    o.table === "knowledge_entity_values" && o.kind === "select" &&
+    o.filters.some((f) => f.column === "source_type" && f.value === "user") &&
+    o.filters.some((f) => f.column === "branch_id" && f.type === "is") &&
+    o.filters.some((f) => f.column === "field_path" && f.value === "age")
+  );
+  assertExists(mainUserLookup);
+
+  // The Main-user-owned field is not (re)written by the Branch AI extraction...
+  const inserted = ops
+    .filter((o) => o.table === "knowledge_entity_values" && o.kind === "insert")
+    .map((o) => o.payload!.field_path);
+  assertEquals(inserted.includes("age"), false);
+  // ...while the other fields still persist to the branch.
+  assertArrayIncludes(inserted, ["first_name", "name", "description"]);
+  for (const insert of ops.filter((o) => o.table === "knowledge_entity_values" && o.kind === "insert")) {
+    assertEquals(insert.payload!.branch_id, "branch-9");
+  }
+  // The Main row itself is never updated or deleted.
+  assertEquals(ops.some((o) => o.kind === "update"), false);
+});
+
+Deno.test("Issue 2: branch-local user provenance is still honored (unchanged)", async () => {
+  const { supabase, ops } = makeFakeSupabase([
+    {
+      id: "branch-user-age",
+      entity_id: "entity-1",
+      field_path: "age",
+      branch_id: "branch-9",
+      source_type: "user",
+      value_status: "active",
+    },
+  ]);
+  await syncEntityValues({
+    // deno-lint-ignore no-explicit-any
+    supabase: supabase as any,
+    entityId: "entity-1",
+    projectId: "project-1",
+    userId: "user-1",
+    rawExtractionId: "raw-1",
+    branchId: "branch-9",
+    normalizedEntity: characterEntity({
+      structured_fields: { first_name: "Leah", age: "30" },
+    }),
+  });
+
+  const inserted = ops
+    .filter((o) => o.table === "knowledge_entity_values" && o.kind === "insert")
+    .map((o) => o.payload!.field_path);
+  assertEquals(inserted.includes("age"), false);
+  assertEquals(ops.some((o) => o.kind === "update"), false);
+});
+
+Deno.test("Issue 2: Main-mode existing-value lookups stay branch_id IS NULL with no Main-user guard query", async () => {
+  const { supabase, ops } = makeFakeSupabase([]);
+  await syncEntityValues({
+    // deno-lint-ignore no-explicit-any
+    supabase: supabase as any,
+    entityId: "entity-1",
+    projectId: "project-1",
+    userId: "user-1",
+    rawExtractionId: "raw-1",
+    branchId: null,
+    normalizedEntity: characterEntity(),
+  });
+
+  const selects = ops.filter((o) => o.table === "knowledge_entity_values" && o.kind === "select");
+  assert(selects.length > 0);
+  for (const select of selects) {
+    assertEquals(select.filters.some((f) => f.column === "branch_id" && f.type === "is"), true);
+    // Main mode issues no extra source_type-scoped guard query.
+    assertEquals(select.filters.some((f) => f.column === "source_type"), false);
   }
 });

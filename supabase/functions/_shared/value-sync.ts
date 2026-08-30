@@ -248,8 +248,30 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
       errors.push(`Failed to check existing value for ${fieldPath}: ${checkError.message}`);
       continue;
     }
+
+    // Issue 2: in Branch context a user-authored value on Main (branch_id IS
+    // NULL) also makes this field user-owned. Detect it with a dedicated
+    // lookup so AI supersession stays scoped to the current Branch and never
+    // touches a Main row.
+    let mainUserOwned = false;
+    if (branchId) {
+      const { data: mainUserValues, error: mainUserError } = await supabase
+        .from("knowledge_entity_values")
+        .select("id")
+        .eq("entity_id", entityId)
+        .eq("field_path", fieldPath)
+        .eq("value_status", "active")
+        .eq("source_type", "user")
+        .is("branch_id", null);
+      if (mainUserError) {
+        errors.push(`Failed to check Main user value for ${fieldPath}: ${mainUserError.message}`);
+        continue;
+      }
+      mainUserOwned = (mainUserValues || []).length > 0;
+    }
+
     const plan = buildValueWritePlan(existingValues || [], observations);
-    if (plan.skip) continue;
+    if (plan.skip || mainUserOwned) continue;
 
     for (const valueId of plan.supersede_ids) {
       await supabase

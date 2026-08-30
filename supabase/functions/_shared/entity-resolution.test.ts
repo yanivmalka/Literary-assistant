@@ -1,6 +1,7 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   applyEntityOverrides,
+  hasConflictingEntityContext,
   resolveEntityCandidate,
   resolveExtractionCandidate,
 } from "./entity-resolution.ts";
@@ -268,4 +269,89 @@ Deno.test("Phase 2: an existing alias resolves run B to the same Main character"
     [runAEntity],
   );
   assertEquals(resolved?.id, "main-leo");
+});
+
+// ============================================================
+// Issue 3: character `age` is canonicalized before an identity-conflict check
+// so semantically equal ages (numbers, "17 שנה", Hebrew number words) never
+// manufacture a duplicate, while genuinely different ages still conflict.
+// ============================================================
+
+const ageCharacter = (id: string, age: unknown) => ({
+  id,
+  canonical_name: "מאיה",
+  entity_type: "character",
+  aliases: [] as string[],
+  structured_fields: { first_name: "מאיה", age },
+  attributes: {},
+});
+
+// A shared non-age field so these tests isolate the `age` identity comparison
+// rather than the separate "rich entities with zero shared tokens" signal.
+const withAge = (age: unknown) => ({
+  canonical_name: "מאיה",
+  entity_type: "character",
+  structured_fields: { first_name: "מאיה", age },
+  attributes: {},
+});
+
+Deno.test("Issue 3: numeric vs Hebrew-word age for the same name is not an identity conflict", () => {
+  assertEquals(hasConflictingEntityContext(withAge("17"), withAge("שבע עשרה")), false);
+});
+
+Deno.test("Issue 3: '17' resolves to an existing character stored as '17 שנה'", () => {
+  const resolved = resolveEntityCandidate(
+    { canonical_name: "מאיה", entity_type: "character", structured_fields: { first_name: "מאיה", age: "17" }, attributes: {} },
+    [ageCharacter("main-maya", "17 שנה")],
+  );
+  assertEquals(resolved?.id, "main-maya");
+});
+
+Deno.test("Issue 3: a numeric age value (not a string) resolves against a Hebrew-word age", () => {
+  const resolved = resolveEntityCandidate(
+    { canonical_name: "מאיה", entity_type: "character", structured_fields: { first_name: "מאיה", age: 17 }, attributes: {} },
+    [ageCharacter("main-maya", "בת שבע עשרה")],
+  );
+  assertEquals(resolved?.id, "main-maya");
+});
+
+Deno.test("Issue 3: legacy 'בן 25' and 'עשרים וחמש' are treated as the same age", () => {
+  const resolved = resolveEntityCandidate(
+    { canonical_name: "מאיה", entity_type: "character", structured_fields: { first_name: "מאיה", age: "עשרים וחמש" }, attributes: {} },
+    [ageCharacter("main-maya", "בן 25")],
+  );
+  assertEquals(resolved?.id, "main-maya");
+});
+
+Deno.test("Issue 3: genuinely different ages (17 vs 41) still block an identity match", () => {
+  assertEquals(hasConflictingEntityContext(withAge("17"), withAge("41")), true);
+  const resolved = resolveEntityCandidate(
+    { canonical_name: "מאיה", entity_type: "character", structured_fields: { first_name: "מאיה", age: "17 שנה" }, attributes: {} },
+    [ageCharacter("main-maya", "41")],
+  );
+  assertEquals(resolved, null);
+});
+
+Deno.test("Issue 3: equal canonicalized age still contributes positive context for ambiguous same-name candidates", () => {
+  // Two same-name Main candidates; only the age (17 == 'שבע עשרה') distinguishes
+  // the correct one, so the match must rely on the canonicalized age both
+  // avoiding a conflict AND contributing to the context score.
+  const resolved = resolveEntityCandidate(
+    { canonical_name: "מאיה", entity_type: "character", structured_fields: { first_name: "מאיה", age: "17" }, attributes: {} },
+    [
+      ageCharacter("main-maya-17", "שבע עשרה"),
+      ageCharacter("main-maya-30", "30"),
+    ],
+  );
+  assertEquals(resolved?.id, "main-maya-17");
+});
+
+Deno.test("Issue 3: age canonicalization is scoped to characters; non-character age is compared literally", () => {
+  assertEquals(
+    hasConflictingEntityContext(
+      { canonical_name: "Relic", entity_type: "object", structured_fields: { age: "17" }, attributes: {} },
+      { canonical_name: "Relic", entity_type: "object", structured_fields: { age: "שבע עשרה" }, attributes: {} },
+    ),
+    true,
+  );
 });

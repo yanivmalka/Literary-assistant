@@ -757,28 +757,46 @@ async function loadEntityAliases(
  * Field paths on one entity that carry an active user-authored value in
  * knowledge_entity_values. A later AI extraction must not overwrite these
  * structured_fields keys.
+ *
+ * In Branch context a field is user-owned when the user edited it on the
+ * current Branch OR on Main (a `branch_id IS NULL` user value). A Branch
+ * extraction must therefore not re-assert an override for a field the user
+ * explicitly edited on Main. Main context only considers Main values.
  */
 async function loadUserOwnedFieldPaths(
   supabase: any,
   entityId: string,
   branchId: string | null,
 ): Promise<Set<string>> {
-  let query = supabase
-    .from("knowledge_entity_values")
-    .select("field_path")
-    .eq("entity_id", entityId)
-    .eq("source_type", "user")
-    .eq("value_status", "active");
-  query = branchId ? query.eq("branch_id", branchId) : query.is("branch_id", null);
+  // null represents the Main scope (`branch_id IS NULL`). Branch runs also
+  // honour Main-scoped user edits; Main runs look at Main only.
+  const scopes: Array<string | null> = branchId ? [branchId, null] : [null];
+  const owned = new Set<string>();
 
-  const { data, error } = await query;
-  if (error) {
-    // Provenance protection is best-effort: log and fall back to no extra guard
-    // rather than aborting a whole extraction batch.
-    console.warn(`[extract-knowledge] Could not load user-owned field paths for ${entityId}: ${error.message}`);
-    return new Set<string>();
+  for (const scope of scopes) {
+    let query = supabase
+      .from("knowledge_entity_values")
+      .select("field_path")
+      .eq("entity_id", entityId)
+      .eq("source_type", "user")
+      .eq("value_status", "active");
+    query = scope === null ? query.is("branch_id", null) : query.eq("branch_id", scope);
+
+    const { data, error } = await query;
+    if (error) {
+      // Provenance protection is best-effort: log and keep whatever other
+      // scope resolved rather than aborting a whole extraction batch.
+      console.warn(
+        `[extract-knowledge] Could not load user-owned field paths for ${entityId} (scope ${scope ?? "main"}): ${error.message}`,
+      );
+      continue;
+    }
+    for (const row of (data || []) as Array<{ field_path: string }>) {
+      if (row.field_path) owned.add(row.field_path);
+    }
   }
-  return new Set<string>((data || []).map((row: { field_path: string }) => row.field_path).filter(Boolean));
+
+  return owned;
 }
 
 async function findExistingEntity(

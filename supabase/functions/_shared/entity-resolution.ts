@@ -1,4 +1,5 @@
 import { normalizeKey, stripNikud } from "./rules/normalization.ts";
+import { normalizeCharacterAge } from "./character-age.ts";
 
 export interface EntityResolutionRecord {
   id?: string;
@@ -145,12 +146,39 @@ function isCharacterRecord(record: EntityResolutionRecord): boolean {
   return record.entity_type === "character" || !!record.entity_types?.includes("character");
 }
 
+/**
+ * Canonical form of a character `age` value for identity comparison. Runs the
+ * value through the shared `normalizeCharacterAge` parser so equivalent forms
+ * ("17", 17, "17 שנה", "בן 25", "בת שבע עשרה", "עשרים וחמש") compare equal and
+ * never manufacture a false identity conflict. A trailing age-unit word
+ * ("שנה"/"years"/…) is stripped before delegating — no age digits are
+ * interpreted here, so this introduces no second parser. Returns null when the
+ * value is not a recognisable age; callers then treat `age` as
+ * non-discriminating rather than forcing a conflict on unparseable free text.
+ */
+function canonicalCharacterAge(value: unknown): string | null {
+  const direct = normalizeCharacterAge(value);
+  if (direct !== null) return direct;
+  if (typeof value !== "string") return null;
+  const withoutUnit = value
+    .replace(/[\s ]*(?:שנה|שנים|שנות|years?(?:[\s-]old)?|yrs?|y[/\s.-]?o)\.?\s*$/iu, "")
+    .trim();
+  return withoutUnit && withoutUnit !== value ? normalizeCharacterAge(withoutUnit) : null;
+}
+
 function fieldValues(record: EntityResolutionRecord): Map<string, string> {
   const result = new Map<string, string>();
+  const isCharacter = isCharacterRecord(record);
   const addFields = (fields: Record<string, unknown> | null | undefined) => {
     Object.entries(fields || {}).forEach(([key, value]) => {
       if (key === "name" || value == null || typeof value === "object") return;
-      const normalized = normalizeText(String(value));
+      // Character `age` is canonicalized so that legacy sub-base output and
+      // user-entered values (numbers, "17 שנה", Hebrew number words) resolve to
+      // the same string; an unparseable age is dropped so it neither vetoes a
+      // match nor pretends to be positive context.
+      const normalized = isCharacter && key === "age"
+        ? canonicalCharacterAge(value)
+        : normalizeText(String(value));
       if (normalized) result.set(key, normalized);
     });
   };
