@@ -278,8 +278,10 @@ export function buildStructuredFields(
     fields.special_properties = entity.special_properties || null;
     fields.origin = entity.origin || null;
     fields.current_location = entity.current_location || null;
+    // Issue 10: keep owners as a normalized array (matching attributes.owners and
+    // knowledge_entity_values.owners) rather than flattening to a joined string.
     const owners = normalizeStringList(entity.owners)
-    fields.owners = owners.length > 0 ? owners.join(", ") : null;
+    fields.owners = owners.length > 0 ? owners : null;
     fields.narrative_importance = entity.narrative_importance || null;
     fields.narrative_impact = null;
     fields.related_characters = entity.related_characters || null;
@@ -471,14 +473,17 @@ export function normalizeEntities(
       }
       // Issue 10: keep an object's owners as an array on attributes.owners
       // (mirroring attributes.users above) so buildObjectLinks can build the
-      // character -> object "owns" edges. structured_fields.owners keeps its
-      // existing joined-string representation for compatibility.
+      // character -> object "owns" edges. structured_fields.owners mirrors the
+      // same deduped array so it never lags behind as a stale subset across
+      // chunks (the fill-if-null loop below would otherwise freeze the first
+      // chunk's owners).
       const entityOwners = normalizeStringList(entity.owners)
       if (entityOwners.length > 0) {
         existing.attributes.owners = [...new Set([
           ...normalizeStringList(existing.attributes.owners),
           ...entityOwners,
         ])]
+        existing.structured_fields.owners = existing.attributes.owners
       }
       if (entity.members && entity.members.length > 0) {
         existing.attributes.members = [...((existing.attributes.members as string[]) || []), ...entity.members];
@@ -513,7 +518,7 @@ export function normalizeEntities(
       if (entityUsers.length > 0) attributes.users = entityUsers;
       // Issue 10: see the existing-entity branch above — owners is preserved as
       // an array on attributes so ownership links can be built; structured_fields
-      // keeps its joined-string owners.
+      // carries the same normalized array (set in buildStructuredFields).
       const entityOwners = normalizeStringList(entity.owners)
       if (entityOwners.length > 0) attributes.owners = entityOwners;
       if (entity.members && entity.members.length > 0) attributes.members = entity.members;

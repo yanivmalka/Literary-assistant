@@ -324,7 +324,7 @@ Deno.test("C normalization extracts an object entity from the unified entities b
   assert(sword);
   assertEquals(sword?.canonical_name, "חרב הזהב");
   assertEquals(sword?.structured_fields.special_properties, "זוהרת בחושך");
-  assertEquals(sword?.structured_fields.owners, "Leah Frost");
+  assertEquals(sword?.structured_fields.owners, ["Leah Frost"]);
 });
 
 Deno.test("C normalization extracts ability and magic_ability entities from the unified entities bucket", () => {
@@ -725,8 +725,8 @@ Deno.test("Issue 10: a top-level owners array (no attributes.owners) is preserve
 
   const [object] = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
   assertEquals(object.attributes.owners, ["Leah Frost"]);
-  // structured_fields keeps its existing joined-string representation.
-  assertEquals(object.structured_fields.owners, "Leah Frost");
+  // Issue 10: structured_fields.owners is the same normalized array, not a join.
+  assertEquals(object.structured_fields.owners, ["Leah Frost"]);
 });
 
 Deno.test("Issue 10: multiple owners are kept as an array, never joined, on attributes.owners", () => {
@@ -741,7 +741,7 @@ Deno.test("Issue 10: multiple owners are kept as an array, never joined, on attr
 
   const [object] = normalizeEntities(extraction, chunkLookup, "sub-base-c-characters");
   assertEquals(object.attributes.owners, ["Leah Frost", "Ada North"]);
-  assertEquals(object.structured_fields.owners, "Leah Frost, Ada North");
+  assertEquals(object.structured_fields.owners, ["Leah Frost", "Ada North"]);
 });
 
 Deno.test("Issue 10: ownership link is built from a top-level owners array alone", () => {
@@ -770,6 +770,40 @@ Deno.test("Issue 10: the same object repeated with the same owner keeps a dedupe
   );
   const object = merged.find((entity) => entity.entity_type === "object")!;
   assertEquals(object.attributes.owners, ["Leah Frost"]);
+});
+
+Deno.test("Issue 10: structured_fields.owners is a normalized array, never a joined string", () => {
+  const [object] = normalizeEntities(
+    {
+      objects: [{
+        name: "חרב הזהב",
+        type: "object",
+        owners: ["Leah Frost", "Ada North"],
+        chunk_positions: [2],
+      }],
+    } as unknown as GeminiExtraction,
+    chunkLookup,
+    "sub-base-c-characters",
+  );
+  assert(Array.isArray(object.structured_fields.owners));
+  assertEquals(object.structured_fields.owners, ["Leah Frost", "Ada North"]);
+});
+
+Deno.test("Issue 10: multi-chunk merge keeps structured_fields.owners in sync with the deduped attributes.owners (no stale subset)", () => {
+  const merged = normalizeEntities(
+    {
+      objects: [
+        { name: "חרב הזהב", type: "object", owners: ["Leah Frost"], chunk_positions: [2] },
+        { name: "חרב הזהב", type: "object", owners: ["Ada North", "Leah Frost"], chunk_positions: [3] },
+      ],
+    } as unknown as GeminiExtraction,
+    chunkLookup,
+    "sub-base-c-characters",
+  );
+  const object = merged.find((entity) => entity.entity_type === "object")!;
+  assertEquals(object.attributes.owners, ["Leah Frost", "Ada North"]);
+  // structured_fields.owners must not be frozen at the first chunk's ["Leah Frost"].
+  assertEquals(object.structured_fields.owners, object.attributes.owners);
 });
 
 Deno.test("Issue 10: an object arriving in a later batch links to a character from an earlier batch via attributes.owners", () => {

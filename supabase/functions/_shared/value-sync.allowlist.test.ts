@@ -276,6 +276,35 @@ Deno.test("Issue 10 x 14: an object with a string structured_fields.owners and a
   assertEquals(inserted.includes("relationship_labels"), false);
 });
 
+Deno.test("Issue 10: an object with array structured_fields.owners and array attributes.owners still persists exactly one array owners value", async () => {
+  const { supabase, ops } = makeFakeSupabase([]);
+  await syncEntityValues({
+    // deno-lint-ignore no-explicit-any
+    supabase: supabase as any,
+    entityId: "obj-1",
+    projectId: "project-1",
+    userId: "user-1",
+    rawExtractionId: "raw-1",
+    branchId: null,
+    normalizedEntity: {
+      canonical_name: "Golden Sword",
+      entity_type: "object",
+      description: "A blade",
+      // Post-Issue-10: both representations are the same normalized array.
+      structured_fields: { object_type: "sword", owners: ["Leah Frost", "Ada North"] },
+      attributes: { owners: ["Leah Frost", "Ada North"], relationship_labels: ["x"] },
+      evidence: [],
+      chunk_positions: [1],
+    },
+  });
+
+  const ownersInserts = ops.filter(
+    (o) => o.table === "knowledge_entity_values" && o.kind === "insert" && o.payload!.field_path === "owners",
+  );
+  assertEquals(ownersInserts.length, 1);
+  assertEquals(ownersInserts[0].payload!.value_json, ["Leah Frost", "Ada North"]);
+});
+
 Deno.test("Issue 2: Branch AI supersede lookups and inserts stay scoped to the current branch", async () => {
   const { supabase, ops } = makeFakeSupabase([]);
   await syncEntityValues({
