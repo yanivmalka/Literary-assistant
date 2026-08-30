@@ -64,6 +64,8 @@ import {
   planCharacterRelationshipWrite,
   shouldUseMainCharacterFallback,
   withUserOwnedStructuredFields,
+  stripUserOwnedOverlayEntries,
+  gateUserOwnedNameAndDescription,
   type ExtractionStrategy,
 } from "./testable-pipeline.ts";
 import type { ExtractionSourceReference, ExtractionNameUncertainty } from "../_shared/extraction-contract.ts";
@@ -1844,24 +1846,28 @@ Deno.serve(async (req) => {
         // Main extraction is repeat-safe: merge observations into the row
         // already created for this version instead of inserting a duplicate.
         const merged = mergeExistingBranchEntity(existing, entity);
-        if (existing.source !== "user") {
-          // Per-field guard: an AI-sourced row can still have individual fields
-          // the user edited. Those must survive re-extraction.
-          const userOwned = await loadUserOwnedFieldPaths(supabase, existing.id, null);
-          if (userOwned.size > 0) {
-            merged.structured_fields = withUserOwnedStructuredFields(
-              merged.structured_fields,
-              existing.structured_fields,
-              userOwned,
-            );
-          }
+        // Per-field guard: an AI-sourced row can still have individual fields the
+        // user edited (including the descriptive `name` / `description`). Those
+        // must survive re-extraction. Loaded unconditionally so the update
+        // payload below can gate the canonical_name / description columns.
+        const userOwned = await loadUserOwnedFieldPaths(supabase, existing.id, null);
+        if (existing.source !== "user" && userOwned.size > 0) {
+          merged.structured_fields = withUserOwnedStructuredFields(
+            merged.structured_fields,
+            existing.structured_fields,
+            userOwned,
+          );
         }
         const { error: mainUpdateError } = await supabase
           .from("knowledge_entities")
           .update({
-            canonical_name: existing.source === "user" ? existing.canonical_name : merged.canonical_name,
+            canonical_name: existing.source === "user" || userOwned.has("name")
+              ? existing.canonical_name
+              : merged.canonical_name,
             entity_types: merged.entity_types,
-            description: existing.source === "user" ? existing.description : merged.description,
+            description: existing.source === "user" || userOwned.has("description")
+              ? existing.description
+              : merged.description,
             attributes: existing.source === "user" ? existing.attributes : merged.attributes,
             structured_fields: existing.source === "user" ? existing.structured_fields : merged.structured_fields,
             raw_extraction_id: rawExtractionId,
@@ -1893,12 +1899,17 @@ Deno.serve(async (req) => {
               userOwned,
             );
           }
+          // Honour user-owned `name` / `description` provenance on the
+          // canonical_name / description column writes, matching the Branch
+          // overlay and Main re-extraction paths.
+          const { canonical_name: gatedCanonicalName, description: gatedDescription } =
+            gateUserOwnedNameAndDescription(merged, existing, userOwned);
           const { error: branchUpdateError } = await supabase
             .from("knowledge_entities")
             .update({
-              canonical_name: merged.canonical_name,
+              canonical_name: gatedCanonicalName,
               entity_types: merged.entity_types,
-              description: merged.description,
+              description: gatedDescription,
               attributes: merged.attributes,
               structured_fields: merged.structured_fields,
               updated_at: new Date().toISOString(),
@@ -1923,16 +1934,16 @@ Deno.serve(async (req) => {
                 entity_id: existing.id,
                 project_id: body.project_id,
                 user_id: body.user_id,
-                canonical_name: merged.canonical_name,
+                canonical_name: gatedCanonicalName,
                 entity_type: merged.entity_type,
                 entity_types: merged.entity_types,
-                description: merged.description,
+                description: gatedDescription,
                 attributes: merged.attributes,
                 structured_fields: merged.structured_fields,
                 overrides: {
-                  canonical_name: merged.canonical_name,
+                  canonical_name: gatedCanonicalName,
                   entity_type: merged.entity_type,
-                  description: merged.description,
+                  description: gatedDescription,
                   attributes: merged.attributes,
                   structured_fields: merged.structured_fields,
                 },
@@ -1956,14 +1967,14 @@ Deno.serve(async (req) => {
           // Main entity: create or update the active Branch overlay. Preserve
           // prior overrides when this extraction omits those fields.
           const { overrides, baseValues } = buildOverlayChanges(existing, entity);
-          // Do not let this extraction re-assert a structured_fields override for
-          // a key the user edited in this Branch; the prior user override (in
-          // overlayOverrides) is kept instead.
+          // Do not let this extraction re-assert an override for a field the user
+          // edited in this Branch or on Main; the prior user override (in
+          // overlayOverrides) is kept instead. Each user-owned field_path is
+          // mapped to every overlay key `buildOverlayChanges` can emit for it
+          // (structured_fields.<key>, attributes.<key>, and the descriptive
+          // `name` -> canonical_name / `description` -> description keys).
           const userOwned = await loadUserOwnedFieldPaths(supabase, existing.id, targetBranchId);
-          for (const key of userOwned) {
-            delete overrides[`structured_fields.${key}`];
-            delete baseValues[`structured_fields.${key}`];
-          }
+          stripUserOwnedOverlayEntries(overrides, baseValues, userOwned);
           const mergedOverrides = { ...(existing.overlayOverrides || {}), ...overrides };
           const mergedBaseValues = { ...(existing.overlayBaseValues || {}), ...baseValues };
           const { error: overlayError } = await supabase

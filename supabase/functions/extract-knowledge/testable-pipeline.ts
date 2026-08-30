@@ -648,6 +648,56 @@ export function withUserOwnedStructuredFields(
 }
 
 /**
+ * The overlay override / base-value keys that `buildOverlayChanges` can emit for
+ * one user-owned entity `field_path`. The descriptive `name` and `description`
+ * field_paths map onto the `canonical_name` / `description` overlay keys; every
+ * other field_path can surface as both a `structured_fields.<key>` and an
+ * `attributes.<key>` change.
+ */
+export function overlayFieldPathsForUserOwned(fieldPath: string): string[] {
+  if (fieldPath === "name") return ["canonical_name"];
+  if (fieldPath === "description") return ["description"];
+  return [`structured_fields.${fieldPath}`, `attributes.${fieldPath}`];
+}
+
+/**
+ * Removes, in place, every overlay `overrides` / `baseValues` entry that a later
+ * Branch extraction must not re-assert because the user owns the corresponding
+ * field_path (an active user-authored knowledge_entity_values row on this Branch
+ * or on Main). The prior user override already stored in the overlay is kept.
+ */
+export function stripUserOwnedOverlayEntries(
+  overrides: Record<string, unknown>,
+  baseValues: Record<string, unknown>,
+  userOwnedFieldPaths: Iterable<string>,
+): void {
+  for (const fieldPath of userOwnedFieldPaths) {
+    for (const key of overlayFieldPathsForUserOwned(fieldPath)) {
+      delete overrides[key];
+      delete baseValues[key];
+    }
+  }
+}
+
+/**
+ * The `canonical_name` / `description` column values to persist on a
+ * re-extraction, honouring user-owned `name` / `description` provenance: a field
+ * the user owns keeps its existing persisted value, otherwise the merged AI
+ * value wins. Callers compose this with any coarser row-level guard (e.g. a
+ * fully user-sourced Main row).
+ */
+export function gateUserOwnedNameAndDescription(
+  merged: { canonical_name?: unknown; description?: unknown },
+  existing: { canonical_name?: unknown; description?: unknown },
+  userOwned: Set<string>,
+): { canonical_name: unknown; description: unknown } {
+  return {
+    canonical_name: userOwned.has("name") ? existing.canonical_name : merged.canonical_name,
+    description: userOwned.has("description") ? existing.description : merged.description,
+  };
+}
+
+/**
  * Whether `findExistingMainEntity` should run its fuzzy Main-character identity
  * fallback (project-wide alias/prefix resolution) after an exact canonical_name
  * lookup misses. Only the Sub-base C profile composes canonical_name from

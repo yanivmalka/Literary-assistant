@@ -5,6 +5,9 @@ import {
   planCharacterRelationshipWrite,
   shouldUseMainCharacterFallback,
   withUserOwnedStructuredFields,
+  stripUserOwnedOverlayEntries,
+  gateUserOwnedNameAndDescription,
+  overlayFieldPathsForUserOwned,
 } from "./testable-pipeline.ts";
 import { isSymmetricCharacterRelationship } from "../_shared/character-specialist.ts";
 import { resolveEntityCandidate } from "../_shared/entity-resolution.ts";
@@ -79,6 +82,98 @@ Deno.test("A2: a user-owned field the user cleared to null stays null through th
   const guarded = withUserOwnedStructuredFields(mergedFromAi, existing, ["scars"]);
   assertEquals(guarded.scars, null);            // cleared value preserved, not resurrected
   assertEquals(guarded.hair_color, "black");    // unrelated AI field still merges
+});
+
+// ------------------------------------------------------------
+// Issue 1b: user-owned `name` / `description` provenance on the
+// canonical_name / description columns and Branch overlay overrides
+// ------------------------------------------------------------
+
+Deno.test("Issue 1b: Main user-owned `name` preserves the existing canonical_name over a longer AI value", () => {
+  const merged = { canonical_name: "Leonard Frost the Third", description: "an archivist" };
+  const existing = { canonical_name: "Leo", description: "an archivist" };
+
+  const gated = gateUserOwnedNameAndDescription(merged, existing, new Set(["name"]));
+  assertEquals(gated.canonical_name, "Leo");        // user-owned name preserved
+  assertEquals(gated.description, "an archivist");  // description not owned -> AI merge (unchanged here)
+});
+
+Deno.test("Issue 1b: Main user-owned `description` preserves the existing description on re-extraction", () => {
+  const merged = { canonical_name: "Leo", description: "AI rewrote the bio at length" };
+  const existing = { canonical_name: "Leo", description: "the bio the user wrote" };
+
+  const gated = gateUserOwnedNameAndDescription(merged, existing, new Set(["description"]));
+  assertEquals(gated.description, "the bio the user wrote");
+  assertEquals(gated.canonical_name, "Leo");
+});
+
+Deno.test("Issue 1b: no user-owned name/description lets the AI merge through", () => {
+  const merged = { canonical_name: "Leo Frost", description: "new bio" };
+  const existing = { canonical_name: "Leo", description: "old bio" };
+
+  const gated = gateUserOwnedNameAndDescription(merged, existing, new Set(["age"]));
+  assertEquals(gated.canonical_name, "Leo Frost");
+  assertEquals(gated.description, "new bio");
+});
+
+Deno.test("Issue 1b: Branch overlay with Main user-owned `name` produces no overrides.canonical_name", () => {
+  const overrides: Record<string, unknown> = { canonical_name: "Leo Frost", "structured_fields.age": "40" };
+  const baseValues: Record<string, unknown> = { canonical_name: "Leo", "structured_fields.age": "27" };
+
+  stripUserOwnedOverlayEntries(overrides, baseValues, ["name"]);
+
+  assert(!("canonical_name" in overrides));
+  assert(!("canonical_name" in baseValues));
+  assertEquals(overrides["structured_fields.age"], "40"); // unrelated change untouched
+});
+
+Deno.test("Issue 1b: Branch overlay with Main user-owned `description` produces no overrides.description", () => {
+  const overrides: Record<string, unknown> = { description: "AI bio", "attributes.mood": "grim" };
+  const baseValues: Record<string, unknown> = { description: "user bio", "attributes.mood": "calm" };
+
+  stripUserOwnedOverlayEntries(overrides, baseValues, ["description"]);
+
+  assert(!("description" in overrides));
+  assert(!("description" in baseValues));
+  assertEquals(overrides["attributes.mood"], "grim");
+});
+
+Deno.test("Issue 1b: a user-owned ordinary field strips both structured_fields.<key> and attributes.<key>", () => {
+  const overrides: Record<string, unknown> = {
+    "structured_fields.hair_color": "black",
+    "attributes.hair_color": "black",
+    "structured_fields.age": "40",
+  };
+  const baseValues: Record<string, unknown> = {
+    "structured_fields.hair_color": "auburn",
+    "attributes.hair_color": "auburn",
+    "structured_fields.age": "27",
+  };
+
+  stripUserOwnedOverlayEntries(overrides, baseValues, ["hair_color"]);
+
+  assert(!("structured_fields.hair_color" in overrides));
+  assert(!("attributes.hair_color" in overrides));
+  assert(!("structured_fields.hair_color" in baseValues));
+  assert(!("attributes.hair_color" in baseValues));
+  assertEquals(overrides["structured_fields.age"], "40"); // non-user-owned field remains
+  assertEquals(baseValues["structured_fields.age"], "27");
+});
+
+Deno.test("Issue 1b: overlayFieldPathsForUserOwned maps name/description and ordinary keys", () => {
+  assertEquals(overlayFieldPathsForUserOwned("name"), ["canonical_name"]);
+  assertEquals(overlayFieldPathsForUserOwned("description"), ["description"]);
+  assertEquals(overlayFieldPathsForUserOwned("age"), ["structured_fields.age", "attributes.age"]);
+});
+
+Deno.test("Issue 1b: withUserOwnedStructuredFields still preserves user-owned name and description keys", () => {
+  const merged = { name: "AI Name", description: "AI desc", age: "40" };
+  const existing = { name: "User Name", description: "User desc", age: "27" };
+
+  const guarded = withUserOwnedStructuredFields(merged, existing, ["name", "description"]);
+  assertEquals(guarded.name, "User Name");
+  assertEquals(guarded.description, "User desc");
+  assertEquals(guarded.age, "40");
 });
 
 // ------------------------------------------------------------
