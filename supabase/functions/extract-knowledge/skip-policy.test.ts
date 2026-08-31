@@ -150,6 +150,29 @@ Deno.test("Issue 11: an unusable-response skip response reports zeros and advanc
   assertEquals(response.summary.chunks_skipped, 2);
 });
 
+Deno.test("Issue 11: an isolated middle-batch model failure is skipped while a genuinely fatal failure still aborts", () => {
+  const profile = "sub-base-c-characters";
+
+  // Batch 1 -> success: no failure object, nothing to classify.
+  // Batch 2 -> model failure (retriable / exhausted fallback). It must resolve
+  // to a skip so the run keeps going, NOT an extraction-wide abort.
+  const batch2Reason = getExtractionSkipReason(profile, true, transientFailure)
+    ?? getUnusableResponseSkip(profile, true);
+  assertEquals(batch2Reason, "transient_failure");
+  const batch2Response = buildSkippedBatchResponse(batch2Reason!, [{ position: 2 }, { position: 3 }], 2, 2);
+  assert(batch2Response.success);
+  assert(batch2Response.skipped);
+  assertEquals(batch2Response.summary.entities_saved, 0);
+  assertEquals(batch2Response.next_offset, 4); // Batch 3 resumes here.
+
+  // Batch 3 -> success: unaffected by Batch 2's skip.
+
+  // A genuinely fatal condition (non-retriable, non-safety) is never skipped —
+  // the caller still returns an error and fails the extraction.
+  const fatal = { status: 400, isRetriable: false, fallbackChain: [{ reason: "bad request" }] };
+  assertEquals(getExtractionSkipReason(profile, true, fatal), null);
+});
+
 Deno.test("Issue 11: the transport-failure classifier is unchanged by the new post-response path", () => {
   // getExtractionSkipReason still only skips retriable/safety transport failures.
   assertEquals(getExtractionSkipReason("sub-base-c-characters", true, transientFailure), "transient_failure");

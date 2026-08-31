@@ -5,7 +5,6 @@ import {
   fingerprintShadowInput,
   validateBaselineScope,
   validateShadowCandidatePayload,
-  validateShadowExecutionGuard,
 } from "./shadow-comparison.ts";
 
 const scope = {
@@ -27,23 +26,6 @@ const baseline = {
     relationships: [],
   },
 };
-
-Deno.test("shadow guard is fail-closed and C-only", () => {
-  assertEquals(validateShadowExecutionGuard({
-    shadow_only: true,
-    model_profile: "sub-base-c-characters",
-    extraction_strategy: "parallel-experts",
-    baseline_raw_extraction_id: "raw-1",
-    shadow_run_id: "shadow:12345678",
-  }), { ok: true });
-  assert(!validateShadowExecutionGuard({
-    shadow_only: true,
-    model_profile: "sub-base-locations",
-    extraction_strategy: "parallel-experts",
-    baseline_raw_extraction_id: "raw-1",
-    shadow_run_id: "shadow:12345678",
-  }).ok);
-});
 
 Deno.test("baseline scope requires explicit matching lineage", () => {
   assertEquals(validateBaselineScope(baseline, {

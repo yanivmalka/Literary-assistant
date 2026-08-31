@@ -1,6 +1,15 @@
 import type { GeminiModelProfile } from "./gemini-config.ts";
 
 export const SHADOW_COMPARISON_CONTRACT_VERSION = 1 as const;
+/**
+ * Value stored in `extraction_shadow_comparisons.candidate_extraction_strategy`
+ * when a caller does not supply one. It is kept as `parallel-experts` only
+ * because migration 140 still constrains that column with
+ * `CHECK (candidate_extraction_strategy = 'parallel-experts')`; the live
+ * extraction pipeline runs `legacy-sequential` (parallel-experts was retired in
+ * Issue 13). The request-time execution guard that also required this value has
+ * been removed as dead code.
+ */
 export const SHADOW_COMPARISON_STRATEGY = "parallel-experts" as const;
 export const SHADOW_COMPARISON_PROFILE = "sub-base-c-characters" as const;
 export const SHADOW_COMPARISON_STATUSES = ["succeeded", "failed"] as const;
@@ -25,14 +34,6 @@ export interface BaselineRawExtraction extends ShadowScope {
   model_profile: string | null;
   extraction_strategy: string | null;
   raw_response: unknown;
-}
-
-export interface ShadowGuardInput {
-  shadow_only: boolean;
-  model_profile: unknown;
-  extraction_strategy: unknown;
-  baseline_raw_extraction_id: unknown;
-  shadow_run_id: unknown;
 }
 
 export type ShadowValidation =
@@ -200,24 +201,6 @@ function normalizeRelationship(value: unknown): ComparisonRelationship | null {
     relationship_type: normalizedRelationshipType,
     fields,
   };
-}
-
-export function validateShadowExecutionGuard(input: ShadowGuardInput): ShadowValidation {
-  const errors: string[] = [];
-  if (input.shadow_only !== true) errors.push("shadow_only must be true");
-  if (input.model_profile !== SHADOW_COMPARISON_PROFILE) {
-    errors.push(`shadow comparison requires model_profile=${SHADOW_COMPARISON_PROFILE}`);
-  }
-  if (input.extraction_strategy !== SHADOW_COMPARISON_STRATEGY) {
-    errors.push(`shadow comparison requires extraction_strategy=${SHADOW_COMPARISON_STRATEGY}`);
-  }
-  if (!nonEmptyString(input.baseline_raw_extraction_id)) {
-    errors.push("baseline_raw_extraction_id is required");
-  }
-  if (!nonEmptyString(input.shadow_run_id) || !/^shadow:[A-Za-z0-9_-]{8,160}$/.test(String(input.shadow_run_id))) {
-    errors.push("shadow_run_id must use the shadow:<id> namespace");
-  }
-  return errors.length > 0 ? { ok: false, errors } : { ok: true };
 }
 
 export function validateBaselineScope(

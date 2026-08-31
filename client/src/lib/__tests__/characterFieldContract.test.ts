@@ -4,6 +4,8 @@ import {
   SUB_BASE_C_FIXED_FIELD_KEYS,
   SUB_BASE_C_ADDABLE_FIELD_KEYS,
 } from '@/lib/characterSchema'
+// Server source of truth for the Sub-base C character contract.
+import { CHARACTER_FIELD_KEYS } from '../../../../supabase/functions/_shared/character-specialist'
 
 /**
  * Issue 15 (Phase 5): the Character field set the UI presents as active,
@@ -23,6 +25,13 @@ describe('Character field contract (Issue 15)', () => {
 
   it('mirrors the server CHARACTER_FIELD_KEYS length (drift guard)', () => {
     expect(SUB_BASE_C_FIXED_FIELD_KEYS.length).toBe(42)
+  })
+
+  it('is exactly the server CHARACTER_FIELD_KEYS set (client/server drift guard)', () => {
+    // A field the UI offers as an addable extraction field but the pipeline does
+    // not support (or the inverse) is the Issue 15 mismatch. Compare the actual
+    // key sets, not just the count, so a same-length swap is still caught.
+    expect([...SUB_BASE_C_FIXED_FIELD_KEYS].sort()).toEqual([...CHARACTER_FIELD_KEYS].sort())
   })
 
   it('catalog-only extras are NOT addable extraction fields', () => {
