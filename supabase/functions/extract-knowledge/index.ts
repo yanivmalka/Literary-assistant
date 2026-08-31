@@ -1759,6 +1759,32 @@ Deno.serve(async (req) => {
     const rawExtractionId = rawExtraction.id;
     const persistenceStartedAt = Date.now();
 
+    // LOW-1: the raw_extraction ids for this whole extraction run (every batch),
+    // used by syncEntityValues to tell a branch value re-affirmed by an earlier
+    // batch of the current run from a stale branch AI value left by a previous
+    // run. Only resolvable when the run carries an extraction_run_id (Branch
+    // extraction always does); legacy Main bootstrap runs pass undefined and the
+    // stale-value reconciliation is skipped.
+    let currentRunRawExtractionIds: string[] | undefined;
+    if (extractionRunId) {
+      const { data: runRawExtractions, error: runRawError } = await supabase
+        .from("raw_extractions")
+        .select("id")
+        .eq("project_id", body.project_id)
+        .eq("extraction_run_id", extractionRunId);
+      if (runRawError) {
+        console.warn(
+          `[extract-knowledge] Could not load run raw-extraction lineage for stale-value cleanup: ${runRawError.message}`,
+        );
+      }
+      currentRunRawExtractionIds = [
+        ...new Set([
+          ...((runRawExtractions ?? []) as Array<{ id: string }>).map((row) => row.id),
+          rawExtractionId,
+        ]),
+      ];
+    }
+
     // ==============================
     // Step 5: Normalize & upsert entities (incremental merge)
     // Priority: user data > existing extracted data > new extracted data > null
@@ -2147,6 +2173,7 @@ Deno.serve(async (req) => {
         rawExtractionId,
         branchId: targetBranchId,
         activeDynamicFieldKeys,
+        currentRunRawExtractionIds,
         normalizedEntity: entity,
       });
       valuesSynced += valueCount;

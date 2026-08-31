@@ -79,6 +79,16 @@ export interface SyncValueRequest {
    * dynamic catalogue.
    */
   activeDynamicFieldKeys?: readonly string[];
+  /**
+   * LOW-1: every `raw_extractions.id` produced by the current extraction run
+   * (all batches so far), including the current one. Supplied only for runs that
+   * carry an `extraction_run_id`. When present (and `branchId` is set), the
+   * stale-branch-value reconciliation pass below supersedes a branch-scoped AI
+   * value row whose field the current run no longer produces. Omitted for legacy
+   * Main bootstrap runs, which cannot be reconciled by run lineage and are left
+   * exactly as before.
+   */
+  currentRunRawExtractionIds?: readonly string[];
   normalizedEntity: {
     canonical_name: string;
     entity_type: string;
@@ -223,9 +233,18 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
     }
   };
 
+  // Field paths this call actually reconciled (wrote a value for, or deliberately
+  // left alone because the user owns them). Any active branch AI row for a field
+  // path NOT in this set — and not re-affirmed by an earlier batch of the same
+  // run — is a candidate for the LOW-1 stale-value cleanup below.
+  const handledFieldPaths = new Set<string>();
+
   // Process each field that has a value.
   for (const [fieldPath, value] of Object.entries(persistableFieldValues)) {
     if (value === null || value === undefined) continue;
+    // The current run positively re-observed this persistable field, so its
+    // branch value must never be treated as stale by the cleanup pass.
+    handledFieldPaths.add(fieldPath);
 
     const observations = observationsForField(fieldPath, value)
       .filter((observation) => observation.value !== null && observation.value !== undefined)
@@ -336,7 +355,109 @@ export async function syncEntityValues(req: SyncValueRequest): Promise<{
     }
   }
 
+  // LOW-1: retire branch-scoped AI value rows the current run no longer produces.
+  if (branchId && req.currentRunRawExtractionIds && req.currentRunRawExtractionIds.length > 0) {
+    const staleErrors = await supersedeStaleBranchAiValues({
+      supabase,
+      entityId,
+      branchId,
+      handledFieldPaths,
+      currentRunRawExtractionIds: new Set(req.currentRunRawExtractionIds),
+    });
+    errors.push(...staleErrors);
+  }
+
   return { valuesSynced, evidenceSynced, errors };
+}
+
+/**
+ * LOW-1: supersede branch-scoped AI value rows that the current extraction run
+ * no longer produces.
+ *
+ * `syncEntityValues` (via `buildValueWritePlan`) only supersedes a field's prior
+ * AI row when the *same* field is written again. A field a branch previously
+ * extracted but the current run no longer emits — because the manuscript
+ * changed, the model is non-deterministic, or the field became non-persistable
+ * (Issue 14 allow-list) — keeps its `active` branch AI row, which then shadows
+ * the Main value in branch-scoped retrieval / QA (`resolveEffectiveEntityValues`
+ * only gates on `value_status === "active"`).
+ *
+ * This pass runs once per entity, after its per-field writes. It supersedes an
+ * existing `active`, branch-scoped, AI-sourced row when BOTH hold:
+ *   - the current `syncEntityValues` call did not handle its `field_path` (the
+ *     field was neither re-observed nor left in place for user ownership), and
+ *   - its `raw_extraction_id` is not part of the current extraction run, so a
+ *     value re-affirmed by an earlier batch of the same run is preserved.
+ *
+ * It never touches a `user` row, and skips any field that still carries an
+ * active user value on the branch or on Main. It is only invoked with a
+ * `branchId` set, so Main confirmed state is never affected.
+ */
+async function supersedeStaleBranchAiValues(args: {
+  supabase: SupabaseClient<any, "public", any>;
+  entityId: string;
+  branchId: string;
+  handledFieldPaths: Set<string>;
+  currentRunRawExtractionIds: Set<string>;
+}): Promise<string[]> {
+  const { supabase, entityId, branchId, handledFieldPaths, currentRunRawExtractionIds } = args;
+  const errors: string[] = [];
+
+  const { data: activeAiRows, error: fetchError } = await supabase
+    .from("knowledge_entity_values")
+    .select("id, field_path, raw_extraction_id")
+    .eq("entity_id", entityId)
+    .eq("branch_id", branchId)
+    .eq("source_type", "ai")
+    .eq("value_status", "active");
+  if (fetchError) {
+    errors.push(`Failed to load branch AI values for stale-value cleanup: ${fetchError.message}`);
+    return errors;
+  }
+
+  const stale = (activeAiRows || []).filter((row: { field_path: string; raw_extraction_id: string | null }) =>
+    !handledFieldPaths.has(row.field_path) &&
+    !(row.raw_extraction_id !== null && currentRunRawExtractionIds.has(row.raw_extraction_id))
+  );
+  if (stale.length === 0) return errors;
+
+  // Never disturb a field the user owns on this branch or on Main. An active
+  // user value keeps AI supersession out of that field entirely, matching the
+  // per-field `plan.skip` / `mainUserOwned` guards in the main loop.
+  const staleFieldPaths = new Set(stale.map((row: { field_path: string }) => row.field_path));
+  const userOwnedFieldPaths = new Set<string>();
+  for (const scopeIsMain of [false, true]) {
+    let userQuery = supabase
+      .from("knowledge_entity_values")
+      .select("field_path")
+      .eq("entity_id", entityId)
+      .eq("source_type", "user")
+      .eq("value_status", "active");
+    userQuery = scopeIsMain
+      ? userQuery.is("branch_id", null)
+      : userQuery.eq("branch_id", branchId);
+    const { data: userRows, error: userError } = await userQuery;
+    if (userError) {
+      errors.push(`Failed to load user provenance for stale-value cleanup: ${userError.message}`);
+      return errors;
+    }
+    for (const row of (userRows || []) as Array<{ field_path: string }>) {
+      if (staleFieldPaths.has(row.field_path)) userOwnedFieldPaths.add(row.field_path);
+    }
+  }
+
+  for (const row of stale as Array<{ id: string; field_path: string }>) {
+    if (userOwnedFieldPaths.has(row.field_path)) continue;
+    const { error: updateError } = await supabase
+      .from("knowledge_entity_values")
+      .update({ value_status: "superseded" })
+      .eq("id", row.id);
+    if (updateError) {
+      errors.push(`Failed to supersede stale branch value ${row.id}: ${updateError.message}`);
+    }
+  }
+
+  return errors;
 }
 
 /**
