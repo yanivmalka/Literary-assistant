@@ -585,6 +585,109 @@ export function adaptSubBaseCSerialExtraction(payload: unknown): Record<string, 
   return { ...record, characters, ...(rawRelationships.length > 0 ? { relationships } : {}) };
 }
 
+/**
+ * Restricts a normalized extraction payload to the sub-base-locations entity
+ * family: locations plus place-to-place containment relationships. The
+ * sub-base-locations prompt already asks the model for only those, but a model
+ * that "spills" a stray character/object/ability/event must not have it
+ * persisted. This is the locations-profile counterpart of the Sub-base C
+ * events/relationships guards in index.ts. Buckets are emptied rather than
+ * deleted so downstream code that reads `extraction.characters` etc. keeps
+ * working, and non-containment relationships are dropped.
+ */
+export function restrictSubBaseLocationsExtraction(payload: unknown): Record<string, unknown[]> | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const record = payload as Record<string, unknown>;
+
+  const isContainment = (item: unknown): boolean => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+    const relationship = item as Record<string, unknown>;
+    const rawType = relationship.relationship_type ?? relationship.type ?? '';
+    const normalizedType = String(rawType)
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, '_');
+    return normalizedType === 'contained_in';
+  };
+
+  const rawRelationships = Array.isArray(record.relationships) ? record.relationships : [];
+  const relationships = rawRelationships.filter(isContainment);
+
+  return {
+    ...record,
+    characters: [],
+    objects: [],
+    abilities: [],
+    magic_abilities: [],
+    organizations: [],
+    events: [],
+    relationships,
+  };
+}
+
+export interface PlannedPlaceType {
+  type_key: string;
+  label: string;
+  category: string;
+}
+
+/**
+ * Slugifies a free-form place-type string into a `knowledge_place_types.type_key`
+ * that satisfies the column CHECK (`^[a-z0-9_\-]{1,80}$`). Returns `''` when the
+ * input has no usable ASCII alphanumerics (e.g. a bare Hebrew phrase).
+ */
+export function slugifyPlaceTypeKey(value: unknown): string {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80)
+    .replace(/_+$/g, '');
+}
+
+/**
+ * Plans the project-scoped `knowledge_place_types` rows to add after a
+ * sub-base-locations extraction: one row per location the model flagged with
+ * `attributes.is_new_type === true` whose slugified `place_type` is usable and
+ * not already known (system row or existing project row). New rows are always
+ * project-scoped and `category: 'custom'`; the caller inserts them with the
+ * project's own `project_id` / `created_by` and `is_system: false`, so a learned
+ * type never leaks into another user's catalog.
+ */
+export function planNewPlaceTypes(
+  locations: unknown,
+  knownTypeKeys: Iterable<string>,
+): PlannedPlaceType[] {
+  if (!Array.isArray(locations)) return [];
+  const known = new Set<string>();
+  for (const key of knownTypeKeys) known.add(String(key).trim().toLowerCase());
+
+  const planned: PlannedPlaceType[] = [];
+  const seen = new Set<string>();
+  for (const location of locations) {
+    if (!location || typeof location !== 'object' || Array.isArray(location)) continue;
+    const record = location as Record<string, unknown>;
+    const attributes = (record.attributes && typeof record.attributes === 'object' && !Array.isArray(record.attributes))
+      ? record.attributes as Record<string, unknown>
+      : {};
+
+    const flag = attributes.is_new_type ?? record.is_new_type;
+    const isNew = flag === true || String(flag).trim().toLowerCase() === 'true';
+    if (!isNew) continue;
+
+    const rawType = attributes.place_type ?? record.place_type ?? record.location_type ?? '';
+    const label = String(rawType).trim();
+    const typeKey = slugifyPlaceTypeKey(rawType);
+    if (!typeKey || typeKey === 'other') continue;
+    if (known.has(typeKey) || seen.has(typeKey)) continue;
+
+    seen.add(typeKey);
+    planned.push({ type_key: typeKey, label: label || typeKey, category: 'custom' });
+  }
+  return planned;
+}
+
 // ============================================================
 // Phase 2: Sub-base C persistence helpers (pure, testable)
 // ============================================================

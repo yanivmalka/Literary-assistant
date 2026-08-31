@@ -467,25 +467,128 @@ const SUB_BASE_2_PROFILE_INSTRUCTIONS = `=== SUB-BASE-2 PROFILE INSTRUCTIONS ===
 This is the sub-base-2 extraction profile. Keep the same JSON schema and evidence requirements as the sub-base profile, but this section is intentionally isolated so this profile's extraction instructions can evolve without changing the other profiles.
 `;
 
-const LOCATIONS_PROFILE_INSTRUCTIONS = `=== LOCATION EXTRACTION PROFILE INSTRUCTIONS ===
-This profile is a clone of sub-base-2 with additional dynamic place extraction rules. Apply the following rules only to entities whose type is location:
+// ============================================
+// Sub-base Locations — dedicated locations-only base prompt
+// ============================================
+// buildExtractionPrompt() above is the shared legacy base prompt; it carries
+// character/object/ability/event extraction rules that this profile must never
+// see. This function is a standalone base prompt for the "sub-base-locations"
+// profile only: one extraction call per chunk window that returns location
+// entities and place-containment relationships, and nothing else. It must never
+// be reused by, or merged back into, buildExtractionPrompt().
+function buildSubBaseLocationsBasePrompt(
+  chunks: { position: number; content: string }[],
+  placeTypes: PlaceTypePromptDefinition[] = [],
+): string {
+  const chunksText = chunks
+    .map((c) => `[chunk ${c.position}]: ${c.content}`)
+    .join("\n\n");
+  const placeTypeCatalogText = buildPlaceTypeCatalogText(placeTypes);
 
+  return `You are a literary place extractor for Hebrew fiction. Extract only locations (places) and the containment relationships between them from these text chunks.
+
+=== OUTPUT FORMAT ===
+Return exactly one JSON object and nothing else. Do not return Markdown, code fences, commentary, or a second object.
+Use schema_version "2" and one unified entities array. Omit an empty relationships array, but always include entities.
+
+{
+  "schema_version": "2",
+  "entities": [
+    {
+      "name": "exact name from the text",
+      "type": "location",
+      "description": "short description grounded in the text",
+      "aliases": [],
+      "attributes": {
+        "place_type": "closest catalog type or the precise story-specific type",
+        "is_new_type": false,
+        "location_fields": {}
+      },
+      "name_uncertainty": {
+        "is_uncertain": false,
+        "confidence": 0.0,
+        "reason": null
+      },
+      "evidence": [],
+      "source_references": [
+        {
+          "chunk_position": 0,
+          "quote": "short exact quote supporting the extraction",
+          "position_start": null,
+          "position_end": null
+        }
+      ],
+      "chunk_positions": [],
+      "field_evidence": { "place_type": ["exact supporting quote"] }
+    }
+  ],
+  "relationships": [
+    {
+      "source": { "name": "child place name", "type": "location" },
+      "target": { "name": "container place name", "type": "location" },
+      "type": "contained_in",
+      "description": "short grounded explanation",
+      "evidence": [],
+      "source_references": [],
+      "chunk_positions": []
+    }
+  ]
+}
+
+Every entity MUST have a non-empty name and type "location". Every relationship MUST have source, target, and type "contained_in"; the relationships array is for place-to-place containment only. Use name_uncertainty when a nickname, title, or partial name may not be the canonical identity; do not invent a full name. Confidence is a number from 0 to 1 and represents model certainty, not a fact from the text.
+
+Do NOT return characters, objects, abilities, magic abilities, organizations, or events as entities. Do NOT invent a top-level "characters"/"objects"/"abilities"/"events" array; use the unified entities array above. Do NOT emit any relationship type other than "contained_in".
+
+=== GENERAL RULES ===
+- Return names in Hebrew exactly as written, WITHOUT nikud (vocalization marks).
+- Do NOT invent information. Only extract what appears in the text.
+- Fields without information = omit entirely. Never emit null, empty, or guessed values.
+- Keep evidence SHORT (max 10 words each, max 2 per entity). field_evidence quotes may be up to 15 words.
+- An alias is NOT a new entity. If the same place has multiple names/references, use ONE entity with aliases[].
+
+=== LOCATIONS ===
+**ONLY extract locations with a DISTINCT IDENTITY and NARRATIVE IMPORTANCE.**
+NEVER EXTRACT (these WILL be FILTERED OUT):
+- Generic indoor spaces: חדר, מטבח, דירה, סלון, חצר, מרתף, גג, עליית גג, שירותים, מסדרון, מרפסת, פרוזדור, מחסן
+- Generic outdoor spaces: שדה, רחוב, שביל, כביש, דרך, גינה, חצר
+- Generic nature (without specific name): יער, נהר, הר, גבעה, אגם, ים, חוף, מערה, גשר, בקעה, עמק, מדבר
+- Generic buildings/structures: בית, בניין, מגדל, חומה, שער, גדר
+- Generic urban: עיר, כפר, שוק, רחבה, ככר
+
+DO EXTRACT (places with distinct identity):
+- Named places: "יער אירויין", "המבצר", "טרונהיים", "המישור הארצי", "האקדמיה"
+- Places with specific narrative importance
+- Unique location identifiers within the story
+
+CONSOLIDATION:
+- If "העיר" refers to "טרונהיים" → canonical = "טרונהיים", aliases = ["העיר"]
+- If "יער" and "יער אירויין" = same → canonical = "יער אירויין", aliases = ["היער"]
+- "המישור הארצי" and "מישור הארצי" = same → use the most frequent form as canonical
+
+=== PLACE TYPE ===
 PLACE TYPE CATALOG (choose the closest type; do not impose a fixed hierarchy):
-- cosmic: universe, parallel_universe, dimension, plane, galaxy, star_system, world, moon
-- geography: continent, subcontinent, island, archipelago, peninsula, sea, ocean, lake, river, mountain, mountain_range, desert, forest, natural_region
-- governance: country, province, kingdom, colony, empire, territory, principality, duchy, republic, city_state
-- settlement: city, capital, town, village, colony_settlement, settlement, farm, fief, trading_post, outpost
-- structure: neighborhood, district, street, square, market, harbor, complex, building, villa, fort, castle, palace, temple, place_of_worship, tower
-- dwelling: house, cabin, apartment, room, tent, basement, attic, courtyard, garden
+${placeTypeCatalogText}
 
 - Put the selected type in attributes.place_type and support it with field_evidence.place_type.
-- If no catalog type is accurate, preserve the precise story-specific type in attributes.place_type. Use other only when no meaningful type can be identified.
+- If a catalog type above fits, use its exact key and set attributes.is_new_type to false.
+- If NO catalog type is accurate, put the precise story-specific type as a short lowercase snake_case key in attributes.place_type AND set attributes.is_new_type to true. Example: a world where the text calls a settlement tier "מאחז" with no catalog match -> place_type "mahaz", is_new_type true.
+- Use "other" (with is_new_type false) only when no meaningful type can be identified at all.
+- Preserve story-specific location facts in attributes.location_fields as grounded key/value pairs. Keep exact user-defined field_key values when they are provided.
+- Do not invent location fields when the text provides no evidence.
+
+=== CONTAINMENT ===
 - When the text explicitly establishes that one place is inside, part of, under, surrounding, or contained by another, emit contained_in from the child place to the container place.
 - Do not require or infer intermediate levels. A place may be directly inside any other place.
 - Do not put child places into the parent place's fields. A place should expose only its direct containers through relationships.
-- Preserve story-specific location facts in attributes.location_fields as grounded key/value pairs. Keep exact user-defined field_key values when they are provided.
-- Do not invent location fields or containment when the text provides no evidence.
-`;
+- Do not invent containment when the text provides no evidence.
+
+=== CONTEXT AWARENESS ===
+- If a word can be either a place name or something else (a character, an organization), decide based on context.
+- When uncertain, prefer NOT extracting over creating wrong entities.
+
+TEXT:
+${chunksText}`;
+}
 
 const CHARACTER_PROFILE_INSTRUCTIONS = `=== SUB-BASE C CHARACTER INSTRUCTIONS ===
 This section of the Sub-base C profile covers named or clearly identifiable characters, their grounded character fields, and relationships between characters. The same profile also extracts objects and abilities — see the OBJECTS and ABILITIES sections of the base prompt.
@@ -516,14 +619,6 @@ Use only these relationship_type values: acquaintance, friendship, friendship_de
 - Preserve direction for mentorship, work_subordinate, work_supervisor, and protection_or_dependency. The product will display an edge from either character's profile without changing its stored direction.
 `;
 
-const DYNAMIC_CHARACTER_FIELD_INSTRUCTIONS = `=== DYNAMIC CHARACTER FIELDS — SUB-BASE-LOCATIONS ONLY ===
-For characters in this profile, use attributes.character_fields for the selected project fields listed below.
-Keep the exact field_key. Extract a field only when the source explicitly supports it; otherwise omit the key entirely.
-Do not create empty or guessed values. Include field_evidence for every populated selected field.
-
-SELECTED CHARACTER FIELDS:
-`;
-
 export interface DynamicCharacterFieldPromptDefinition {
   field_key: string;
   label: string;
@@ -534,6 +629,59 @@ export interface ProjectPlaceFieldPromptDefinition {
   place_type_key: string;
   field_key: string;
   label: string;
+}
+
+export interface PlaceTypePromptDefinition {
+  type_key: string;
+  label: string;
+  category: string;
+}
+
+const PLACE_TYPE_CATEGORY_ORDER = [
+  "cosmic",
+  "geography",
+  "governance",
+  "settlement",
+  "structure",
+  "dwelling",
+  "custom",
+];
+
+const FALLBACK_PLACE_TYPE_CATALOG = `- cosmic: universe, parallel_universe, dimension, plane, galaxy, star_system, world, moon
+- geography: continent, subcontinent, island, archipelago, peninsula, sea, ocean, lake, river, mountain, mountain_range, desert, forest, natural_region
+- governance: country, province, kingdom, colony, empire, territory, principality, duchy, republic, city_state
+- settlement: city, capital, town, village, colony_settlement, settlement, farm, fief, trading_post, outpost
+- structure: neighborhood, district, street, square, market, harbor, complex, building, villa, fort, castle, palace, temple, place_of_worship, tower
+- dwelling: house, cabin, apartment, room, tent, basement, attic, courtyard, garden`;
+
+/**
+ * Renders the place-type catalog block for the sub-base-locations prompt.
+ * When the project supplies its own catalog (system rows + project-scoped rows
+ * from knowledge_place_types) it is grouped by category; otherwise the static
+ * fallback catalog is used so extraction still works before the catalog loads.
+ */
+export function buildPlaceTypeCatalogText(
+  placeTypes: PlaceTypePromptDefinition[] = [],
+): string {
+  if (placeTypes.length === 0) {
+    return FALLBACK_PLACE_TYPE_CATALOG;
+  }
+  const byCategory = new Map<string, string[]>();
+  for (const placeType of placeTypes) {
+    const key = String(placeType.type_key || "").trim();
+    if (!key) continue;
+    const category = String(placeType.category || "custom").trim() || "custom";
+    const list = byCategory.get(category) || [];
+    if (!list.includes(key)) list.push(key);
+    byCategory.set(category, list);
+  }
+  const orderedCategories = [
+    ...PLACE_TYPE_CATEGORY_ORDER.filter((category) => byCategory.has(category)),
+    ...[...byCategory.keys()].filter((category) => !PLACE_TYPE_CATEGORY_ORDER.includes(category)).sort(),
+  ];
+  return orderedCategories
+    .map((category) => `- ${category}: ${(byCategory.get(category) || []).join(", ")}`)
+    .join("\n");
 }
 
 export function buildSubBaseCCharactersInstructions(
@@ -561,49 +709,46 @@ ${dynamicCharacterFields
 }
 
 /**
- * Builds the profile-specific rules that must also be supplied to specialist
- * prompts. Keeping these rules here prevents parallel extraction from drifting
- * away from the sequential extraction contract.
+ * Builds the project-specific location-field rules appended to the
+ * sub-base-locations base prompt. Returns an empty string when the project has
+ * selected no custom place fields.
  */
 export function buildSubBaseLocationsInstructions(
   customPlaceFields: ProjectPlaceFieldPromptDefinition[] = [],
-  dynamicCharacterFields: DynamicCharacterFieldPromptDefinition[] = [],
 ): string {
-  const sections = [LOCATIONS_PROFILE_INSTRUCTIONS];
-
-  if (dynamicCharacterFields.length > 0) {
-    sections.push(
-      `${DYNAMIC_CHARACTER_FIELD_INSTRUCTIONS}${dynamicCharacterFields
-        .map(field => `- ${field.field_key} (${field.label}; group: ${field.group_key})`)
-        .join("\n")}`,
-    );
+  if (customPlaceFields.length === 0) {
+    return "";
   }
 
-  if (customPlaceFields.length > 0) {
-    sections.push(`=== PROJECT-SPECIFIC LOCATION FIELDS ===
+  return `=== PROJECT-SPECIFIC LOCATION FIELDS ===
 For a location, use attributes.location_fields for the following user-defined fields when the text explicitly supports them. Keep the exact field_key; do not invent a value. If the field does not apply or has no evidence, omit it.
 ${customPlaceFields
   .map(field => `- ${field.place_type_key}: ${field.field_key} (${field.label})`)
-  .join("\n")}`);
-  }
-
-  return sections.join("\n");
+  .join("\n")}`;
 }
 
 /**
  * Builds the prompt for the selected extraction profile.
- * sub-base-2 remains the existing development profile; the locations profile
- * is exactly that profile plus isolated location and dynamic-character rules.
+ * sub-base-2 remains the existing development profile. sub-base-locations and
+ * sub-base-c-characters each use a dedicated standalone base prompt scoped to a
+ * single entity family; they never see the shared legacy base prompt.
  */
 export function buildExtractionPromptForProfile(
   chunks: { position: number; content: string }[],
   profile: ExtractionPromptProfile,
   dynamicCharacterFields: DynamicCharacterFieldPromptDefinition[] = [],
   customPlaceFields: ProjectPlaceFieldPromptDefinition[] = [],
+  projectPlaceTypes: PlaceTypePromptDefinition[] = [],
 ): string {
   if (profile === "sub-base-c-characters") {
     const characterBasePrompt = buildSubBaseCCharactersBasePrompt(chunks);
     return `${characterBasePrompt}\n${buildSubBaseCCharactersInstructions(dynamicCharacterFields)}`;
+  }
+
+  if (profile === "sub-base-locations") {
+    const locationsBasePrompt = buildSubBaseLocationsBasePrompt(chunks, projectPlaceTypes);
+    const projectFields = buildSubBaseLocationsInstructions(customPlaceFields);
+    return projectFields ? `${locationsBasePrompt}\n${projectFields}` : locationsBasePrompt;
   }
 
   const basePrompt = buildExtractionPrompt(chunks);
@@ -613,9 +758,5 @@ export function buildExtractionPromptForProfile(
   }
 
   const subBase2Prompt = `${basePrompt}\n${SUB_BASE_2_PROFILE_INSTRUCTIONS}`;
-  if (profile === "sub-base-2") {
-    return subBase2Prompt;
-  }
-
-  return `${subBase2Prompt}\n${buildSubBaseLocationsInstructions(customPlaceFields, dynamicCharacterFields)}`;
+  return subBase2Prompt;
 }

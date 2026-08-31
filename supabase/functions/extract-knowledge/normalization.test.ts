@@ -2,7 +2,12 @@ import { assert, assertEquals, assertFalse } from "https://deno.land/std@0.224.0
 import { normalizeCharacterAge } from "../_shared/character-age.ts";
 import { buildExtractionPromptForProfile, buildSubBaseCCharactersInstructions } from "../_shared/rules/prompt.ts";
 import { buildAbilityLinks, buildObjectLinks, type AbilityLinkEntity } from "../_shared/ability-links.ts";
-import { adaptSubBaseCSerialExtraction } from "./testable-pipeline.ts";
+import {
+  adaptSubBaseCSerialExtraction,
+  planNewPlaceTypes,
+  restrictSubBaseLocationsExtraction,
+  slugifyPlaceTypeKey,
+} from "./testable-pipeline.ts";
 import {
   buildStructuredFields,
   normalizeEntities,
@@ -822,4 +827,82 @@ Deno.test("Issue 10: an object arriving in a later batch links to a character fr
   const links = buildObjectLinks([...persisted, ...current]);
   assertEquals(links.length, 1);
   assertEquals(links[0].relationshipType, "owns");
+});
+
+// ============================================
+// sub-base-locations: locations-only persistence guard
+// ============================================
+
+Deno.test("restrictSubBaseLocationsExtraction keeps only locations and containment relationships", () => {
+  const restricted = restrictSubBaseLocationsExtraction({
+    schema_version: "2",
+    locations: [{ name: "טרונהיים", type: "location" }],
+    characters: [{ name: "ליאו", type: "character" }],
+    objects: [{ name: "חרב", type: "object" }],
+    abilities: [{ name: "טלקינזיס", type: "ability" }],
+    magic_abilities: [{ name: "רונת אש", type: "magic_ability" }],
+    organizations: [{ name: "המסדר", type: "organization" }],
+    events: [{ name: "הקרב", description: "..." }],
+    relationships: [
+      { character_a: "השוק", character_b: "טרונהיים", relationship_type: "contained_in" },
+      { character_a: "ליאו", character_b: "טרונהיים", relationship_type: "located_in" },
+    ],
+  });
+
+  assert(restricted);
+  assertEquals(restricted?.locations.length, 1);
+  assertEquals(restricted?.characters, []);
+  assertEquals(restricted?.objects, []);
+  assertEquals(restricted?.abilities, []);
+  assertEquals(restricted?.magic_abilities, []);
+  assertEquals(restricted?.organizations, []);
+  assertEquals(restricted?.events, []);
+  assertEquals(restricted?.relationships.length, 1);
+  assertEquals(
+    (restricted?.relationships[0] as Record<string, unknown>).relationship_type,
+    "contained_in",
+  );
+});
+
+Deno.test("restrictSubBaseLocationsExtraction normalizes containment type spelling and canonical `type`", () => {
+  const restricted = restrictSubBaseLocationsExtraction({
+    relationships: [
+      { source: { name: "a" }, target: { name: "b" }, type: "Contained-In" },
+    ],
+  });
+  assertEquals(restricted?.relationships.length, 1);
+});
+
+Deno.test("restrictSubBaseLocationsExtraction returns null for a non-object payload", () => {
+  assertEquals(restrictSubBaseLocationsExtraction(null), null);
+  assertEquals(restrictSubBaseLocationsExtraction([{ name: "x" }]), null);
+});
+
+Deno.test("slugifyPlaceTypeKey produces a CHECK-valid key or empty string", () => {
+  assertEquals(slugifyPlaceTypeKey("Trading Post"), "trading_post");
+  assertEquals(slugifyPlaceTypeKey("  Star-System!!  "), "star_system");
+  assertEquals(slugifyPlaceTypeKey("מאחז"), "");
+  assertEquals(slugifyPlaceTypeKey("city"), "city");
+});
+
+Deno.test("planNewPlaceTypes returns only flagged, unknown, slug-valid types (deduped)", () => {
+  const locations = [
+    { name: "A", attributes: { place_type: "sky_citadel", is_new_type: true } },
+    { name: "B", attributes: { place_type: "sky_citadel", is_new_type: true } }, // dup
+    { name: "C", attributes: { place_type: "kingdom", is_new_type: true } },     // already known
+    { name: "D", attributes: { place_type: "Void Reach", is_new_type: "true" } },// string flag
+    { name: "E", attributes: { place_type: "harbor" } },                         // not flagged
+    { name: "F", attributes: { place_type: "other", is_new_type: true } },       // 'other' skipped
+    { name: "G", attributes: { place_type: "מאחז", is_new_type: true } },         // no ascii -> skipped
+  ];
+  const planned = planNewPlaceTypes(locations, ["kingdom", "city"]);
+  assertEquals(planned, [
+    { type_key: "sky_citadel", label: "sky_citadel", category: "custom" },
+    { type_key: "void_reach", label: "Void Reach", category: "custom" },
+  ]);
+});
+
+Deno.test("planNewPlaceTypes returns [] for a non-array payload", () => {
+  assertEquals(planNewPlaceTypes(null, []), []);
+  assertEquals(planNewPlaceTypes({ locations: [] }, []), []);
 });

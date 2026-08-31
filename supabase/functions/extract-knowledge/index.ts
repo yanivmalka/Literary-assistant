@@ -58,6 +58,8 @@ import {
   cloneJsonValue,
   normalizeExtractionPayload,
   adaptSubBaseCSerialExtraction,
+  planNewPlaceTypes,
+  restrictSubBaseLocationsExtraction,
   validateExtractionMode,
   validateExtractionPayload,
   validateExtractionStrategy,
@@ -257,8 +259,15 @@ function buildPrompt(
   profile: GeminiModelProfile,
   customPlaceFields: Array<{ place_type_key: string; field_key: string; label: string }> = [],
   dynamicCharacterFields: Array<{ field_key: string; label: string; group_key: string }> = [],
+  projectPlaceTypes: Array<{ type_key: string; label: string; category: string }> = [],
 ): string {
-  return buildExtractionPromptForProfile(chunks, profile, dynamicCharacterFields, customPlaceFields);
+  return buildExtractionPromptForProfile(
+    chunks,
+    profile,
+    dynamicCharacterFields,
+    customPlaceFields,
+    projectPlaceTypes,
+  );
 }
 
 // ============================================
@@ -1460,6 +1469,7 @@ Deno.serve(async (req) => {
     // ==============================
     const promptBuildStartedAt = Date.now();
     let projectPlaceFields: Array<{ place_type_key: string; field_key: string; label: string }> = [];
+    let projectPlaceTypes: Array<{ type_key: string; label: string; category: string }> = [];
     let projectCharacterFields: Array<{ field_key: string; label: string; group_key: string }> = [];
     if (modelProfile === "sub-base-locations") {
       const { data, error } = await supabase
@@ -1472,9 +1482,22 @@ Deno.serve(async (req) => {
         console.warn("[extract-knowledge] Could not load project place fields:", error.message);
       }
       projectPlaceFields = (data || []) as Array<{ place_type_key: string; field_key: string; label: string }>;
+
+      // System catalog rows (project_id IS NULL, is_system = true) plus any this
+      // project already learned. Feeds the prompt's PLACE TYPE CATALOG so the
+      // model reuses known keys and only flags genuinely new ones.
+      const { data: placeTypeData, error: placeTypeError } = await supabase
+        .from("knowledge_place_types")
+        .select("type_key, label, category")
+        .or(`is_system.eq.true,project_id.eq.${body.project_id}`)
+        .order("category");
+      if (placeTypeError) {
+        console.warn("[extract-knowledge] Could not load place types:", placeTypeError.message);
+      }
+      projectPlaceTypes = (placeTypeData || []) as Array<{ type_key: string; label: string; category: string }>;
     }
 
-    if (modelProfile === "sub-base-locations" || modelProfile === "sub-base-c-characters") {
+    if (modelProfile === "sub-base-c-characters") {
       const { data: characterData, error: characterError } = await supabase
         .from("knowledge_character_field_definitions")
         .select("field_key, label, group_key")
@@ -1488,7 +1511,7 @@ Deno.serve(async (req) => {
       projectCharacterFields = (characterData || []) as Array<{ field_key: string; label: string; group_key: string }>;
     }
 
-    const prompt = buildPrompt(chunkData, modelProfile, projectPlaceFields, projectCharacterFields);
+    const prompt = buildPrompt(chunkData, modelProfile, projectPlaceFields, projectCharacterFields, projectPlaceTypes);
     const promptBuildLatencyMs = Date.now() - promptBuildStartedAt;
     const totalChars = chunkData.reduce((sum, c) => sum + c.content.length, 0);
     let extraction: GeminiExtraction;
@@ -1582,9 +1605,12 @@ Deno.serve(async (req) => {
 
     const parsedExtraction = parseExtractionJson<unknown>(responseText);
     const normalizedPayload = normalizeExtractionPayload<GeminiExtraction>(parsedExtraction);
-    const normalizedExtraction = modelProfile === "sub-base-c-characters" && normalizedPayload
+    let normalizedExtraction = modelProfile === "sub-base-c-characters" && normalizedPayload
       ? adaptSubBaseCSerialExtraction(normalizedPayload) as GeminiExtraction | null
       : normalizedPayload;
+    if (modelProfile === "sub-base-locations" && normalizedExtraction) {
+      normalizedExtraction = restrictSubBaseLocationsExtraction(normalizedExtraction) as GeminiExtraction | null;
+    }
     if (!normalizedExtraction) {
       const message = "Gemini returned JSON that does not match the extraction schema.";
       console.error(`[extract-knowledge] ${message} offset=${offset}`);
@@ -2492,15 +2518,52 @@ Deno.serve(async (req) => {
     }
 
     // ==============================
+    // Step 6b: Learn new place types (sub-base-locations only)
+    // ==============================
+    // When the model flags a location's place_type as not in the catalog it was
+    // given, persist that type as a project-scoped row so future runs reuse it.
+    // Rows are always is_system=false and carry this project's id, so a learned
+    // type stays inside the owner's catalog and never reaches other users.
+    let placeTypesLearned = 0;
+    if (modelProfile === "sub-base-locations") {
+      const knownTypeKeys = projectPlaceTypes.map((placeType) => placeType.type_key);
+      const newPlaceTypes = planNewPlaceTypes(extraction.locations || [], knownTypeKeys);
+      if (newPlaceTypes.length > 0) {
+        const { data: insertedTypes, error: placeTypeInsertError } = await supabase
+          .from("knowledge_place_types")
+          .upsert(
+            newPlaceTypes.map((placeType) => ({
+              project_id: body.project_id,
+              type_key: placeType.type_key,
+              label: placeType.label,
+              category: placeType.category,
+              is_system: false,
+              created_by: body.user_id,
+            })),
+            { onConflict: "project_id,type_key", ignoreDuplicates: true },
+          )
+          .select("id");
+        if (placeTypeInsertError) {
+          console.warn("[extract-knowledge] Could not persist learned place types:", placeTypeInsertError.message);
+        } else {
+          placeTypesLearned = insertedTypes?.length || 0;
+        }
+      }
+    }
+
+    // ==============================
     // Step 7: Save events in the target layer
     // ==============================
     let eventsSaved = 0;
     let eventMentionsSaved = 0;
     let eventParticipantsSaved = 0;
-    // Sub-base C never extracts events/timeline entries; skip persisting them
-    // even if the model returns some despite the prompt's instructions.
-    const subBaseCEvents = modelProfile === "sub-base-c-characters" ? [] : (extraction.events || []);
-    for (const event of subBaseCEvents) {
+    // Sub-base C and Sub-base Locations are single-family profiles that never
+    // extract events/timeline entries; skip persisting them even if the model
+    // returns some despite the prompt's instructions.
+    const persistedEvents = modelProfile === "sub-base-c-characters" || modelProfile === "sub-base-locations"
+      ? []
+      : (extraction.events || []);
+    for (const event of persistedEvents) {
       const eventName = (event.name || event.description || event.what_happened || "unnamed event").trim().slice(0, 200);
       const eventDescription = event.what_happened || event.description || event.name || null;
       const eventBranchId = targetBranchId;
@@ -2679,6 +2742,7 @@ Deno.serve(async (req) => {
           aliases_saved: aliasesSaved,
           relationships_saved: relationshipsSaved,
           relationships_dropped: relationshipsDropped || undefined,
+          place_types_learned: placeTypesLearned || undefined,
           ability_relationships_saved: abilityRelationshipsSaved,
           ability_relationship_errors: abilityRelationshipErrors.length > 0 ? abilityRelationshipErrors : undefined,
           object_relationships_saved: objectRelationshipsSaved,
