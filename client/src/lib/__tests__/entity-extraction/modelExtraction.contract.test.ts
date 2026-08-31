@@ -64,14 +64,19 @@ describe('Entity Extraction model matrix contract (offline)', () => {
     expect(subBasePrompt).not.toContain('attributes.location_fields')
 
     expect(subBase2Prompt).toContain('SUB-BASE-2 PROFILE INSTRUCTIONS')
-    expect(subBase2Prompt).not.toContain('LOCATION EXTRACTION PROFILE INSTRUCTIONS')
     expect(subBase2Prompt).not.toContain('attributes.location_fields')
 
-    expect(locationsPrompt.startsWith(subBase2Prompt)).toBe(true)
-    expect(locationsPrompt).toContain('LOCATION EXTRACTION PROFILE INSTRUCTIONS')
+    // sub-base-locations now uses a dedicated standalone base prompt scoped to
+    // places only; it no longer piggybacks on the sub-base-2 prompt.
+    expect(locationsPrompt.startsWith(subBase2Prompt)).toBe(false)
+    expect(locationsPrompt).toContain('You are a literary place extractor for Hebrew fiction.')
     expect(locationsPrompt).toContain('attributes.place_type')
     expect(locationsPrompt).toContain('attributes.location_fields')
+    expect(locationsPrompt).toContain('attributes.is_new_type')
     expect(locationsPrompt).toContain('contained_in')
+    // Other entity families must not leak into the locations prompt.
+    expect(locationsPrompt).not.toContain('SUB-BASE-2 PROFILE INSTRUCTIONS')
+    expect(locationsPrompt).not.toContain('=== CHARACTERS ===')
   })
 
   it('keeps dynamic location fields out of legacy profile normalization', () => {

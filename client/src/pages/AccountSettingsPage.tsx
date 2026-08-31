@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { useAuthStore } from '@/stores/authStore'
+import { useAuthStore, getUserSettings } from '@/stores/authStore'
 import { useTheme, type ThemeTransitionMode, type ExtractionProgressStyle, type AccentColor } from '@/components/ThemeProvider'
 import { ArrowLeft, Lock, Mail, Chrome, Check } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
@@ -23,7 +23,7 @@ interface Identity {
 export default function AccountSettingsPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { user, linkIdentity, updateUserPassword, getUserIdentities } = useAuthStore()
+  const { user, linkIdentity, updateUserPassword, updateUserSettings, getUserIdentities } = useAuthStore()
   const { themeSettings, updateThemeSettings } = useTheme()
   
   const [identities, setIdentities] = useState<Identity[]>([])
@@ -37,6 +37,22 @@ export default function AccountSettingsPage() {
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+
+  // Knowledge-base preferences (stored in auth user metadata)
+  const [showPlaceLevel, setShowPlaceLevel] = useState(getUserSettings(user).show_place_hierarchy_level ?? false)
+  const [placeLevelSaving, setPlaceLevelSaving] = useState(false)
+
+  const handleTogglePlaceLevel = async (next: boolean) => {
+    setShowPlaceLevel(next)
+    setPlaceLevelSaving(true)
+    setError(null)
+    const { error: err } = await updateUserSettings({ show_place_hierarchy_level: next })
+    setPlaceLevelSaving(false)
+    if (err) {
+      setShowPlaceLevel(!next)
+      setError(err)
+    }
+  }
 
   // Load identities on mount
   useEffect(() => {
@@ -279,6 +295,30 @@ export default function AccountSettingsPage() {
               <option value="sword">{t('ui.extraction.progressStyleSword')}</option>
               <option value="minimal">{t('ui.extraction.progressStyleMinimal')}</option>
             </select>
+          </div>
+        </div>
+
+        {/* Knowledge base */}
+        <div className="border rounded-lg p-4 sm:p-6 bg-card mb-6">
+          <h2 className="text-xl font-semibold">{t('ui.location.settingsTitle')}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{t('ui.location.settingsDescription')}</p>
+
+          <div className="mt-6">
+            <label className="flex items-start justify-between gap-4 cursor-pointer">
+              <span>
+                <span className="block font-medium">{t('ui.location.showHierarchyLevel')}</span>
+                <span className="block mt-1 text-sm text-muted-foreground">
+                  {t('ui.location.showHierarchyLevelDescription')}
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={showPlaceLevel}
+                disabled={placeLevelSaving}
+                onChange={(event) => { void handleTogglePlaceLevel(event.target.checked) }}
+                className="mt-1 h-5 w-5 accent-primary disabled:opacity-50"
+              />
+            </label>
           </div>
         </div>
 

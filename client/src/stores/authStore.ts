@@ -36,8 +36,22 @@ interface AuthState {
   confirmEmail: (email: string, token: string) => Promise<{ error: string | null }>
   linkIdentity: (provider: 'google' | 'github') => Promise<{ error: string | null }>
   updateUserPassword: (password: string) => Promise<{ error: string | null }>
+  updateUserSettings: (patch: Record<string, unknown>) => Promise<{ error: string | null }>
   sendPasswordReset: (email: string) => Promise<{ error: string | null }>
   getUserIdentities: () => Promise<{ identities: any[] | null; error: string | null }>
+}
+
+/**
+ * Per-user preferences are stored in Supabase auth user metadata
+ * (`user.user_metadata`) because this deployment has no `profiles` table.
+ */
+export interface UserSettings {
+  /** When true, the Locations view shows a computed containment depth badge. Default off. */
+  show_place_hierarchy_level?: boolean
+}
+
+export function getUserSettings(user: User | null): UserSettings {
+  return (user?.user_metadata ?? {}) as UserSettings
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -214,6 +228,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err) {
       console.error('Failed to update password:', err)
       return { error: i18n.t('auth.passwordUpdateFailed') }
+    }
+  },
+
+  updateUserSettings: async (patch) => {
+    try {
+      const current = get().user?.user_metadata ?? {}
+      const { data, error } = await supabase.auth.updateUser({ data: { ...current, ...patch } })
+      if (!error && data.user) {
+        set({ user: data.user })
+      }
+      return { error: error ? translateAuthError(error, 'ui.common.unexpectedError') : null }
+    } catch (err) {
+      console.error('Failed to update user settings:', err)
+      return { error: i18n.t('ui.common.unexpectedError') }
     }
   },
 

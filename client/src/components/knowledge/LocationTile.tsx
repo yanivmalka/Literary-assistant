@@ -7,6 +7,8 @@ import { useTheme } from '@/components/ThemeProvider'
 interface LocationTileProps {
   location: Entity
   parentNames?: string[]
+  /** Containment depth (1-based); shown as a badge only when the user enabled the option. */
+  level?: number
   onEdit?: (location: Entity) => void
 }
 
@@ -24,12 +26,13 @@ function tintHue(name: string): number {
   return hash
 }
 
-export default function LocationTile({ location, parentNames = [], onEdit }: LocationTileProps) {
+export default function LocationTile({ location, parentNames = [], level, onEdit }: LocationTileProps) {
   const { t } = useTranslation()
   const { theme } = useTheme()
   const placeType = getField(location, 'place_type') || getField(location, 'location_type')
   const description = getField(location, 'description')
-  const customFields = Object.entries(location.structured_fields || {}).filter(([key, value]) => !['name', 'place_type', 'location_type', 'description'].includes(key) && value != null && value !== '')
+  const isDescriptiveName = getField(location, 'is_descriptive_name') === 'true'
+  const customFields = Object.entries(location.structured_fields || {}).filter(([key, value]) => !['name', 'place_type', 'location_type', 'description', 'is_descriptive_name', 'is_new_type'].includes(key) && value != null && value !== '')
   const hue = tintHue(location.name)
 
   return (
@@ -54,7 +57,19 @@ export default function LocationTile({ location, parentNames = [], onEdit }: Loc
           {location.name.charAt(0)}
         </div>
         <div className="min-w-0">
-          <h3 className="font-display font-semibold text-lg leading-tight">{location.name}</h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-display font-semibold text-lg leading-tight">{location.name}</h3>
+            {level != null && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground" title={t('ui.location.hierarchyLevel')}>
+                {t('ui.location.levelBadge', { level })}
+              </span>
+            )}
+            {isDescriptiveName && (
+              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-warning-soft text-warning" title={t('ui.location.descriptiveNameHint')}>
+                {t('ui.location.descriptiveNameBadge')}
+              </span>
+            )}
+          </div>
           {placeType && <p className="text-xs text-muted-foreground font-medium mt-0.5">{placeType}</p>}
         </div>
       </div>

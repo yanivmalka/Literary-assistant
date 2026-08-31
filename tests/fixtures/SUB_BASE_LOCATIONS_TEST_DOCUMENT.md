@@ -32,6 +32,15 @@ pendant locked in a copper box there. His colleague Mira Stonewell can read
 memories by touch, an ability the wardens call farsight. Dorian trusts Mira, and
 the two are allies.
 
+## A plot-central unnamed space (SHOULD be rescued with a descriptive name)
+
+Beneath the Obsidian Spire is a cellar. It has no name. In the first chapter the
+old archivist is found dead in that cellar. In the third chapter Mira returns to
+the cellar and finds the missing ledger hidden under its floor. In the seventh
+chapter Dorian confronts the killer in the same cellar, and the confession that
+ends the story is spoken there. Every turning point of the mystery happens in
+this one cellar.
+
 ## Containment summary
 
 Aeltharûn contains Var Solethi. Var Solethi contains Or'Dahl. Or'Dahl contains

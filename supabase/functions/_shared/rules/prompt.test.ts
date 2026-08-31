@@ -111,6 +111,15 @@ Deno.test("sub-base-locations prompt renders the supplied project catalog groupe
   assertFalse(prompt.includes("- cosmic: universe, parallel_universe, dimension"));
 });
 
+Deno.test("sub-base-locations prompt rescues a plot-central unnamed space with a descriptive name and flag", () => {
+  const prompt = buildExtractionPromptForProfile(chunks, "sub-base-locations");
+  assert(prompt.includes("EXCEPTION — a generic space that carries the plot:"));
+  assert(prompt.includes("attributes.is_descriptive_name to true"));
+  assert(prompt.includes('"is_descriptive_name": false'));
+  // The rescue must stay narrow.
+  assert(prompt.includes("Do NOT rescue a space that is only mentioned once or twice"));
+});
+
 Deno.test("buildPlaceTypeCatalogText orders known categories first, then extras alphabetically, deduping keys", () => {
   const text = buildPlaceTypeCatalogText([
     { type_key: "void", label: "Void", category: "zeta" },

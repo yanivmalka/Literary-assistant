@@ -189,3 +189,41 @@ export async function savePlaceContainers(params: {
 export function getContainerOptions(locations: Entity[], locationId?: string): Entity[] {
   return locations.filter(location => location.id !== locationId && location.entity_type === 'location')
 }
+
+/**
+ * Derives a 1-based containment depth for every place from the parent map
+ * produced by {@link loadPlaceHierarchy}. A place with no container is level 1;
+ * otherwise it is 1 + the deepest of its containers (longest path from a root),
+ * so a place that sits inside several containers reports the deepest nesting.
+ * Cycles (which the data should never contain) are broken so the walk always
+ * terminates. Ids present only as containers are included as roots.
+ */
+export function computePlaceLevels(parentsByChild: Record<string, string[]>): Record<string, number> {
+  const levels: Record<string, number> = {}
+  const visiting = new Set<string>()
+
+  const resolve = (id: string): number => {
+    if (levels[id] !== undefined) return levels[id]
+    const parents = parentsByChild[id] || []
+    if (parents.length === 0) {
+      levels[id] = 1
+      return 1
+    }
+    if (visiting.has(id)) return 1 // cycle guard
+    visiting.add(id)
+    let deepestParent = 0
+    for (const parentId of parents) {
+      deepestParent = Math.max(deepestParent, resolve(parentId))
+    }
+    visiting.delete(id)
+    levels[id] = deepestParent + 1
+    return levels[id]
+  }
+
+  const ids = new Set<string>(Object.keys(parentsByChild))
+  for (const parents of Object.values(parentsByChild)) {
+    for (const parentId of parents) ids.add(parentId)
+  }
+  for (const id of ids) resolve(id)
+  return levels
+}

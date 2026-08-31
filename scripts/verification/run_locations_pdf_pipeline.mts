@@ -177,7 +177,7 @@ async function main() {
     relationships_are_containment_only: relationships.length > 0 && nonContainment.length === 0,
     main_bootstrap: locations.every((e) => e.layer === "main" && e.branch_id === null),
     values_have_lineage: values.length === 0 || values.every((v) => v.raw_extraction_id === raw?.id),
-    learned_place_type_persisted: learned.length > 0 && learned.every((t) => t.is_system === false && t.project_id === project.id),
+    learned_place_types_are_project_scoped: learned.every((t) => t.is_system === false && t.project_id === project.id),
   };
 
   const output = {

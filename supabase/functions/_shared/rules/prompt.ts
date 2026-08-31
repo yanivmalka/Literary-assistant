@@ -502,6 +502,7 @@ Use schema_version "2" and one unified entities array. Omit an empty relationshi
       "attributes": {
         "place_type": "closest catalog type or the precise story-specific type",
         "is_new_type": false,
+        "is_descriptive_name": false,
         "location_fields": {}
       },
       "name_uncertainty": {
@@ -559,6 +560,11 @@ DO EXTRACT (places with distinct identity):
 - Named places: "יער אירויין", "המבצר", "טרונהיים", "המישור הארצי", "האקדמיה"
 - Places with specific narrative importance
 - Unique location identifiers within the story
+
+EXCEPTION — a generic space that carries the plot:
+- If a space from the NEVER EXTRACT lists has no proper name but is clearly load-bearing for the story — it recurs across several scenes AND a major event happens there (a death, a discovery, a confrontation) — extract it anyway.
+- Give it a short descriptive Hebrew name grounded in the text (for example "המרתף שבו נמצאה הגופה", "החדר שבו נחתם ההסכם"), keep the plain word as an alias ("מרתף"), and set attributes.is_descriptive_name to true with field_evidence.is_descriptive_name pointing at the event.
+- Do NOT rescue a space that is only mentioned once or twice in passing, or one that is merely a backdrop for ordinary conversation. When in doubt, leave it out.
 
 CONSOLIDATION:
 - If "העיר" refers to "טרונהיים" → canonical = "טרונהיים", aliases = ["העיר"]

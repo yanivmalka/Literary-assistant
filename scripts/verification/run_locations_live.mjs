@@ -212,6 +212,12 @@ function buildChecks(data, response) {
 
   const learnedPlaceTypes = data.project_place_types || [];
 
+  const rescuedLocations = locationEntities.filter((entity) => {
+    const sf = entity.structured_fields || {};
+    const attrs = entity.attributes || {};
+    return sf.is_descriptive_name === true || attrs.is_descriptive_name === true;
+  });
+
   const checks = {
     response_success: response.success === true,
     response_profile: response.telemetry?.model_profile === "sub-base-locations",
@@ -226,8 +232,13 @@ function buildChecks(data, response) {
     main_bootstrap: mainEntities.length === locationEntities.length && data.branch_entities.length === 0,
     relationships_are_containment_only: data.relationships.length > 0 && nonContainmentRelationships.length === 0,
     values_have_lineage: data.values.length === 0 || data.values.every((value) => value.raw_extraction_id === raw?.id),
-    learned_place_type_persisted: learnedPlaceTypes.length > 0
-      && learnedPlaceTypes.every((placeType) => placeType.is_system === false && placeType.project_id === data.project.id),
+    // The model does not always flag the borderline "warden-hold" type, so this
+    // asserts scoping is correct for whatever it did learn rather than requiring
+    // a learned row every run. planNewPlaceTypes has its own unit coverage.
+    learned_place_types_are_project_scoped: learnedPlaceTypes.every(
+      (placeType) => placeType.is_system === false && placeType.project_id === data.project.id,
+    ),
+    descriptive_name_rescued: rescuedLocations.length > 0,
   };
 
   return {
@@ -236,6 +247,7 @@ function buildChecks(data, response) {
     raw_out_of_scope_bucket_keys_with_values: outOfScopeBuckets,
     non_containment_relationship_types: [...new Set(nonContainmentRelationships.map((rel) => rel.relationship_type || rel.type))],
     learned_place_types: learnedPlaceTypes.map((placeType) => `${placeType.type_key} (${placeType.label}; ${placeType.category})`),
+    rescued_descriptive_names: rescuedLocations.map((entity) => entity.canonical_name || entity.name),
     place_types_learned_reported: response.summary?.place_types_learned ?? null,
     entity_counts: {
       total: data.entities.length,

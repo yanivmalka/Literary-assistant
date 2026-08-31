@@ -335,6 +335,11 @@ function buildStructuredFields(type: string, entity: ExtractedEntity): Record<st
     if (entity.parent_location) fields.parent_location = entity.parent_location;
     fields.narrative_impact = null;
     fields.narrative_importance = entity.narrative_importance || null;
+    // Sub-base Locations may rescue an unnamed but plot-central space and give it
+    // a descriptive name; surface the flag so the UI can mark it for review.
+    if (entityAttributes.is_descriptive_name === true) {
+      fields.is_descriptive_name = true;
+    }
   } else if (type === "object") {
     fields.object_type = entity.object_type || null;
     fields.appearance = entity.appearance || null;

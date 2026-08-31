@@ -6,7 +6,8 @@ import { useEntityStore } from '@/stores/entityStore'
 import type { Entity } from '@/stores/entityStore'
 import type { ExtractionModelProfile } from '@/lib/extractionModels'
 import { shouldUseProfileBranch } from '@/lib/extractionModels'
-import { loadPlaceHierarchy } from '@/lib/placeHierarchy'
+import { loadPlaceHierarchy, computePlaceLevels } from '@/lib/placeHierarchy'
+import { useAuthStore, getUserSettings } from '@/stores/authStore'
 import LocationTile from './LocationTile'
 import LocationEditModal from './LocationEditModal'
 import { Card } from '@/components/ui/Card'
@@ -28,6 +29,8 @@ export default function LocationsHub({ projectId, modelProfile }: LocationsHubPr
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState<Entity | null>(null)
   const [parentsByChild, setParentsByChild] = useState<Record<string, string[]>>({})
+  const showHierarchyLevel = useAuthStore(state => getUserSettings(state.user).show_place_hierarchy_level ?? false)
+  const placeLevels = showHierarchyLevel ? computePlaceLevels(parentsByChild) : {}
 
   const mainLocations = getMainOnlyEntities({ type: 'location' })
   const branchLocations = getEffectiveBranchEntities({ type: 'location' })
@@ -79,7 +82,7 @@ export default function LocationsHub({ projectId, modelProfile }: LocationsHubPr
 
       <div className="mb-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4"><h2 className="font-display text-lg font-semibold break-words">{selectedVersion === 'main' ? t('branch.main') : currentBranch?.name}</h2><Button onClick={handleCreateNew} disabled={selectedVersion === 'branch' && !currentBranch} size="sm" className="w-full sm:w-auto"><Plus className="h-4 w-4" />{t('entities.newLocation')}</Button></div>
-        {locations.length === 0 ? <div className="border-2 border-dashed border-border rounded-lg p-12 text-center"><p className="text-muted-foreground">{t('entities.emptyLocations')}</p></div> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{locations.map(location => <LocationTile key={location.id} location={location} parentNames={(parentsByChild[location.id] || []).map(displayName)} onEdit={handleEditLocation} />)}</div>}
+        {locations.length === 0 ? <div className="border-2 border-dashed border-border rounded-lg p-12 text-center"><p className="text-muted-foreground">{t('entities.emptyLocations')}</p></div> : <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{locations.map(location => <LocationTile key={location.id} location={location} parentNames={(parentsByChild[location.id] || []).map(displayName)} level={showHierarchyLevel ? placeLevels[location.id] : undefined} onEdit={handleEditLocation} />)}</div>}
       </div>
 
       <LocationEditModal

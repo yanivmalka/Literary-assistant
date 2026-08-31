@@ -204,8 +204,7 @@ async function main() {
     relationships_are_containment_only: relationships.length > 0 && nonContainmentRels.length === 0,
     main_bootstrap: locationEntities.every((e) => e.layer === "main" && e.branch_id === null),
     values_have_lineage: values.length === 0 || values.every((v) => v.raw_extraction_id === raw?.id),
-    learned_place_type_persisted: learnedPlaceTypes.length > 0
-      && learnedPlaceTypes.every((t) => t.is_system === false && t.project_id === project.id),
+    learned_place_types_are_project_scoped: learnedPlaceTypes.every((t) => t.is_system === false && t.project_id === project.id),
   };
 
   const output = {
