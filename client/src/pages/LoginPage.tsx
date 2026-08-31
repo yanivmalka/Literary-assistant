@@ -86,6 +86,12 @@ export default function LoginPage() {
               />
             </div>
 
+            <div className="text-end">
+              <Link to="/forgot-password" className="text-sm text-primary hover:underline">
+                {t('auth.forgotPassword')}
+              </Link>
+            </div>
+
             <Button type="submit" disabled={loading} className="w-full">
               {loading ? t('common.loading') : t('auth.login')}
             </Button>

@@ -100,7 +100,19 @@
     "userNotFound": "User not found.",
     "identitiesFetchFailed": "Failed to fetch sign-in methods. Please try again.",
     "passwordAdded": "Password added successfully!",
-    "googleLinkingStarted": "Google linking initiated. Complete the sign-in process."
+    "googleLinkingStarted": "Google linking initiated. Complete the sign-in process.",
+    "forgotPassword": "Forgot your password?",
+    "forgotPasswordTitle": "Reset your password",
+    "forgotPasswordBody": "Enter your account email and we'll send you a link to set a new password.",
+    "sendResetLink": "Send reset link",
+    "resetLinkSent": "If an account exists for {{email}}, a password reset link is on its way. Check your inbox.",
+    "backToLogin": "Back to log in",
+    "resetPasswordTitle": "Choose a new password",
+    "newPassword": "New password",
+    "updatePassword": "Update password",
+    "passwordResetSuccess": "Your password has been updated. Redirecting to log in…",
+    "resetLinkInvalid": "This password reset link is invalid or has expired.",
+    "passwordResetFailed": "Could not send the reset link. Please try again."
   },
   "projects": {
     "title": "My Creations",

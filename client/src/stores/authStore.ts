@@ -36,6 +36,7 @@ interface AuthState {
   confirmEmail: (email: string, token: string) => Promise<{ error: string | null }>
   linkIdentity: (provider: 'google' | 'github') => Promise<{ error: string | null }>
   updateUserPassword: (password: string) => Promise<{ error: string | null }>
+  sendPasswordReset: (email: string) => Promise<{ error: string | null }>
   getUserIdentities: () => Promise<{ identities: any[] | null; error: string | null }>
 }
 
@@ -213,6 +214,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err) {
       console.error('Failed to update password:', err)
       return { error: i18n.t('auth.passwordUpdateFailed') }
+    }
+  },
+
+  sendPasswordReset: async (email) => {
+    try {
+      const normalizedEmail = email.trim()
+      if (!normalizedEmail) {
+        return { error: i18n.t('auth.emailRequired') }
+      }
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}reset-password`,
+      })
+      return { error: error ? translateAuthError(error, 'auth.passwordResetFailed') : null }
+    } catch (err) {
+      console.error('Failed to send password reset:', err)
+      return { error: i18n.t('auth.passwordResetFailed') }
     }
   },
 

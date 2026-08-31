@@ -100,7 +100,19 @@
     "userNotFound": "המשתמש לא נמצא.",
     "identitiesFetchFailed": "לא ניתן לטעון את שיטות ההתחברות. נסה שוב.",
     "passwordAdded": "הסיסמה נוספה בהצלחה!",
-    "googleLinkingStarted": "החיבור ל-Google התחיל. השלם את תהליך ההתחברות."
+    "googleLinkingStarted": "החיבור ל-Google התחיל. השלם את תהליך ההתחברות.",
+    "forgotPassword": "שכחת את הסיסמה?",
+    "forgotPasswordTitle": "איפוס סיסמה",
+    "forgotPasswordBody": "הזן את כתובת האימייל של החשבון ונשלח לך קישור להגדרת סיסמה חדשה.",
+    "sendResetLink": "שלח קישור לאיפוס",
+    "resetLinkSent": "אם קיים חשבון עבור {{email}}, קישור לאיפוס הסיסמה בדרך אליך. בדוק את תיבת הדואר הנכנס.",
+    "backToLogin": "חזרה להתחברות",
+    "resetPasswordTitle": "בחירת סיסמה חדשה",
+    "newPassword": "סיסמה חדשה",
+    "updatePassword": "עדכן סיסמה",
+    "passwordResetSuccess": "הסיסמה עודכנה. מעביר אותך למסך ההתחברות…",
+    "resetLinkInvalid": "קישור איפוס הסיסמה אינו תקין או שפג תוקפו.",
+    "passwordResetFailed": "לא ניתן היה לשלוח את קישור האיפוס. נסה שוב."
   },
   "projects": {
     "title": "היצירות שלי",
